@@ -1,15 +1,16 @@
-import { ruPlural } from "@/lib/plural";
-
-// Единый источник навигации кабинета. Разделы сгруппированы по роли, в которой
-// человек сейчас находится: «я арендую» и «мои вещи». Отдельной сущности
-// «владелец» нет — обе группы доступны любому залогиненному юзеру.
+// Единый источник навигации кабинета.
+//
+// По роли разделы больше НЕ делятся. Человек в C2C сдаёт и арендует
+// одновременно, и деление «я арендую» / «мои вещи» заставляло его сначала
+// вспомнить, кто он в этой сделке, и только потом понять, куда идти. Заявки
+// обеих ролей живут одной лентой, роль внутри неё — фильтр.
 
 // Иконка передаётся ключом, а не компонентом: навигацию собирает серверный
 // layout, а функции через границу RSC не сериализуются. Словарь ключ → иконка
 // живёт в AccountShell, на клиенте.
 export type AccountNavIcon =
-  | "summary" | "messages" | "requests" | "inbox"
-  | "listings" | "calendar" | "profile";
+  | "summary" | "messages" | "inbox"
+  | "listings" | "profile";
 
 export interface AccountNavItem {
   href: string;
@@ -25,7 +26,9 @@ export interface AccountNavItem {
 }
 
 export interface AccountNavGroup {
-  title: string;
+  /** Без заголовка — плоский список. Кабинет теперь такой: пять пунктов не
+   *  нуждаются в оглавлении, а заголовки, что у него были, называли роли. */
+  title?: string;
   items: AccountNavItem[];
 }
 
@@ -35,58 +38,36 @@ export interface AccountNavCounts {
   unreadMessages?: number;
   /** Ниже — только для подписей мобильного хаба; в сайдбаре их не видно. */
   activeListings?: number;
-  upcomingBookings?: number;
-  pendingMine?: number;
 }
 
 export function buildAccountNav(
   {
     newRequestsCount, unreadMessages,
-    activeListings, upcomingBookings, pendingMine,
+    activeListings,
   }: AccountNavCounts,
 ): AccountNavGroup[] {
+  // Один список без заголовков. Группировать нечем и незачем: заголовки
+  // называли роли («я арендую», «мои вещи»), а роль перестала быть способом
+  // навигации — заявки обеих сторон живут одной лентой, занятость уехала внутрь
+  // вещи. Пяти пунктам оглавление не нужно.
   return [
     {
-      // Переписка стоит здесь, а не в одной из ролевых групп: она идёт и по
-      // своим вещам, и по чужим, делить её между «я арендую» и «мои вещи» нечем.
-      title: "сейчас",
       items: [
         { href: "/cabinet", label: "Сводка", icon: "summary", exact: true },
+        // Бейдж — только про ожидающие МОЕГО ответа: это число уезжает ещё и в
+        // герой кабинета как «ждут ответа». Чужие решения по моим заявкам сюда
+        // не складываются, иначе подпись начнёт врать.
+        { href: "/cabinet/requests", label: "Заявки", badge: newRequestsCount, icon: "inbox" },
         { href: "/chat", label: "Сообщения", badge: unreadMessages, icon: "messages" },
-      ],
-    },
-    {
-      title: "мои вещи",
-      items: [
-        { href: "/cabinet/requests", label: "Заявки на мои вещи", badge: newRequestsCount, icon: "inbox" },
         {
           href: "/cabinet/listings",
           label: "Мои объявления",
           hint: activeListings ? String(activeListings) : undefined,
           icon: "listings",
         },
-        {
-          href: "/cabinet/calendar",
-          label: "Календарь занятости",
-          hint: upcomingBookings
-            ? `${upcomingBookings} ${ruPlural(upcomingBookings, "бронь", "брони", "броней")}`
-            : undefined,
-          icon: "calendar",
-        },
+        { href: "/profile", label: "Профиль", icon: "profile" },
       ],
-    },
-    {
-      title: "я арендую",
-      items: [{
-        href: "/requests",
-        label: "Мои заявки",
-        hint: pendingMine ? `${pendingMine} ${ruPlural(pendingMine, "ждёт", "ждут", "ждут")}` : undefined,
-        icon: "requests",
-      }],
-    },
-    {
-      title: "аккаунт",
-      items: [{ href: "/profile", label: "Профиль", icon: "profile" }],
     },
   ];
 }
+

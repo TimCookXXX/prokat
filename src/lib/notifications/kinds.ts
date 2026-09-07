@@ -32,6 +32,14 @@ export const CUSTOMER_EVENT_KINDS = [
   "request_confirmed", "request_declined", "request_completed", "request_no_show",
 ] as const;
 
+/* Какой стороной человек оказывается в этом событии. Лента показывает обе роли
+ * и умеет фильтроваться по одной, поэтому всплывашку надо гасить не «на ленте
+ * вообще», а только когда показанная сторона совпадает: иначе событие по своей
+ * заявке, пришедшее при фильтре «я сдаю», не покажется нигде. */
+export function sideForKind(kind: RequestNotificationKind): "owner" | "customer" {
+  return (OWNER_EVENT_KINDS as readonly string[]).includes(kind) ? "owner" : "customer";
+}
+
 // Решения владельца по заявке — подмножество BookingStatus. Сужение не
 // косметика: transitionRequest принимает все семь статусов, а вид уведомления
 // есть только у четырёх, и `request_${to}` на полном union не типизируется.

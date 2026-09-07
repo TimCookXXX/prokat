@@ -65,7 +65,7 @@ export function ListingCardActions({
 
   return (
     <>
-      <Link href={`/cabinet/listings/${listingId}`} className={BTN} aria-label={`Править: ${title}`} title="Править">
+      <Link href={`/cabinet/listings/${listingId}?tab=edit`} className={BTN} aria-label={`Править: ${title}`} title="Править">
         <Pencil className={ICON} aria-hidden="true" />
       </Link>
 

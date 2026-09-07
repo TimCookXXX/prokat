@@ -81,16 +81,10 @@ export default async function CabinetListingsPage() {
         // фото, и в ~156px она помещается. Дальше ширину считает сама сетка.
         <ul className="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] md:gap-4">
           {items.map((l) => {
-            const cSlug = citySlug.get(l.cityId);
-            const catS = catSlug.get(l.categoryId);
-            // Слага может не быть: город деактивировали. Публичная страница
-            // такого объявления всё равно отдаст 404 — ссылки не строим.
-            const publicHref = cSlug && catS ? listingPath(cSlug, catS, l.slug, l.id) : null;
             return (
               <li key={l.id}>
                 <CabinetListingCard
                   listing={l}
-                  publicHref={publicHref}
                   availabilityMap={availByListing.get(l.id) ?? new Map()}
                   from={from}
                   actions={

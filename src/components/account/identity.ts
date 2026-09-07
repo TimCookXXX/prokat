@@ -17,8 +17,4 @@ export interface AccountIdentity {
   isVerified: boolean;
   activeListings: number;
   deals: number;
-  /** Подтверждённые брони на мои вещи, которые ещё не закончились. */
-  upcomingBookings: number;
-  /** Мои заявки как арендатора, ждущие ответа владельца. */
-  pendingMine: number;
 }

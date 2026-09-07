@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { useSignOut } from "@/components/auth/useSignOut";
 import {
-  Package, ClipboardList, CalendarDays, Settings, ShieldCheck, LogOut, Palette,
+  Package, Settings, ShieldCheck, LogOut, Palette,
   MessageCircle, Bell, type LucideIcon,
 } from "lucide-react";
 import {
@@ -31,14 +31,13 @@ const CLOSE_DELAY_MS = 160;
 // counter — какое число из стора показать рядом. Пункты с индикатором обязаны
 // покрывать всё, от чего загорается точка на аватарке: иначе она горит, человек
 // открывает меню, а там пусто — и идёт искать причину по разделам руками.
-// «Заявки на мои вещи» раньше в меню не было вовсе, и точка от новой заявки
-// объяснялась только походом в кабинет.
+// «Заявки» — один пункт на обе роли, и счётчик у него тоже общий: other как раз
+// и есть incoming + mine. Раздельные пункты заставляли выбирать роль до того,
+// как человек увидел, что случилось.
 export const LINKS = [
   { href: "/chat", label: "Сообщения", Icon: MessageCircle, counter: "messages" },
-  { href: "/cabinet/requests", label: "Заявки на мои вещи", Icon: Bell, counter: "incoming" },
-  { href: "/requests", label: "Мои заявки", Icon: ClipboardList, counter: "mine" },
+  { href: "/cabinet/requests", label: "Заявки", Icon: Bell, counter: "other" },
   { href: "/cabinet/listings", label: "Мои объявления", Icon: Package },
-  { href: "/cabinet/calendar", label: "Календарь", Icon: CalendarDays },
   { href: "/profile", label: "Настройки", Icon: Settings },
 ] as const satisfies readonly {
   href: string; label: string; Icon: LucideIcon; counter?: LiveScope;

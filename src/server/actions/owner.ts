@@ -118,6 +118,7 @@ export async function updateListing(listingId: string, input: unknown): Promise<
   if (res.length === 0) return { ok: false, error: "not_found" };
 
   revalidatePath("/cabinet/listings");
+  revalidatePath(`/cabinet/listings/${listingId}`);
   return { ok: true, data: undefined };
 }
 
@@ -245,8 +246,10 @@ async function transitionRequest(
     throw e;
   }
 
+  // Лента одна на обе роли, поэтому адрес тоже один. Сводка — отдельно:
+  // решение принимают и там, и карточка «требует действия» обязана уйти.
   revalidatePath("/cabinet/requests");
-  revalidatePath("/requests");
+  revalidatePath("/cabinet");
   return { ok: true, data: undefined };
 }
 
@@ -301,6 +304,6 @@ export async function setBlockedDates(
     }
   });
 
-  revalidatePath("/cabinet/calendar");
+  revalidatePath(`/cabinet/listings/${listingId}`);
   return { ok: true, data: undefined };
 }

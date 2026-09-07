@@ -14,7 +14,7 @@ import { bookingRequests, chatMessages, chatThreads, listings, users } from "@db
 import { canReadThread } from "@/lib/chat/rules";
 import { toPreview } from "@/server/chat";
 import { notificationTarget } from "@/lib/notifications/target";
-import type { RequestNotificationKind } from "@/lib/notifications/kinds";
+import { sideForKind, type RequestNotificationKind } from "@/lib/notifications/kinds";
 import { content } from "@theme/content";
 import {
   REALTIME_CHANNEL, serializeNotify, type NotifyPayload,
@@ -33,6 +33,9 @@ export type ToastContent = {
   title: string;
   text: string;
   href: string;
+  /** Для заявок — чьей стороны событие. Лента фильтруется по роли, и без этого
+   *  всплывашку пришлось бы гасить на всей ленте разом. */
+  side?: "owner" | "customer";
 };
 
 export async function readMessageToast(
@@ -86,5 +89,6 @@ export async function readRequestToast(
     title: content.notifications.kinds[kind],
     text: row.listingTitle,
     href: notificationTarget(kind, requestId).href,
+    side: sideForKind(kind),
   };
 }

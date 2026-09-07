@@ -88,7 +88,7 @@ export function BookingFormDialog({
                 подтверждения. Если ответа нет 24 часа, заявка истечёт автоматически.
               </ModalDescription>
               <Button asChild className="mt-5 w-full">
-                <Link href={"/requests" as never}>Мои заявки</Link>
+                <Link href={"/cabinet/requests?role=customer" as never}>Мои заявки</Link>
               </Button>
             </>
           ) : (

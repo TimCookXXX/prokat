@@ -1,8 +1,7 @@
 // Read-слой личного кабинета покупателя.
 
-import { and, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { todayStr } from "@/lib/catalog/dates";
 import { accounts, bookingRequests, listings, users } from "@db/schema";
 import type { AccountIdentity } from "@/components/account/identity";
 
@@ -26,8 +25,7 @@ export type { AccountIdentity as CabinetIdentity } from "@/components/account/id
  * счётчика подписывают строки мобильного хаба: «2 брони», «1 ждёт». */
 export async function getCabinetIdentity(userId: string): Promise<AccountIdentity | null> {
   const db = getDb();
-  const today = todayStr();
-  const [userRows, listingRows, dealRows, bookingRows, pendingRows] = await Promise.all([
+  const [userRows, listingRows, dealRows] = await Promise.all([
     db
       .select({
         name: users.name,
@@ -56,22 +54,6 @@ export async function getCabinetIdentity(userId: string): Promise<AccountIdentit
         // Аренда состоялась: вещь вернули или не вернули, но событие было.
         inArray(bookingRequests.status, ["completed", "no_show"]),
       )),
-    db
-      .select({ cnt: sql<number>`count(*)::int` })
-      .from(bookingRequests)
-      .where(and(
-        eq(bookingRequests.ownerUserId, userId),
-        eq(bookingRequests.status, "confirmed"),
-        // Бронь «впереди», пока не прошёл последний её день: границы включены.
-        gte(bookingRequests.dateTo, today),
-      )),
-    db
-      .select({ cnt: sql<number>`count(*)::int` })
-      .from(bookingRequests)
-      .where(and(
-        eq(bookingRequests.customerUserId, userId),
-        eq(bookingRequests.status, "new"),
-      )),
   ]);
 
   const user = userRows[0];
@@ -81,7 +63,5 @@ export async function getCabinetIdentity(userId: string): Promise<AccountIdentit
     ...user,
     activeListings: listingRows[0]?.cnt ?? 0,
     deals: dealRows[0]?.cnt ?? 0,
-    upcomingBookings: bookingRows[0]?.cnt ?? 0,
-    pendingMine: pendingRows[0]?.cnt ?? 0,
   };
 }

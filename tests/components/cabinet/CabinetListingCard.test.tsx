@@ -7,16 +7,14 @@ import type { AvailabilityMap } from "@/lib/catalog/availability";
 // рендерится в jsdom без заглушек — ради этого проп и заведён.
 
 const TODAY = "2026-09-04";
-const PUBLIC_HREF = "/kazan/elektroinstrumenty/perforator-01ARZ3NDEKTSV4RRFFQ69G5FAW";
-const EDIT_HREF = "/cabinet/listings/01ARZ3NDEKTSV4RRFFQ69G5FAW";
+const ITEM_HREF = "/cabinet/listings/01ARZ3NDEKTSV4RRFFQ69G5FAW";
 
 function card({
-  status = "active", quantity = 3, booked = 0, publicHref = PUBLIC_HREF as string | null,
+  status = "active", quantity = 3, booked = 0,
 }: {
   status?: "active" | "hidden" | "archived";
   quantity?: number;
   booked?: number;
-  publicHref?: string | null;
 } = {}) {
   const listing = {
     id: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
@@ -37,7 +35,6 @@ function card({
   return (
     <CabinetListingCard
       listing={listing}
-      publicHref={publicHref}
       availabilityMap={availability}
       from={TODAY}
       actions={<button type="button">Действие</button>}
@@ -57,28 +54,15 @@ describe("CabinetListingCard", () => {
     expect(screen.getByText("Архив")).toBeInTheDocument();
   });
 
-  // У активного главное действие — посмотреть вещь глазами арендатора.
-  it("активная карточка ведёт на витрину", () => {
-    render(card());
-    expect(title()).toHaveAttribute("href", PUBLIC_HREF);
-  });
-
-  // Скрытых и архивных на витрине нет — getActiveListingById их не отдаёт,
-  // и публичная страница ответила бы 404.
-  it("скрытая и архивная ведут в правку, а не в 404", () => {
-    const { unmount } = render(card({ status: "hidden" }));
-    expect(title()).toHaveAttribute("href", EDIT_HREF);
-    unmount();
-
-    render(card({ status: "archived" }));
-    expect(title()).toHaveAttribute("href", EDIT_HREF);
-  });
-
-  // Город объявления могли деактивировать — слага в справочнике активных
-  // городов уже нет, строить публичный адрес не из чего.
-  it("без публичного адреса активная тоже ведёт в правку", () => {
-    render(card({ publicHref: null }));
-    expect(title()).toHaveAttribute("href", EDIT_HREF);
+  // Единственный вход на страницу вещи: занятость, заявки и переписки по ней
+  // живут там, а карандаш ведёт сразу в форму. На витрину ссылка есть уже
+  // со страницы вещи.
+  it("карточка ведёт на страницу вещи при любом статусе", () => {
+    for (const status of ["active", "hidden", "archived"] as const) {
+      const { unmount } = render(card({ status }));
+      expect(title()).toHaveAttribute("href", ITEM_HREF);
+      unmount();
+    }
   });
 
   // Плашка занятости у неактивных врала бы: строк занятости у них обычно нет,

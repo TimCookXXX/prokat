@@ -2,8 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAMES } from "@/lib/auth/cookie-name";
 
 // Маршруты, на которые анон не должен попадать вообще (префикс-match).
+// /requests здесь больше нет: заявки арендатора переехали в общую ленту
+// кабинета, а старый адрес просто удалён — редиректа с него нет.
 const PROTECTED_PREFIXES: string[] = [
-  "/requests", "/profile", "/cabinet", "/admin", "/chat",
+  "/profile", "/cabinet", "/admin", "/chat",
 ];
 
 function hasSessionCookie(req: NextRequest): boolean {

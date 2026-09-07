@@ -98,7 +98,7 @@ export async function updateCover(url: string | null): Promise<ActionResult> {
   // публичной витрине.
   revalidatePath("/cabinet", "layout");
   revalidatePath("/profile", "layout");
-  revalidatePath("/requests", "layout");
+  revalidatePath("/cabinet/requests", "layout");
   revalidatePath(`/u/${userId}`);
   return { ok: true, data: undefined };
 }
@@ -147,7 +147,7 @@ export async function updateAvatar(url: string | null): Promise<ActionResult> {
   // того, кто менял, — остальные получат свежую на следующем запросе и так.
   revalidatePath("/cabinet", "layout");
   revalidatePath("/profile", "layout");
-  revalidatePath("/requests", "layout");
+  revalidatePath("/cabinet/requests", "layout");
   revalidatePath("/chat", "layout");
   revalidatePath(`/u/${userId}`);
   return { ok: true, data: undefined };

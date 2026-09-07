@@ -6,6 +6,7 @@ import { getCabinetSummary, type CabinetDeal } from "@/server/cabinet";
 import { formatDayMonth, formatTimeLeft } from "@/lib/catalog/dates";
 import { listingPath } from "@/lib/catalog/listing-path";
 import { Stats } from "@/components/cabinet/StatTile";
+import { RequestActions } from "@/components/cabinet/RequestActions";
 import { Button } from "@/components/ui/button";
 import { ScrollReset } from "@/components/account/ScrollReset";
 
@@ -17,7 +18,7 @@ export default async function CabinetIndex() {
   const session = await requireAuthState();
   if (!session) redirect("/login?from=/cabinet");
 
-  const { pending, lending, borrowing, stats } = await getCabinetSummary(session.user.id);
+  const { pending, pendingTotal, lending, borrowing, stats } = await getCabinetSummary(session.user.id);
   const quiet = pending.length === 0 && lending.length === 0 && borrowing.length === 0;
 
   return (
@@ -36,8 +37,8 @@ export default async function CabinetIndex() {
         <Section
           title="требует действия"
           note="срок горит только здесь"
-          href="/cabinet/requests"
-          linkLabel="Все входящие"
+          href="/cabinet/requests?role=owner"
+          linkLabel={`Все заявки (${pendingTotal})`}
         >
           {pending.map((d) => (
             <PendingCard key={d.id} deal={d} />
@@ -62,7 +63,7 @@ export default async function CabinetIndex() {
         <Section
           title="я арендую"
           note="вернуть вовремя"
-          href="/requests"
+          href="/cabinet/requests?role=customer"
           linkLabel="Все мои заявки"
         >
           {borrowing.map((d) => (
@@ -122,33 +123,39 @@ function dates(deal: CabinetDeal): string {
 }
 
 /* Заявка со сроком. Последствие названо прямо: без него непонятно, почему
- * это вообще стоит перед человеком. */
+ * это вообще стоит перед человеком.
+ *
+ * Решение принимается здесь же, а не «на той странице»: типичный случай — одна
+ * горящая заявка, и переход ради двух кнопок был лишним шагом. Лента остаётся
+ * для случая, когда их много. */
 function PendingCard({ deal }: { deal: CabinetDeal }) {
   const left = formatTimeLeft(deal.expiresAt);
 
   return (
-    <article className="surface flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
-        <Bell className="h-5 w-5" aria-hidden="true" />
-      </span>
+    <article className="surface flex flex-col gap-3 p-4">
+      <div className="flex gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+          <Bell className="h-5 w-5" aria-hidden="true" />
+        </span>
 
-      <div className="min-w-0 flex-1">
-        <p className="font-medium">
-          {peerLabel(deal)} просит {deal.listingTitle.toLowerCase()}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {dates(deal)}
-          {deal.qty > 1 && ` · ${deal.qty} шт.`}
-          {left && ` · осталось ${left}`}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Не ответите — заявка закроется сама, и человек уйдёт к другому владельцу.
-        </p>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">
+            {peerLabel(deal)} просит {deal.listingTitle.toLowerCase()}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {dates(deal)}
+            {deal.qty > 1 && ` · ${deal.qty} шт.`}
+            {left && ` · осталось ${left}`}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Не ответите — заявка закроется сама, и человек уйдёт к другому владельцу.
+          </p>
+        </div>
       </div>
 
-      <Button asChild className="shrink-0">
-        <Link href={"/cabinet/requests" as never}>Ответить</Link>
-      </Button>
+      {/* Сводка показывает только ждущие решения владельца, поэтому сторона и
+        * статус здесь известны заранее. */}
+      <RequestActions requestId={deal.id} side="owner" status="new" />
     </article>
   );
 }

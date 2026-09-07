@@ -191,7 +191,7 @@ export const content = {
         links: [
           { label: "Разместить вещь", href: "/cabinet/listings/new" },
           { label: "Мои объявления", href: "/cabinet/listings" },
-          { label: "Входящие заявки", href: "/cabinet/requests" },
+          { label: "Заявки", href: "/cabinet/requests" },
         ],
       },
       {

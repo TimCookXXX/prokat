@@ -16,8 +16,10 @@ beforeEach(() => setListingStatus.mockClear());
 describe("ListingCardActions", () => {
   it("у активного — правка, скрытие и удаление", () => {
     render(<ListingCardActions listingId={ID} status="active" title={TITLE} />);
+    // Именно на вкладку правки: сам адрес вещи теперь показывает её занятость,
+    // заявки и переписки, а форма — одна из вкладок внутри.
     expect(screen.getByRole("link", { name: `Править: ${TITLE}` }))
-      .toHaveAttribute("href", `/cabinet/listings/${ID}`);
+      .toHaveAttribute("href", `/cabinet/listings/${ID}?tab=edit`);
     expect(screen.getByRole("button", { name: `Скрыть: ${TITLE}` })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: `Удалить: ${TITLE}` })).toBeInTheDocument();
   });

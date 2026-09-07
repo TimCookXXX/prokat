@@ -2,17 +2,21 @@ import { describe, it, expect } from "vitest";
 import { buildAccountNav } from "@/components/account/accountNav";
 
 describe("buildAccountNav", () => {
-  it("groups sections by the role the person is in", () => {
+  // Ролевого деления больше нет: заявки обеих сторон живут одной лентой, «я
+  // арендую» исчез вместе с ней, занятость уехала внутрь вещи. Группировать
+  // стало нечем — кабинет плоский.
+  it("отдаёт один список без заголовков", () => {
     const groups = buildAccountNav({ newRequestsCount: 2 });
-    expect(groups.map((g) => g.title)).toEqual(["сейчас", "мои вещи", "я арендую", "аккаунт"]);
-    expect(groups.flatMap((g) => g.items).map((i) => i.href)).toEqual([
-      // Переписка идёт и по своим вещам, и по чужим — поэтому в «сейчас»,
-      // а не в одной из ролевых групп.
-      "/cabinet", "/chat",
-      "/cabinet/requests", "/cabinet/listings", "/cabinet/calendar",
-      "/requests",
-      "/profile",
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.title).toBeUndefined();
+    expect(groups[0]!.items.map((i) => i.href)).toEqual([
+      "/cabinet", "/cabinet/requests", "/chat", "/cabinet/listings", "/profile",
     ]);
+  });
+
+  it("отдельного раздела для роли арендатора не осталось", () => {
+    const items = buildAccountNav({ newRequestsCount: 0 }).flatMap((g) => g.items);
+    expect(items.some((i) => i.href === "/requests")).toBe(false);
   });
 
 
@@ -53,11 +57,9 @@ describe("buildAccountNav", () => {
 
   it("writes hub hints in humane Russian and omits them at zero", () => {
     const items = buildAccountNav({
-      newRequestsCount: 0, activeListings: 3, upcomingBookings: 2, pendingMine: 1,
+      newRequestsCount: 0, activeListings: 3,
     }).flatMap((g) => g.items);
     expect(items.find((i) => i.href === "/cabinet/listings")!.hint).toBe("3");
-    expect(items.find((i) => i.href === "/cabinet/calendar")!.hint).toBe("2 брони");
-    expect(items.find((i) => i.href === "/requests")!.hint).toBe("1 ждёт");
 
     const bare = buildAccountNav({ newRequestsCount: 0 }).flatMap((g) => g.items);
     expect(bare.every((i) => i.hint === undefined)).toBe(true);

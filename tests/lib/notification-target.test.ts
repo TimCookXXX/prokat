@@ -10,20 +10,24 @@ describe("куда ведёт уведомление", () => {
     });
   });
 
-  // Ключ не в слове «заявка», а в том, кто получатель: request_cancelled
-  // получает ВЛАДЕЛЕЦ (отменил арендатор), и смотрит он на входящие.
-  it("адресованное владельцу ведёт во входящие заявки", () => {
-    for (const kind of ["request_created", "request_cancelled"] as const) {
+  // Списков больше не два: обе роли живут одной лентой, и делить виды по
+  // получателю стало незачем.
+  it("любая заявка ведёт в общую ленту, независимо от стороны", () => {
+    const kinds = [
+      "request_created", "request_cancelled",
+      "request_confirmed", "request_declined", "request_completed", "request_no_show",
+    ] as const;
+    for (const kind of kinds) {
       expect(notificationTarget(kind, "r1").href).toBe("/cabinet/requests");
     }
   });
 
-  it("адресованное арендатору ведёт в свои заявки", () => {
-    const kinds = [
-      "request_confirmed", "request_declined", "request_completed", "request_no_show",
-    ] as const;
-    for (const kind of kinds) {
-      expect(notificationTarget(kind, "r1").href).toBe("/requests");
+  // Адрес сравнивают с usePathname(), чтобы не показывать всплывашку о том, что
+  // человек и так видит. Query туда не попадает, и роль в адресе сломала бы
+  // сравнение молча.
+  it("адрес не несёт фильтра по роли", () => {
+    for (const kind of NOTIFICATION_KINDS) {
+      expect(notificationTarget(kind, "x").href).not.toContain("?");
     }
   });
 

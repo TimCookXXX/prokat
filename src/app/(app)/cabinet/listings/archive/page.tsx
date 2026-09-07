@@ -66,7 +66,6 @@ export default async function CabinetArchivePage() {
                 <CabinetListingCard
                   listing={l}
                   // В архиве витрины нет по определению — карточка ведёт в правку.
-                  publicHref={null}
                   availabilityMap={new Map()}
                   from={from}
                   actions={

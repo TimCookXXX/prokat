@@ -20,15 +20,9 @@ const STATUS_LABEL: Record<Listing["status"], string> = {
 // а через него next-auth, и карточка перестала бы рендериться в тестах. Так она
 // остаётся чистым видом.
 export function CabinetListingCard({
-  listing, publicHref, availabilityMap, from, actions,
+  listing, availabilityMap, from, actions,
 }: {
   listing: Listing;
-  /**
-   * Адрес на витрине. null, когда его нет: город объявления деактивировали, и
-   * слага в справочнике активных городов уже не найти — публичная страница
-   * такого объявления всё равно ответит 404.
-   */
-  publicHref: string | null;
   /** Занятость на сегодня. Пустая карта у неактивных — плашку им не рисуем. */
   availabilityMap: AvailabilityMap;
   from: string;
@@ -37,13 +31,11 @@ export function CabinetListingCard({
 }) {
   const photo = listingPhotos(listing)[0];
   const price = formatPrice(listing.priceDay);
-  const editHref = `/cabinet/listings/${listing.id}`;
+  // Карточка ведёт на страницу вещи — и у активного тоже. Занятость, заявки и
+  // переписки по вещи живут там, и это единственный вход в неё: карандаш ведёт
+  // сразу в форму. На витрину ссылка есть уже со страницы вещи.
+  const href = `/cabinet/listings/${listing.id}`;
   const isActive = listing.status === "active";
-
-  // У активного главное действие — посмотреть, как вещь видят арендаторы; у
-  // скрытого и архивного витрины нет вовсе, и карточка ведёт в правку, а не в
-  // никуда.
-  const href = isActive && publicHref ? publicHref : editHref;
 
   // Плашка занятости только у активных: у архивного строк занятости обычно нет,
   // а freeQty без строки возвращает всё количество — вышло бы зелёное

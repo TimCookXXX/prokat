@@ -146,7 +146,7 @@ export async function createBookingRequest(
     }
   });
 
-  revalidatePath("/requests");
+  revalidatePath("/cabinet/requests");
   return { ok: true, data: { requestId } };
 }
 
@@ -207,7 +207,7 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
     throw e;
   }
 
-  revalidatePath("/requests");
+  revalidatePath("/cabinet/requests");
   return { ok: true, data: undefined };
 }
 

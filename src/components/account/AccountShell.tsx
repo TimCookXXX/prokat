@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  ChevronLeft, ClipboardList, Bell, Package, CalendarDays, User, LogOut, Zap,
+  ChevronLeft, Bell, Package, User, LogOut, Zap,
   MessageCircle,
 } from "lucide-react";
 import { Brackets } from "@/components/brand/Brackets";
@@ -28,10 +28,8 @@ import type { Counters } from "@/components/realtime/store";
 const ICONS: Record<AccountNavIcon, typeof User> = {
   summary: Zap,
   messages: MessageCircle,
-  requests: ClipboardList,
   inbox: Bell,
   listings: Package,
-  calendar: CalendarDays,
   profile: User,
 };
 
@@ -59,9 +57,10 @@ function Badge({ n }: { n?: number }) {
 // Какому пункту какой счётчик из стора. По ключу иконки искать нельзя — это
 // ровно та эвристика, из-за которой «ждут ответа» в герое привязан к "inbox".
 //
-// Только сообщения. Бейдж «Заявки на мои вещи» считает ДРУГОЕ — сколько заявок
-// ждёт ответа, а не сколько событий не увидено; подменять его числом из стора
-// значило бы тихо поменять смысл. Живым его держит дебаунсенный refresh,
+// Только сообщения. Бейдж «Заявок» считает ДРУГОЕ — сколько заявок ждёт МОЕГО
+// ответа, а не сколько событий не увидено; подменять его числом из стора
+// значило бы тихо поменять смысл. Тем более что лента теперь показывает обе
+// роли, а «ждут ответа» в герое — по-прежнему только про мои решения. Живым его держит дебаунсенный refresh,
 // который на кабинетных маршрутах и так срабатывает.
 const LIVE_COUNTERS: Record<string, keyof Counters> = {
   "/chat": "messages",
@@ -178,11 +177,16 @@ export function AccountShell({
         <div className={`md:grid md:grid-cols-[250px_1fr] md:items-start md:gap-5 ${identity ? "md:mt-3" : ""}`}>
           <aside className="hidden md:sticky md:top-20 md:flex md:flex-col md:gap-3.5">
             <nav aria-label="Разделы" className="surface flex flex-col gap-0.5 p-2">
-              {groupsWithLive.map((group) => (
-                <div key={group.title} className="flex flex-col gap-0.5">
-                  <span className="px-3 pb-1 pt-2.5 font-mono text-2xs uppercase tracking-mono text-muted-foreground">
-                    {group.title}
-                  </span>
+              {groupsWithLive.map((group, gi) => (
+                /* Заголовка может не быть: кабинет — плоский список, группы
+                 * остались только у админки. Ключ по индексу, потому что
+                 * заголовок перестал быть обязательным и уникальным. */
+                <div key={group.title ?? gi} className="flex flex-col gap-0.5">
+                  {group.title && (
+                    <span className="px-3 pb-1 pt-2.5 font-mono text-2xs uppercase tracking-mono text-muted-foreground">
+                      {group.title}
+                    </span>
+                  )}
                   {group.items.map((it) => {
                     const active = isActive(pathname, it);
                     const Icon = it.icon ? ICONS[it.icon] : null;

@@ -11,7 +11,7 @@ import { buildAccountNav } from "@/components/account/accountNav";
 
 export default async function MeLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAuthState();
-  if (!session) redirect("/login?from=/requests");
+  if (!session) redirect("/login?from=/cabinet");
 
   const [newCount, unread, identity] = await Promise.all([
     countNewRequests(session.user.id),
@@ -25,8 +25,6 @@ export default async function MeLayout({ children }: { children: React.ReactNode
         newRequestsCount: newCount,
         unreadMessages: unread,
         activeListings: identity?.activeListings,
-        upcomingBookings: identity?.upcomingBookings,
-        pendingMine: identity?.pendingMine,
       })}
       identity={identity}
     >
