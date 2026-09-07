@@ -13,6 +13,7 @@ import { canStartThread } from "@/lib/chat/rules";
 import { chatErrorText } from "@/lib/chat/errors";
 import { content } from "@theme/content";
 import { ThreadView } from "@/components/chat/ThreadView";
+import { ChatPersonLink } from "@/components/chat/ChatPersonLink";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,7 @@ export default async function ChatPage({
     ownerUserId: listings.ownerUserId,
     status: listings.status,
     ownerName: users.name,
+    ownerImage: users.image,
     ownerBannedAt: users.bannedAt,
   })
     .from(listings)
@@ -89,11 +91,15 @@ export default async function ChatPage({
       aria-label="Новая переписка"
       className="flex min-h-0 flex-1 flex-col"
     >
-      <header className="shrink-0 border-b border-border px-3 py-2.5 md:px-4">
-        <h2 className="truncate font-display text-base font-bold md:text-lg">
-          {listing.ownerName ?? "Владелец"}
-        </h2>
-        <p className="truncate text-xs text-muted-foreground">{listing.title}</p>
+      {/* Шапка та же, что у открытой переписки, тем же компонентом. Забаненный
+        * владелец сюда не доходит — его отсекает redirect выше. */}
+      <header className="flex shrink-0 items-center gap-3 border-b border-border px-3 py-2.5 md:px-4">
+        <ChatPersonLink
+          userId={listing.ownerUserId}
+          name={listing.ownerName ?? "Владелец"}
+          image={listing.ownerImage}
+          subtitle={listing.title}
+        />
       </header>
       <ThreadView
         mode={{ kind: "new", listingId }}

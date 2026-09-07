@@ -46,7 +46,7 @@ export default async function ThreadPage({
       aria-label="Переписка"
       className="flex min-h-0 flex-1 flex-col"
     >
-      <ThreadTopBar header={header} viewerId={session.user.id} />
+      <ThreadTopBar header={header} />
       <ThreadListingBar header={header} />
 
       {/* key по треду обязателен: ленту и черновик компонент держит в

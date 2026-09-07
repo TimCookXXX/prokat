@@ -1,11 +1,11 @@
-// Шапка переписки: собеседник, его роль в этой сделке и чип объявления.
+// Шапка переписки: собеседник и чип объявления.
 //
 // Имя ThreadTopBar, а не ThreadHeader: последнее занято типом в server/chat,
 // и импортировать их вместе пришлось бы через переименование.
 
 import Link from "next/link";
 import Image from "next/image";
-import { Avatar } from "@/components/ui/Avatar";
+import { ChatPersonLink } from "@/components/chat/ChatPersonLink";
 import { ThreadBackButton } from "@/components/chat/ThreadBackButton";
 import { listingPath } from "@/lib/catalog/listing-path";
 import { formatDeposit, formatPrice } from "@/lib/catalog/format";
@@ -14,10 +14,8 @@ import type { ThreadHeader } from "@/server/chat";
 
 const t = content.chat;
 
-export function ThreadTopBar({ header, viewerId }: { header: ThreadHeader; viewerId: string }) {
+export function ThreadTopBar({ header }: { header: ThreadHeader }) {
   const name = header.counterpartName ?? "Собеседник";
-  // Роль объясняет, почему вы вообще говорите: моя вещь или чужая.
-  const role = header.ownerUserId === viewerId ? t.roleTheyRent : t.roleIRent;
   const href = listingPath(
     header.listingCitySlug,
     header.listingCategorySlug,
@@ -58,14 +56,12 @@ export function ThreadTopBar({ header, viewerId }: { header: ThreadHeader; viewe
         * пути к списку нет. На десктопе список виден слева. */}
       <ThreadBackButton />
 
-      <Avatar src={header.counterpartImage} name={name} size={40} />
-
-      <div className="min-w-0 flex-1">
-        <h2 className="truncate font-display text-base font-bold leading-tight md:text-lg">
-          {name}
-        </h2>
-        <p className="truncate text-xs text-muted-foreground">{role}</p>
-      </div>
+      <ChatPersonLink
+        userId={header.counterpartId}
+        name={name}
+        image={header.counterpartImage}
+        banned={header.counterpartBannedAt !== null}
+      />
 
       {/* Снятое с публикации объявление отдаёт 404 — чип остаётся, ссылка нет. */}
       {header.listingStatus === "active" ? (
