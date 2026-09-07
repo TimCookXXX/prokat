@@ -49,8 +49,8 @@ export function kindForDecision(to: OwnerDecision): RequestNotificationKind {
 
 // Получателя задаёт точка записи, а не вид: request_cancelled рождается и у
 // владельца (отменил арендатор), и у арендатора (владелец отменил
-// подтверждённую). Здесь только охранник «не уведомляй самого себя» — заявку на
-// своё объявление создать можно, createBookingRequest сравнивает лишь статус.
+// подтверждённую). Здесь только охранник «не уведомляй самого себя»; почему
+// стороны всё ещё могут совпасть — в server/notifications.ts.
 export function notificationRecipient(
   recipientId: string | null,
   actorId: string,

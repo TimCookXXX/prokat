@@ -173,6 +173,8 @@ async function ListingPage({
 
   const session = await auth();
   const isAuthed = Boolean(session?.user);
+  // Своё объявление: ни писать самому себе, ни бронировать свою вещь нельзя.
+  const isOwn = session?.user?.id === listing.ownerUserId;
   const initialPhone = session?.user?.id ? (await getUserPhone(session.user.id)) ?? "" : "";
   const env = getEnv();
   const authProps = authPanelProps();
@@ -266,7 +268,7 @@ async function ListingPage({
               createdAt={seller.createdAt}
               chatHref={`/chat?listing=${listing.id}`}
               isAuthed={isAuthed}
-              isOwn={session?.user?.id === listing.ownerUserId}
+              isOwn={isOwn}
               authProps={authProps}
             />
           </div>
@@ -333,6 +335,7 @@ async function ListingPage({
             sellerHref={sellerHref}
             sellerLocation={listing.location}
             isAuthed={isAuthed}
+            isOwn={isOwn}
             authProps={authProps}
           />
         </aside>

@@ -6,8 +6,9 @@
 // callbackUrl = текущий path+query, и после входа пользователь возвращается
 // на тот же шаг с теми же датами.
 //
-// Отправка заявки появится следующим этапом: для авторизованного пользователя
-// кнопка пока ведёт в состояние «скоро».
+// Кнопка ведёт в форму заявки (анонима — сперва в окно входа), а у владельца её
+// нет вовсе: свою вещь бронировать нельзя, createBookingRequest отвечает
+// own_listing.
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,8 @@ export interface BookingWidgetProps {
   sellerHref: string;
   sellerLocation: string | null;
   isAuthed: boolean;
+  /** Своё объявление — бронировать нечего. */
+  isOwn: boolean;
   authProps: AuthPanelProps;
 }
 
@@ -106,13 +109,25 @@ export function BookingWidget(props: BookingWidgetProps) {
     else setLoginOpen(true);
   };
 
-  const bookButton = (extra: string) => (
-    <Button className={extra} onClick={onBook} disabled={bookDisabled}>
-      {hasComplete ? "Забронировать" : "Выберите даты"}
-    </Button>
+  // Место кнопки: владельцу мутация ответит own_listing, поэтому кнопки у него
+  // нет вовсе — на её месте подпись, а не другое действие. Карточка своей вещи
+  // показывает владельцу ровно то, что видит арендатор, а дела с объявлением
+  // делаются в кабинете. Календарь занятости и цена остаются.
+  const bookSlot = (extra: string) => (
+    props.isOwn ? (
+      <p className={`text-center text-sm text-muted-foreground ${extra}`}>
+        Это ваше объявление
+      </p>
+    ) : (
+      <Button className={extra} onClick={onBook} disabled={bookDisabled}>
+        {hasComplete ? "Забронировать" : "Выберите даты"}
+      </Button>
+    )
   );
 
-  const conflictMessage = hasConflict ? (
+  // Владельцу подсказка про занятые даты не адресована: выбирать ему нечего,
+  // а занятость он и так видит в календаре выше.
+  const conflictMessage = hasConflict && !props.isOwn ? (
     <p className="text-sm text-destructive" role="alert">
       {sel.qty > 1 ? `Нет ${sel.qty} свободных единиц` : "Занято"}:{" "}
       {conflicts.map(formatDayMonth).join(", ")}. Выберите другие даты
@@ -208,7 +223,7 @@ export function BookingWidget(props: BookingWidgetProps) {
 
         {conflictMessage && <div className="mt-2">{conflictMessage}</div>}
 
-        {bookButton("mt-3 w-full")}
+        {bookSlot("mt-3 w-full")}
       </div>
 
       {/* Цена и залог — отдельным блоком под виджетом (не на подложке) */}
@@ -247,8 +262,11 @@ export function BookingWidget(props: BookingWidgetProps) {
       {/* Mobile: прилипшая к низу кнопка */}
       {/* Верхний ярус той же карточки, что и таб-бар: полоса садится вплотную на
        * него и скругляется только сверху — снизу их стык держит волосяная
-       * линия. Навигация на карточке товара остаётся доступной. */}
-      <div
+       * линия. Навигация на карточке товара остаётся доступной.
+       * Владельцу полосы нет вовсе: без кнопки она весь экран носила бы его же
+       * цену. Таб-бар возвращает себе верхние скругления сам — их снимает
+       * селектор body:has([data-booking-bar]) в globals.css. */}
+      {!props.isOwn && <div
         data-booking-bar
         className="fixed inset-x-0 bottom-[var(--tabbar-h)] z-40 px-4 md:hidden"
       >
@@ -265,9 +283,9 @@ export function BookingWidget(props: BookingWidgetProps) {
               </span>
             )}
           </span>
-          {bookButton("shrink-0")}
+          {bookSlot("shrink-0")}
         </div>
-      </div>
+      </div>}
 
       <LoginDialog
         open={loginOpen}

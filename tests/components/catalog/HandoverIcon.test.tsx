@@ -70,6 +70,7 @@ function widgetWith(pickup: boolean, delivery: boolean) {
     sellerHref="/u/01ARZ3NDEKTSV4RRFFQ69G5FAV"
     sellerLocation={null}
     isAuthed
+    isOwn={false}
     authProps={{ nextAuthProviders: ["yandex"], vkEnabled: false, canRegisterByEmail: true }}
   />;
 }

@@ -64,9 +64,19 @@ export async function createBookingRequest(
     .where(eq(listings.id, form.listingId))
     .limit(1);
   const row = listingRows[0];
+  if (!row) return { ok: false, error: "listing_not_found" };
+  // Заявка на свою же вещь закрыта так же, как переписка с самим собой: иначе
+  // владелец подтверждает её сам и занимает собственные даты в обход календаря
+  // занятости, а уведомлений за весь её цикл не приходит никому.
+  // Сравнение стоит раньше публичности — тот же порядок, что в canStartThread:
+  // владельцу скрытого объявления ответ «позиция недоступна» говорил бы не о
+  // том, а раскрыть эта ветка ничего не может, она отвечает только владельцу.
+  if (row.listing.ownerUserId === session.user.id) {
+    return { ok: false, error: "own_listing" };
+  }
   // Ответ совпадает с несуществующим объявлением: по нему нельзя узнать, что
   // владелец забанен, — тот же принцип, что в lib/chat/rules.ts.
-  if (!row || !isPubliclyVisible({ status: row.listing.status, ownerBannedAt: row.ownerBannedAt })) {
+  if (!isPubliclyVisible({ status: row.listing.status, ownerBannedAt: row.ownerBannedAt })) {
     return { ok: false, error: "listing_not_found" };
   }
   const listing = row.listing;
@@ -123,16 +133,12 @@ export async function createBookingRequest(
       userId: session.user.id,
       metaJson: { requestId, from: sel.from, to: sel.to, qty: sel.qty },
     });
-    // Заявку на своё объявление создать можно — статус объявления единственное,
-    // что проверяется выше. Охранник внутри notify это и отсекает.
     const notified = await notify(tx, {
       recipientId: listing.ownerUserId,
       actorId: session.user.id,
       kind: "request_created",
       entityId: requestId,
     });
-    // notify вернул null — значит получатель и деятель совпали (заявка на своё
-    // объявление). Рассказывать некому.
     if (notified) {
       await publish(tx, requestNotify({
         kind: "request_created", requestId, recipientId: listing.ownerUserId,

@@ -74,3 +74,26 @@ describe("createBookingRequest: устаревший выбор дат", () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 });
+
+describe("createBookingRequest: своё объявление", () => {
+  // Подтвердив такую заявку, владелец занял бы собственные даты в обход
+  // календаря занятости, а уведомлений за весь её цикл не пришло бы никому.
+  it("владельцу отказ, а не заявка самому себе", async () => {
+    listingLimit.mockResolvedValue([
+      { listing: { id: "l1", ownerUserId: "u1", status: "active", quantity: 1 }, ownerBannedAt: null },
+    ]);
+    const res = await createBookingRequest(form(TODAY, TODAY));
+    expect(res).toEqual({ ok: false, error: "own_listing" });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  // Порядок отказов тот же, что в canStartThread: своё объявление называется
+  // своим, даже когда оно снято с публикации.
+  it("скрытое своё объявление тоже own_listing, а не listing_not_found", async () => {
+    listingLimit.mockResolvedValue([
+      { listing: { id: "l1", ownerUserId: "u1", status: "hidden", quantity: 1 }, ownerBannedAt: null },
+    ]);
+    const res = await createBookingRequest(form(TODAY, TODAY));
+    expect(res).toEqual({ ok: false, error: "own_listing" });
+  });
+});
