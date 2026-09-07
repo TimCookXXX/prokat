@@ -16,7 +16,7 @@ import { useCurrentCity } from "./use-current-city";
  * (/chat) и достижима оттуда и из мобильного хаба. Пятое место — продуктовое
  * решение, менять его вместе с появлением чата не стали.
  *
- * Скобки работают пиктограммой только здесь («Мои вещи») — в остальных местах
+ * Скобки работают пиктограммой только здесь («Объявления») — в остальных местах
  * это знак. Прочие иконки нейтральные, чтобы бренд не спорил с навигацией. */
 export function TabBar({
   placeHref,
@@ -47,6 +47,13 @@ export function TabBar({
       on ? "text-primary" : "text-muted-foreground",
     );
 
+  // На самых узких экранах подпись на ступень мельче: «Объявления» вдвое длиннее
+  // соседних, и в полном кегле пять колонок на 320 px не помещаются. Обрезка —
+  // страховка на случай, если и этого не хватит: вылезшая подпись наезжает на
+  // соседнюю, обрезанная — нет. leading-snug при этом обязателен: с leading-none
+  // overflow срезал бы хвосты у «д» и «у».
+  const labelClass = "w-full truncate text-center text-2xs leading-snug min-[375px]:text-xs";
+
   // Аноним ни в один закрытый раздел не попадёт — middleware выбросит его на
   // /login. Поэтому вместо ссылки даём вход модалкой, а после входа ведём туда,
   // куда он жал.
@@ -59,7 +66,7 @@ export function TabBar({
 
   const myItems = isOn("/cabinet/listings");
   const messages = isOn("/chat");
-  // Весь кабинет, кроме «Моих вещей» (у них своя вкладка), плюс профиль:
+  // Весь кабинет, кроме «Объявлений» (у них своя вкладка), плюс профиль:
   // он живёт на отдельном /profile, но открывается из кабинета и часть его.
   const cabinet = (isOn("/cabinet") && !myItems) || isOn("/profile");
 
@@ -67,15 +74,18 @@ export function TabBar({
     <nav
       aria-label="Основная навигация"
       data-tabbar
-      className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] min-[375px]:px-4 md:hidden"
     >
-      <div className="glass mx-auto flex max-w-[420px] items-center justify-between gap-2 rounded-lg px-4 py-1.5">
+      {/* Поля и зазоры ужаты на самых узких экранах: подпись «Объявления» вдвое
+        * длиннее остальных, и на 320 px пять колонок в прежние отступы не
+        * помещались — подписи наезжали друг на друга. */}
+      <div className="glass mx-auto flex max-w-[420px] items-center justify-between gap-1 rounded-lg px-2 py-1.5 min-[375px]:gap-2 min-[375px]:px-4">
         <Link
           href={catalogHref as never}
           className={itemClass(catalogHref !== "/" && isOn(catalogHref))}
         >
           <LayoutGrid className="h-[22px] w-[22px]" aria-hidden="true" />
-          Каталог
+          <span className={labelClass}>Каталог</span>
         </Link>
 
         {tab("/cabinet/listings", itemClass(myItems), (
@@ -87,7 +97,7 @@ export function TabBar({
                 bracketClassName={myItems ? "border-accent" : "border-muted-foreground"}
               />
             </span>
-            Мои вещи
+            <span className={labelClass}>Объявления</span>
           </>
         ))}
 
@@ -98,7 +108,7 @@ export function TabBar({
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
               <Plus className="h-4 w-4" aria-hidden="true" />
             </span>
-            Сдать
+            <span className={labelClass}>Сдать</span>
           </>
         ))}
 
@@ -108,7 +118,7 @@ export function TabBar({
               <MessageCircle className="h-[22px] w-[22px]" aria-hidden="true" />
               <LiveDot scope="messages" />
             </span>
-            Чаты
+            <span className={labelClass}>Чаты</span>
           </>
         ))}
 
@@ -127,7 +137,7 @@ export function TabBar({
                   и второй такой же кружок был бы дублем. */}
               <LiveDot scope="other" />
             </span>
-            Кабинет
+            <span className={labelClass}>Кабинет</span>
           </>
         ))}
       </div>

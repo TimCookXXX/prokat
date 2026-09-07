@@ -37,7 +37,7 @@ export const LINKS = [
   { href: "/chat", label: "Сообщения", Icon: MessageCircle, counter: "messages" },
   { href: "/cabinet/requests", label: "Заявки на мои вещи", Icon: Bell, counter: "incoming" },
   { href: "/requests", label: "Мои заявки", Icon: ClipboardList, counter: "mine" },
-  { href: "/cabinet/listings", label: "Мои товары", Icon: Package },
+  { href: "/cabinet/listings", label: "Мои объявления", Icon: Package },
   { href: "/cabinet/calendar", label: "Календарь", Icon: CalendarDays },
   { href: "/profile", label: "Настройки", Icon: Settings },
 ] as const satisfies readonly {
