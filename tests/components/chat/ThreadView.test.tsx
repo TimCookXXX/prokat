@@ -104,35 +104,6 @@ describe("ThreadView: заготовка под реальное время", ()
   });
 });
 
-describe("ThreadView: быстрые ответы", () => {
-  // Очередь за мной — последним писал собеседник.
-  it("предлагаются, когда последним писал собеседник", () => {
-    render(<ThreadView {...base} />);
-    expect(screen.getByRole("button", { name: content.chat.quickReplies[0] })).toBeInTheDocument();
-  });
-
-  it("не предлагаются, когда последним писал я", () => {
-    render(
-      <ThreadView {...base} initialMessages={[message("01A", "01ME", "моё последнее")]} />,
-    );
-    expect(screen.queryByRole("button", { name: content.chat.quickReplies[0] })).toBeNull();
-  });
-
-  // Отправка в один тап необратима и тратит лимит — чип только подставляет.
-  it("подставляют текст в черновик, а не отправляют", () => {
-    render(<ThreadView {...base} />);
-    fireEvent.click(screen.getByRole("button", { name: content.chat.quickReplies[0] }));
-    expect(screen.getByLabelText(content.chat.composerLabel))
-      .toHaveValue(content.chat.quickReplies[0]);
-  });
-
-  it("после подстановки исчезают, чтобы не затереть набранное", () => {
-    render(<ThreadView {...base} />);
-    fireEvent.click(screen.getByRole("button", { name: content.chat.quickReplies[0] }));
-    expect(screen.queryByRole("button", { name: content.chat.quickReplies[1] })).toBeNull();
-  });
-});
-
 describe("ChatPanes", () => {
   // Без переписок список колонкой не занимает места — иначе на десктопе выходят
   // две заглушки рядом, обе про одно и то же.

@@ -24,7 +24,6 @@ import { buildFeed, unreadAnchor } from "@/lib/chat/grouping";
 import { fetchOlderMessages, postMessage, startThread, markThreadRead } from "@/server/actions/chat";
 import { DateDivider, UnreadDivider } from "@/components/chat/FeedDividers";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
-import { QuickReplies } from "@/components/chat/QuickReplies";
 import { content } from "@theme/content";
 import type { ThreadMessage } from "@/server/chat";
 
@@ -397,18 +396,6 @@ export function ThreadView({
     });
   }
 
-  // Быстрые ответы уместны, когда очередь за мной: лента пуста или последним
-  // писал собеседник. Последнее берём по максимальному id, а не по хвосту
-  // массива: «показать более ранние» дописывает в него СТАРЫЕ сообщения.
-  const lastMessage = messages.reduce<ThreadMessage | null>(
-    (acc, m) => (!acc || m.id > acc.id ? m : acc),
-    null,
-  );
-  const showQuickReplies = !blockedReason
-    && pending.length === 0
-    && !draft
-    && (messages.length === 0 || lastMessage?.senderUserId !== viewerId);
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Живой регион вне ленты и с aria-atomic: иначе скринридер зачитывал бы
@@ -512,7 +499,6 @@ export function ThreadView({
          * домашнюю полосу айфона; при открытой клавиатуре её нет, и max() сам
          * отдаёт базовое значение. */
         <div className="shrink-0 border-t border-border bg-card px-3 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-4 md:pb-3">
-          {showQuickReplies && <QuickReplies onPick={setDraft} />}
           <div className="flex items-end gap-2">
             <textarea
               value={draft}
