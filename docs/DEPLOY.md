@@ -525,6 +525,54 @@ OAuth у них нет, а домен `@seed.local` почту не приним
 таблиц (на них могут висеть заявки и переписки), и не поднимает статус у
 объявлений, погашенных баном владельца.
 
+#### Переход с демо-данных на реальные
+
+Если прод уже засеян демо-сидом, реальный сид не заменит его, а встанет рядом:
+Казань с двадцатью «Тестовый товар из сидов» останется в выдаче. Сначала надо
+понять, есть ли в базе живые данные:
+
+```bash
+docker compose exec db psql -U app -d app -c "
+select
+  (select count(*) from users)                                          as всего_юзеров,
+  (select count(*) from users where email in
+     ('owner1@seed.local','owner2@seed.local','owner3@seed.local',
+      'owner4@seed.local','owner5@seed.local'))                         as демо_владельцев,
+  (select count(*) from users where email not like '%@seed.local'
+      and email not like '%@local.test')                                as похоже_живых,
+  (select count(*) from booking_requests)                               as заявок,
+  (select count(*) from chat_messages)                                  as сообщений,
+  (select string_agg(slug, ', ') from cities)                           as города;"
+```
+
+**Живых нет** — проще всего полный сброс (раздел ниже) и один `seed-real.ts`.
+
+**Живые есть** — сброс отменяется, демо-владельцы удаляются точечно; каскад
+уносит их объявления, заявки и переписки:
+
+```bash
+docker compose exec db psql -U app -d app -c "
+delete from users where email in
+  ('owner1@seed.local','owner2@seed.local','owner3@seed.local',
+   'owner4@seed.local','owner5@seed.local');"
+```
+
+Перечислять адреса поимённо обязательно. Маска `like '%@seed.local'` снесла бы
+вместе с демо и владельцев из `seed_real` — они на том же домене.
+
+**Казань гасится в обоих случаях**, кроме полного сброса, где её просто не
+будет:
+
+```bash
+docker compose exec db psql -U app -d app -c "
+update cities set is_active = false where slug = 'kazan';"
+```
+
+Иначе она остаётся дефолтным городом главной: `getActiveCities()` сортирует
+города по имени, «Казань» идёт раньше «Краснодара», а посетитель без куки и без
+профиля попадает на первый активный город — то есть на пустую витрину.
+Деактивация обратима и ничего не удаляет.
+
 ### Полный сброс БД и пересев
 
 ```bash
