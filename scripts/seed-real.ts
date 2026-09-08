@@ -24,6 +24,7 @@ import type { SeedData } from "../src/lib/seed/rows";
 import { categoryPath } from "../src/lib/seed/categories";
 import { missingFromManifest, type SeedPhotoManifest } from "../src/lib/seed/photos";
 import { newId } from "../src/lib/id";
+import { buildPublicUrl } from "../src/lib/storage/upload";
 import { DEV_SEED_PASSWORD, devSeedPassword } from "../src/lib/auth/password";
 import { ensureCategories, type SeedDb } from "./seed-categories";
 import { die, photoSources, readManifest, readSeedData } from "./seed-source";
@@ -31,21 +32,6 @@ import { die, photoSources, readManifest, readSeedData } from "./seed-source";
 interface Photo { url: string; width: number; height: number }
 
 // -------------------------------------------------------------------- фото
-
-/**
- * Адрес объекта собирается здесь, а не через lib/storage/upload.buildPublicUrl:
- * тот зовёт getEnv(), который валидирует всю схему окружения целиком — NEXTAUTH_*,
- * DOMAIN и все пять STORAGE_*. Сид на проде запускают с одним лишь DATABASE_URL в
- * командной строке (см. docs/DEPLOY.md), и такая проверка его убивала бы, хотя
- * от хранилища ему нужна ровно одна строка.
- */
-function publicUrlBase(): string {
-  const base = process.env.STORAGE_PUBLIC_BASE;
-  if (!base) {
-    die("Не задан STORAGE_PUBLIC_BASE — без него не собрать адреса фотографий.\nСм. docs/environment.md");
-  }
-  return base.replace(/\/$/, "");
-}
 
 /**
  * Собирает записи photos_json из манифеста. Сами файлы не читаются и не
@@ -64,12 +50,14 @@ function resolvePhotos(data: SeedData, manifest: SeedPhotoManifest): Map<string,
     process.exit(1);
   }
 
-  const base = publicUrlBase();
+  if (!process.env.STORAGE_PUBLIC_BASE) {
+    die("Не задан STORAGE_PUBLIC_BASE — без него не собрать адреса фотографий.\nСм. docs/environment.md");
+  }
   const photos = new Map<string, Photo>();
   for (const source of sources) {
     const entry = manifest[source];
     photos.set(source, {
-      url: `${base}/${entry.key}`,
+      url: buildPublicUrl(entry.key),
       width: entry.width,
       height: entry.height,
     });

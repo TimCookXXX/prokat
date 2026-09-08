@@ -1,16 +1,14 @@
 import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getEnv } from "@/lib/env";
-import { getR2Client, r2Bucket } from "./r2";
+import { getR2Client, r2Bucket, storageEnv } from "./r2";
 
 export function buildKey(userId: string, ulid: string): string {
   return `uploads/${userId}/${ulid}.webp`;
 }
 
 export function buildPublicUrl(key: string): string {
-  const env = getEnv();
-  if (!env.STORAGE_PUBLIC_BASE) throw new Error("STORAGE_PUBLIC_BASE not set");
-  const base = env.STORAGE_PUBLIC_BASE.replace(/\/$/, "");
-  return `${base}/${key}`;
+  const base = storageEnv().publicBase;
+  if (!base) throw new Error("STORAGE_PUBLIC_BASE not set");
+  return `${base.replace(/\/$/, "")}/${key}`;
 }
 
 /**
