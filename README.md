@@ -55,6 +55,11 @@ pnpm dev                         # http://localhost:3000
 `/api/dev/login?role=admin`. Тестовые владельцы из сида —
 `owner1@seed.local` … `owner5@seed.local` с паролем `inrenta-dev-12345`.
 
+Сидов два, и они независимы: `pnpm db:seed` кладёт демо-данные с вымышленными
+товарами, `pnpm db:seed:real` — витрину из настоящих объявлений (таблицы в
+`seed_real/`, формат описан там же в `README.md`). Оба поднимаются на чистой
+базе поодиночке и в любом порядке; дерево категорий у них общее.
+
 Без `STORAGE_*` загрузка изображений недоступна (`/api/upload` отвечает 503) —
 для локальной разработки это нормально. Без `SMTP_*` письма печатаются в
 консоль dev-сервера.
@@ -70,7 +75,9 @@ pnpm exec tsc --noEmit   # проверка типов
 pnpm check-theme         # проверка CSS-токенов
 pnpm db:generate         # сгенерировать миграцию из drizzle/schema.ts
 pnpm db:migrate          # применить миграции
-pnpm db:seed             # тестовые данные
+pnpm db:seed             # демо-данные (Казань, вымышленные товары)
+pnpm db:seed:real        # реальные данные из seed_real/
+pnpm seed:photos         # обработать и залить в бакет фотографии из seed_real/Фото/
 pnpm db:studio           # drizzle studio
 ```
 

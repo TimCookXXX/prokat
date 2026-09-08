@@ -31,3 +31,7 @@ caddy_config/
 design_handoff_chat_redesign/
 design_handoff_home_v6/
 design_handoff_listing_card/
+# Сид из реальных данных: таблицы и манифест фотографий едут в git — из них
+# наполняется база на любой машине. Вне git только тяжёлое и локальное:
+# исходники снимков (обработанные лежат в бакете) и черновик в Numbers.
+seed_real/Фото/

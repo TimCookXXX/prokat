@@ -36,7 +36,9 @@ pnpm check-theme         # проверка обязательных CSS-ток�
 pnpm build:icons         # иконки из theme/brand/*.svg (после правки исходников)
 pnpm db:generate         # миграция из drizzle/schema.ts
 pnpm db:migrate          # применить миграции
-pnpm db:seed             # тестовые данные (идемпотентно)
+pnpm db:seed             # демо-данные (идемпотентно)
+pnpm db:seed:real        # реальные данные из seed_real/ (идемпотентно)
+pnpm seed:photos         # фотографии сида: обработать и залить в бакет
 pnpm db:studio           # drizzle studio
 ```
 

@@ -18,6 +18,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
+    "db:seed:real": "tsx --env-file=.env scripts/seed-real.ts",
+    "seed:photos": "tsx --env-file=.env scripts/seed-photos.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

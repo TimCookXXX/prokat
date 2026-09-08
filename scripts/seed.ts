@@ -3,7 +3,7 @@
 // Запуск: pnpm db:seed (нужен DATABASE_URL в .env, миграции применены).
 
 import { drizzle } from "drizzle-orm/node-postgres";
-import { and, eq, inArray, isNull, like, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Pool } from "pg";
 import {
   users, cities, categories, listings, availability,
@@ -13,6 +13,16 @@ import { slugify } from "../src/lib/slugify";
 import { addDaysStr, todayStr } from "../src/lib/catalog/dates";
 import { DEV_SEED_PASSWORD, devSeedPassword } from "../src/lib/auth/password";
 import { COVER_PRESETS } from "../src/lib/covers";
+import { categoryPath } from "../src/lib/seed/categories";
+import { ensureCategories } from "./seed-categories";
+
+// Владельцы именно этого сида. Все выборки ниже ограничены ровно этими
+// адресами, а не маской `%@seed.local`: домен делят и владельцы из seed_real
+// (scripts/seed-real.ts), а они приезжают с собственными способами получения из
+// таблицы. По маске демо-сид переставлял бы им флаги по формуле `i % 3` при
+// каждом запуске — и «только доставка» у вещи, которую возят, молча
+// превращалась бы в самовывоз.
+const DEMO_OWNER_EMAILS = [1, 2, 3, 4, 5].map((i) => `owner${i}@seed.local`);
 
 // Способ получения демо-товара по его порядковому номеру. Разнообразие тут не
 // украшение: будь самовывоз у всех, чип «Самовывоз» отбирал бы вообще всё и
@@ -40,7 +50,7 @@ async function main() {
   if (seedHash) {
     const updated = await db.update(users)
       .set({ passwordHash: seedHash, emailVerified: new Date() })
-      .where(and(like(users.email, "%@seed.local"), isNull(users.passwordHash)))
+      .where(and(inArray(users.email, DEMO_OWNER_EMAILS), isNull(users.passwordHash)))
       .returning({ id: users.id });
     if (updated.length > 0) {
       console.log(`Seed owners got a dev password (${updated.length}): ${DEV_SEED_PASSWORD}`);
@@ -57,7 +67,7 @@ async function main() {
   const seededListings = await db.select({ id: listings.id })
     .from(listings)
     .innerJoin(users, eq(listings.ownerUserId, users.id))
-    .where(like(users.email, "%@seed.local"))
+    .where(inArray(users.email, DEMO_OWNER_EMAILS))
     .orderBy(listings.createdAt, listings.id);
   for (const [pickup, delivery] of [[true, false], [true, true], [false, true]] as const) {
     const ids = seededListings
@@ -95,91 +105,23 @@ async function main() {
     lon: 49.1088,
   });
 
-  // --- Категории (дерево 2 уровня) ---
-  const cat = async (
-    name: string, vertical: string, parentId: string | null = null, slug?: string,
-  ) => {
-    const id = newId();
-    await db.insert(categories).values({ id, parentId, name, slug: slug ?? slugify(name), vertical });
+  // --- Категории ---
+  // Дерево общее с реальным сидом и заводится идемпотентно: оба сида могут
+  // отработать на одной базе в любом порядке. См. scripts/seed-categories.ts.
+  const categoryIds = await ensureCategories(db);
+  const cat = (root: string, child: string) => {
+    const id = categoryIds.get(categoryPath(root, child));
+    if (!id) throw new Error(`Нет категории «${categoryPath(root, child)}»`);
     return id;
   };
 
-  // Инструменты
-  const toolsId = await cat("Инструменты", "tools");
-  const powerToolsId = await cat("Электроинструменты", "tools", toolsId);
-  await cat("Ручной инструмент", "tools", toolsId);
-  const gardenId = await cat("Садовая техника", "tools", toolsId);
-  await cat("Строительное оборудование", "tools", toolsId);
-
-  // Одежда
-  const clothesId = await cat("Одежда", "clothing");
-  const eveningId = await cat("Вечерняя одежда", "clothing", clothesId);
-  const weddingId = await cat("Свадебная одежда", "clothing", clothesId);
-  await cat("Костюмы", "clothing", clothesId);
-  await cat("Аксессуары", "clothing", clothesId, "aksessuary-odezhda");
-
-  // Фото и видео
-  const photoId = await cat("Фото и видео", "photo");
-  await cat("Камеры", "photo", photoId);
-  await cat("Объективы", "photo", photoId);
-  await cat("Освещение", "photo", photoId);
-  await cat("Штативы и стабилизаторы", "photo", photoId);
-  await cat("Дроны", "photo", photoId);
-  await cat("Экшн-камеры", "photo", photoId);
-
-  // Транспорт
-  const transportId = await cat("Транспорт", "transport");
-  const bikesId = await cat("Велосипеды", "transport", transportId);
-  const scootersId = await cat("Электросамокаты", "transport", transportId);
-  await cat("Автомобили", "transport", transportId);
-  await cat("Прицепы", "transport", transportId);
-  await cat("Водный транспорт", "transport", transportId);
-
-  // Туризм и отдых
-  const outdoorId = await cat("Туризм и отдых", "outdoor");
-  await cat("Палатки", "outdoor", outdoorId);
-  await cat("Спальники", "outdoor", outdoorId);
-  await cat("Рюкзаки", "outdoor", outdoorId);
-  await cat("Кемпинг-оборудование", "outdoor", outdoorId);
-  await cat("Туристическая посуда", "outdoor", outdoorId);
-
-  // Развлечения
-  const funId = await cat("Развлечения", "entertainment");
-  await cat("Игровые приставки", "entertainment", funId);
-  await cat("VR", "entertainment", funId);
-  await cat("Настольные игры", "entertainment", funId);
-  await cat("Проекторы", "entertainment", funId);
-
-  // Детские товары
-  const kidsId = await cat("Детские товары", "kids");
-  await cat("Коляски", "kids", kidsId);
-  await cat("Автокресла", "kids", kidsId);
-  await cat("Игрушки", "kids", kidsId);
-  await cat("Стульчики для кормления", "kids", kidsId);
-
-  // Дом и мероприятия
-  const homeId = await cat("Дом и мероприятия", "home");
-  await cat("Мебель", "home", homeId);
-  await cat("Декор", "home", homeId);
-  await cat("Шатры и тенты", "home", homeId);
-  await cat("Грили и барбекю", "home", homeId);
-  await cat("Уборочная техника", "home", homeId);
-
-  // Электроника
-  const electronicsId = await cat("Электроника", "electronics");
-  await cat("Ноутбуки", "electronics", electronicsId);
-  await cat("Планшеты", "electronics", electronicsId);
-  await cat("Смартфоны", "electronics", electronicsId);
-  await cat("Мониторы", "electronics", electronicsId);
-  await cat("Аксессуары", "electronics", electronicsId, "aksessuary-elektronika");
-
-  // Спорт
-  const sportId = await cat("Спорт", "sport");
-  await cat("Тренажеры", "sport", sportId);
-  await cat("Фитнес-инвентарь", "sport", sportId);
-  await cat("Зимний спорт", "sport", sportId);
-  await cat("Велоспорт", "sport", sportId);
-  const waterSportId = await cat("Водный спорт", "sport", sportId);
+  const powerToolsId = cat("Инструменты", "Электроинструменты");
+  const gardenId = cat("Инструменты", "Садовая техника");
+  const eveningId = cat("Одежда", "Вечерняя одежда");
+  const weddingId = cat("Одежда", "Свадебная одежда");
+  const bikesId = cat("Транспорт", "Велосипеды");
+  const scootersId = cat("Транспорт", "Электросамокаты");
+  const waterSportId = cat("Спорт", "Водный спорт");
 
   // --- Юзеры-владельцы (телефон = контакт продавца) ---
   const ownerDefs = [
