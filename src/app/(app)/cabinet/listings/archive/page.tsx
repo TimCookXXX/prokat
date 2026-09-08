@@ -4,10 +4,9 @@ import { redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { requireAuthState } from "@/lib/auth/guard";
-import { getOwnerListings } from "@/server/owner";
-import { todayStr } from "@/lib/catalog/dates";
-import { CabinetListingCard } from "@/components/cabinet/CabinetListingCard";
-import { ListingCardActions } from "@/components/cabinet/ListingCardActions";
+import { countNewRequestsByListing, getOwnerListings } from "@/server/owner";
+import { getAllCategories, listingPhotos } from "@/server/catalog";
+import { ListingsList, type ListingRow } from "@/components/cabinet/ListingsList";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Архив объявлений", robots: { index: false } };
@@ -18,14 +17,36 @@ export default async function CabinetArchivePage() {
   const session = await requireAuthState();
   if (!session) redirect("/login?from=/cabinet");
 
-  const all = await getOwnerListings(session.user.id);
+  const [all, pendingByListing, cats] = await Promise.all([
+    getOwnerListings(session.user.id),
+    countNewRequestsByListing(session.user.id),
+    getAllCategories(),
+  ]);
+  const catName = new Map(cats.map((c) => [c.id, c.name]));
   // По времени последней правки, а не создания: сверху то, что убрали только
   // что, — за ним и возвращаются.
   const items = all
     .filter((l) => l.status === "archived")
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
-  const from = todayStr();
+  // Занятость и витрина архивным не нужны: из каталога они убраны, а календарь
+  // у архивной вещи не показывается.
+  const rows: ListingRow[] = items.map((l) => ({
+    id: l.id,
+    title: l.title,
+    photoUrl: listingPhotos(l)[0]?.url ?? null,
+    categoryName: catName.get(l.categoryId) ?? null,
+    priceDay: l.priceDay,
+    depositType: l.depositType,
+    depositAmount: l.depositAmount,
+    status: l.status,
+    freeToday: null,
+    quantity: l.quantity,
+    // Архивная вещь из каталога убрана, но заявка по ней могла остаться
+    // ждущей ответа — прочерк тут врал бы.
+    pendingRequests: pendingByListing.get(l.id) ?? 0,
+    publicHref: null,
+  }));
 
   return (
     <section aria-label="Архив объявлений">
@@ -60,21 +81,7 @@ export default async function CabinetArchivePage() {
             Эти объявления не видны в каталоге. Вернуть можно любое — оно
             появится в списке скрытым, и вы сами решите, публиковать ли снова.
           </p>
-          <ul className="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] md:gap-4">
-            {items.map((l) => (
-              <li key={l.id}>
-                <CabinetListingCard
-                  listing={l}
-                  // В архиве витрины нет по определению — карточка ведёт в правку.
-                  availabilityMap={new Map()}
-                  from={from}
-                  actions={
-                    <ListingCardActions listingId={l.id} status={l.status} title={l.title} />
-                  }
-                />
-              </li>
-            ))}
-          </ul>
+          <ListingsList rows={rows} />
         </>
       )}
     </section>

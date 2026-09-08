@@ -21,6 +21,22 @@ export async function countNewRequests(userId: string): Promise<number> {
   return rows[0]?.cnt ?? 0;
 }
 
+/* Сколько заявок ждёт ответа по каждой вещи — для колонки в списке объявлений.
+ * Одним группированным запросом, а не выборкой заявок: списку нужно число, а не
+ * строки, и вытягивать их ради счётчика значило бы читать всю ленту заново. */
+export async function countNewRequestsByListing(userId: string): Promise<Map<string, number>> {
+  await expireStaleRequests();
+  const rows = await getDb()
+    .select({ listingId: bookingRequests.listingId, cnt: sql<number>`count(*)::int` })
+    .from(bookingRequests)
+    .where(and(
+      eq(bookingRequests.ownerUserId, userId),
+      eq(bookingRequests.status, "new"),
+    ))
+    .groupBy(bookingRequests.listingId);
+  return new Map(rows.map((r) => [r.listingId, r.cnt]));
+}
+
 // Все товары юзера (включая скрытые/архив) для кабинета.
 export async function getOwnerListings(userId: string) {
   return getDb().select().from(listings)

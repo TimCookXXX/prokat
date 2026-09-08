@@ -48,16 +48,6 @@ export function addDaysStr(dateStr: string, days: number): string {
   return new Date(t).toISOString().slice(0, 10);
 }
 
-const WEEKDAYS_SHORT = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"] as const;
-
-export function weekdayShort(dateStr: string): string {
-  return WEEKDAYS_SHORT[new Date(`${dateStr}T00:00:00Z`).getUTCDay()];
-}
-
-export function dayOfMonth(dateStr: string): number {
-  return new Date(`${dateStr}T00:00:00Z`).getUTCDate();
-}
-
 const MONTHS_GEN = [
   "января", "февраля", "марта", "апреля", "мая", "июня",
   "июля", "августа", "сентября", "октября", "ноября", "декабря",

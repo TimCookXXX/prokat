@@ -574,6 +574,16 @@
   color: var(--color-accent);
   border-radius: var(--radius-sm);
 }
+/* Закрытые владельцем дни — нейтральная плашка с пунктиром. Не охра: охра уже
+ * означает бронь, а эти два состояния различать обязательно — бронь владелец
+ * снять не может, своё закрытие снимает кликом. Пунктир несёт различие и без
+ * цвета, для дальтоников и в печати. */
+.rdp-theme .rdp-blocked .rdp-day_button {
+  background: var(--color-muted);
+  color: var(--color-muted-fg);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+}
 /* Прошедшие дни — приглушённое зачёркивание (не красное, как «занято»). */
 .rdp-theme .rdp-past .rdp-day_button {
   text-decoration: line-through;

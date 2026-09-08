@@ -9,7 +9,10 @@ export function formatPrice(rub: number): string {
 export function formatDeposit(type: "money" | "document" | "none", amount: number | null): string {
   if (type === "none") return "без залога";
   if (type === "document") return "залог: документ";
-  return amount ? `залог ${formatPrice(amount)}` : "залог";
+  // Тип «деньги» без суммы: владелец выбрал залог, но не сказал какой. Голое
+  // «залог» ничего не сообщало — ноль здесь то же «значения нет», что и пустое
+  // поле, и оба честнее назвать вслух.
+  return amount ? `залог ${formatPrice(amount)}` : "залог не указан";
 }
 
 // Значение к подписи «Получение» в блоке брони — короткое, как «залог 3 000 ₽»

@@ -4,15 +4,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Archive } from "lucide-react";
 import { requireAuthState } from "@/lib/auth/guard";
-import { getOwnerListings } from "@/server/owner";
-import { getActiveCities, getAllCategories, getAvailabilityRows } from "@/server/catalog";
+import { countNewRequestsByListing, getOwnerListings } from "@/server/owner";
+import {
+  getActiveCities, getAllCategories, getAvailabilityRows, listingPhotos,
+} from "@/server/catalog";
 import { listingPath } from "@/lib/catalog/listing-path";
-import { buildAvailabilityByListing } from "@/lib/catalog/availability";
+import { buildAvailabilityByListing, freeQty } from "@/lib/catalog/availability";
 import { todayStr } from "@/lib/catalog/dates";
 import { ruPlural } from "@/lib/plural";
 import { Button } from "@/components/ui/button";
-import { CabinetListingCard } from "@/components/cabinet/CabinetListingCard";
-import { ListingCardActions } from "@/components/cabinet/ListingCardActions";
+import { ListingsList, type ListingRow } from "@/components/cabinet/ListingsList";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Мои объявления", robots: { index: false } };
@@ -21,13 +22,15 @@ export default async function CabinetListingsPage() {
   const session = await requireAuthState();
   if (!session) redirect("/login?from=/cabinet");
 
-  const [all, cities, cats] = await Promise.all([
+  const [all, cities, cats, pendingByListing] = await Promise.all([
     getOwnerListings(session.user.id),
     getActiveCities(),
     getAllCategories(),
+    countNewRequestsByListing(session.user.id),
   ]);
   const citySlug = new Map(cities.map((c) => [c.id, c.slug]));
   const catSlug = new Map(cats.map((c) => [c.id, c.slug]));
+  const catName = new Map(cats.map((c) => [c.id, c.name]));
 
   // Архивные живут в своём разделе. Всё на странице считается по видимому
   // списку, а не по `all`: заархивировав последнее объявление, иначе получаешь
@@ -43,6 +46,29 @@ export default async function CabinetListingsPage() {
   const availByListing = buildAvailabilityByListing(
     await getAvailabilityRows(activeIds, from, from),
   );
+
+  const rows: ListingRow[] = items.map((l) => {
+    const cSlug = citySlug.get(l.cityId);
+    const catS = catSlug.get(l.categoryId);
+    // Слага может не быть: город деактивировали. Публичная страница такого
+    // объявления всё равно отдаст 404 — ссылку на витрину не строим.
+    return {
+      id: l.id,
+      title: l.title,
+      photoUrl: listingPhotos(l)[0]?.url ?? null,
+      categoryName: catName.get(l.categoryId) ?? null,
+      priceDay: l.priceDay,
+      depositType: l.depositType,
+      depositAmount: l.depositAmount,
+      status: l.status,
+      freeToday: l.status === "active"
+        ? freeQty(l.quantity, availByListing.get(l.id)?.get(from))
+        : null,
+      quantity: l.quantity,
+      pendingRequests: pendingByListing.get(l.id) ?? 0,
+      publicHref: cSlug && catS ? listingPath(cSlug, catS, l.slug, l.id) : null,
+    };
+  });
 
   return (
     <section aria-label="Мои объявления">
@@ -77,24 +103,7 @@ export default async function CabinetListingsPage() {
             : "Разместите первое объявление — оно появится в каталоге."}
         </EmptyState>
       ) : (
-        // Две колонки на телефоне: подвал у карточки исчез, действия уехали на
-        // фото, и в ~156px она помещается. Дальше ширину считает сама сетка.
-        <ul className="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] md:gap-4">
-          {items.map((l) => {
-            return (
-              <li key={l.id}>
-                <CabinetListingCard
-                  listing={l}
-                  availabilityMap={availByListing.get(l.id) ?? new Map()}
-                  from={from}
-                  actions={
-                    <ListingCardActions listingId={l.id} status={l.status} title={l.title} />
-                  }
-                />
-              </li>
-            );
-          })}
-        </ul>
+        <ListingsList rows={rows} />
       )}
     </section>
   );

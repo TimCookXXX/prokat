@@ -80,6 +80,51 @@ export function unavailableDates(
   return eachDate(dateFrom, dateTo).filter((d) => freeQty(quantity, map.get(d)) < qty);
 }
 
+export interface OccupancySummary {
+  /** Дней в окне, где свободно меньше, чем единиц всего. */
+  busyDays: number;
+  /** Первая занятая череда окна. null, если окно свободно целиком. */
+  nextBusyFrom: string | null;
+  nextBusyTo: string | null;
+}
+
+/* Занятость окна одной строкой — над календарём. Владельцу почти всегда нужен
+ * ответ «свободна ли вещь и когда ближайшая занятость», а не разбор сетки по
+ * цветам; сетка остаётся для случая, когда нужен именно обзор месяца.
+ *
+ * Кто именно занял дни, здесь не считается: заявки лежат отдельным блоком выше,
+ * и дублировать имена значило бы держать их в двух местах. */
+export function occupancySummary(
+  quantity: number,
+  map: AvailabilityMap,
+  dateFrom: string,
+  dateTo: string,
+): OccupancySummary {
+  let busyDays = 0;
+  let nextBusyFrom: string | null = null;
+  let nextBusyTo: string | null = null;
+  let streakOpen = false;
+
+  for (const date of eachDate(dateFrom, dateTo)) {
+    const busy = freeQty(quantity, map.get(date)) < quantity;
+    if (busy) busyDays += 1;
+
+    // Череду закрываем первым же свободным днём: дальше по окну могут быть
+    // другие занятые дни, но «ближайшая занятость» — только первая.
+    if (busy && nextBusyFrom === null) {
+      nextBusyFrom = date;
+      nextBusyTo = date;
+      streakOpen = true;
+    } else if (busy && streakOpen) {
+      nextBusyTo = date;
+    } else if (!busy) {
+      streakOpen = false;
+    }
+  }
+
+  return { busyDays, nextBusyFrom, nextBusyTo };
+}
+
 // Дельта бронирования на диапазон: +qty при подтверждении, -qty при освобождении.
 // Возвращает новую карту (вход не мутирует); bookedQty не уходит ниже нуля —
 // защита от двойного release.
