@@ -59,6 +59,8 @@ export function ChatPanes({
   hasThreads: boolean;
   children: React.ReactNode;
 }) {
+  // Открытая переписка — любой дочерний сегмент: и тред /chat/[threadId], и
+  // композер новой переписки /chat/new/[listingId].
   const threadOpen = useSelectedLayoutSegment() !== null;
   useVisualViewport();
 

@@ -11,7 +11,7 @@ const base = {
   cityName: "Казань",
   isVerified: true,
   createdAt: new Date("2023-05-01"),
-  chatHref: "/chat?listing=01ARZ3NDEKTSV4RRFFQ69G5FAW",
+  chatHref: "/chat/new/01ARZ3NDEKTSV4RRFFQ69G5FAW",
   isAuthed: true,
   isOwn: false,
   authProps,

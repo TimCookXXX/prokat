@@ -33,6 +33,7 @@ import { OwnerCard } from "@/components/booking/OwnerCard";
 import { auth } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import { getUserPhone } from "@/server/booking";
+import { findThreadByListing } from "@/server/chat";
 import { getDb } from "@/lib/db";
 import { events } from "@db/schema";
 import { newId } from "@/lib/id";
@@ -175,6 +176,14 @@ async function ListingPage({
   const isAuthed = Boolean(session?.user);
   // Своё объявление: ни писать самому себе, ни бронировать свою вещь нельзя.
   const isOwn = session?.user?.id === listing.ownerUserId;
+  // «Написать» ведёт сразу в конечный экран: существующий тред — в него,
+  // иначе — в композер /chat/new. Промежуточного захода на список чатов нет.
+  // Анониму тред неизвестен — ему всегда композер: после входа тот сам
+  // редиректнет в тред, если он есть. Для своего объявления кнопки нет.
+  const existingThreadId = isAuthed && !isOwn && session?.user?.id
+    ? await findThreadByListing(listing.id, session.user.id)
+    : null;
+  const chatHref = existingThreadId ? `/chat/${existingThreadId}` : `/chat/new/${listing.id}`;
   const initialPhone = session?.user?.id ? (await getUserPhone(session.user.id)) ?? "" : "";
   const env = getEnv();
   const authProps = authPanelProps();
@@ -266,7 +275,7 @@ async function ListingPage({
               location={listing.location}
               cityName={city.name}
               createdAt={seller.createdAt}
-              chatHref={`/chat?listing=${listing.id}`}
+              chatHref={chatHref}
               isAuthed={isAuthed}
               isOwn={isOwn}
               authProps={authProps}
