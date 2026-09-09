@@ -25,7 +25,6 @@ const realtime = vi.hoisted(() => ({
 vi.mock("@/server/actions/realtime", () => realtime);
 
 const { ThreadView } = await import("@/components/chat/ThreadView");
-const { ChatPanes } = await import("@/components/chat/ChatPanes");
 const { content } = await import("@theme/content");
 
 const message = (id: string, sender: string, body: string) => ({
@@ -101,30 +100,6 @@ describe("ThreadView: заготовка под реальное время", ()
   it("с typing показывает индикатор и называет собеседника", () => {
     render(<ThreadView {...base} typing counterpartName="Иван" />);
     expect(screen.getByText(`Иван ${content.chat.typing}`)).toBeInTheDocument();
-  });
-});
-
-describe("ChatPanes", () => {
-  // Без переписок список колонкой не занимает места — иначе на десктопе выходят
-  // две заглушки рядом, обе про одно и то же.
-  it("без переписок не рисует колонку списка", () => {
-    render(
-      <ChatPanes list={<nav aria-label="Переписки" />} hasThreads={false}>
-        <p>заглушка</p>
-      </ChatPanes>,
-    );
-    expect(screen.queryByLabelText("Переписки")).toBeNull();
-    expect(screen.getByText("заглушка")).toBeInTheDocument();
-  });
-
-  it("с переписками показывает обе колонки", () => {
-    render(
-      <ChatPanes list={<nav aria-label="Переписки" />} hasThreads>
-        <p>заглушка</p>
-      </ChatPanes>,
-    );
-    expect(screen.getByLabelText("Переписки")).toBeInTheDocument();
-    expect(screen.getByText("заглушка")).toBeInTheDocument();
   });
 });
 

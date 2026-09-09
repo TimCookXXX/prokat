@@ -1,0 +1,243 @@
+import { describe, it, expect } from "vitest";
+import type { CsvRow } from "@/lib/csv";
+import { parseHandover, parsePhotos, parseSeedData } from "@/lib/seed/rows";
+
+const city = (over: Partial<CsvRow> = {}): CsvRow => ({
+  slug: "krasnodar", name: "Краснодар", name_locative: "Краснодаре",
+  region: "Краснодарский край", lat: "", lon: "", ...over,
+});
+
+const user = (over: Partial<CsvRow> = {}): CsvRow => ({
+  key: "sergey", email: "sergey@seed.local", name: "Сергей",
+  phone: "+7 900 111-22-33", city_slug: "krasnodar", bio: "", cover: "",
+  is_verified: "", ...over,
+});
+
+const listing = (over: Partial<CsvRow> = {}): CsvRow => ({
+  owner: "sergey", city: "krasnodar",
+  category: "Инструменты / Электроинструменты",
+  title: "Перфоратор Bosch", description: "Рабочая лошадка", location: "ул. Гагарина",
+  price_day: "550", deposit_type: "money", deposit_amount: "3000",
+  quantity: "3", handover: "pickup", status: "active", photos: "drill-1.webp",
+  ...over,
+});
+
+const parse = (over: { cities?: CsvRow[]; users?: CsvRow[]; listings?: CsvRow[] } = {}) =>
+  parseSeedData({
+    cities: over.cities ?? [city()],
+    users: over.users ?? [user()],
+    listings: over.listings ?? [listing()],
+  });
+
+const messages = (result: ReturnType<typeof parseSeedData>) =>
+  result.ok ? [] : result.issues.map((i) => `${i.file}:${i.line} ${i.message}`);
+
+describe("parseSeedData", () => {
+  it("разбирает согласованные таблицы", () => {
+    const res = parse();
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.listings[0]).toMatchObject({
+      title: "Перфоратор Bosch",
+      slug: "perforator-bosch",
+      categoryRoot: "Инструменты",
+      categoryChild: "Электроинструменты",
+      priceDay: 550,
+      depositType: "money",
+      depositAmount: 3000,
+      handoverPickup: true,
+      handoverDelivery: false,
+      photos: ["drill-1.webp"],
+    });
+  });
+
+  it("русские подписи принимаются наравне с кодами", () => {
+    const res = parse({
+      listings: [listing({ deposit_type: "Деньги", handover: "Самовывоз, Доставка", status: "Архив" })],
+      users: [user({ is_verified: "да" })],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.listings[0]).toMatchObject({
+      depositType: "money", handoverPickup: true, handoverDelivery: true, status: "archived",
+    });
+    expect(res.data.users[0].isVerified).toBe(true);
+  });
+
+  it("пустые ячейки становятся NULL, а не пустыми строками", () => {
+    const res = parse({ listings: [listing({ location: "", description: "", photos: "" })] });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.listings[0]).toMatchObject({ location: null, description: null, photos: [] });
+  });
+
+  it("cover переводится в адрес пресета", () => {
+    const res = parse({ users: [user({ cover: "lenta" })] });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.users[0].coverUrl).toBe("/covers/lenta.svg");
+  });
+
+  it("неизвестный пресет обложки — ошибка со списком доступных", () => {
+    expect(messages(parse({ users: [user({ cover: "nesushchestvuyushchiy" })] })))
+      .toEqual([expect.stringContaining("нет такого пресета")]);
+  });
+
+  // Залог обязан быть согласован в обе стороны: сумма без типа «деньги» —
+  // почти всегда следствие правки типа без правки суммы.
+  it("deposit_amount обязателен при money", () => {
+    expect(messages(parse({ listings: [listing({ deposit_amount: "" })] })))
+      .toEqual([expect.stringContaining("deposit_amount обязателен")]);
+  });
+
+  it("deposit_amount при document — ошибка", () => {
+    expect(messages(parse({ listings: [listing({ deposit_type: "document", deposit_amount: "3000" })] })))
+      .toEqual([expect.stringContaining("залога нет, суммы быть не должно")]);
+  });
+
+  it("несуществующая категория — ошибка", () => {
+    expect(messages(parse({ listings: [listing({ category: "Инструменты / Ковролин" })] })))
+      .toEqual([expect.stringContaining("нет категории")]);
+  });
+
+  it("категория без пути — ошибка про формат", () => {
+    expect(messages(parse({ listings: [listing({ category: "Электроинструменты" })] })))
+      .toEqual([expect.stringContaining("ожидается путь вида")]);
+  });
+
+  it("owner не из users.csv — ошибка", () => {
+    expect(messages(parse({ listings: [listing({ owner: "petr" })] })))
+      .toEqual([expect.stringContaining("нет такого key")]);
+  });
+
+  it("city не из cities.csv — ошибка", () => {
+    expect(messages(parse({ listings: [listing({ city: "moskva" })] })))
+      .toEqual([expect.stringContaining("нет такого slug")]);
+  });
+
+  it("city_slug владельца сверяется с городами", () => {
+    expect(messages(parse({ users: [user({ city_slug: "moskva" })] })))
+      .toEqual([expect.stringContaining("нет такого города")]);
+  });
+
+  // Пара (владелец, заголовок) — ключ идемпотентности: неоднозначность в нём
+  // означала бы, что второй прогон переписывает одну строку дважды.
+  it("два одинаковых заголовка у одного владельца — ошибка", () => {
+    expect(messages(parse({ listings: [listing(), listing()] })))
+      .toEqual([expect.stringContaining("уже есть объявление")]);
+  });
+
+  it("одинаковые заголовки у разных владельцев допустимы", () => {
+    const res = parse({
+      users: [user(), user({ key: "pavel", email: "pavel@seed.local", name: "Павел" })],
+      listings: [listing(), listing({ owner: "pavel" })],
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it("slug города проверяется на пригодность для адреса", () => {
+    expect(messages(parse({ cities: [city({ slug: "Краснодар" })] })))
+      .toEqual([expect.stringContaining("не годится для адреса")]);
+  });
+
+  it("пустой name_locative — ошибка", () => {
+    expect(messages(parse({ cities: [city({ name_locative: "" })] })))
+      .toEqual([expect.stringContaining("name_locative пустой")]);
+  });
+
+  it("нецелая цена — ошибка", () => {
+    expect(messages(parse({ listings: [listing({ price_day: "550,50" })] })))
+      .toEqual([expect.stringContaining("price_day")]);
+  });
+
+  it("нулевое количество — ошибка", () => {
+    expect(messages(parse({ listings: [listing({ quantity: "0" })] })))
+      .toEqual([expect.stringContaining("quantity")]);
+  });
+
+  it("заголовок длиннее 200 символов — ошибка", () => {
+    expect(messages(parse({ listings: [listing({ title: "я".repeat(201) })] })))
+      .toEqual([expect.stringContaining("длиннее 200")]);
+  });
+
+  it("нет обязательной колонки — ошибка про шапку, а не про каждую строку", () => {
+    const { price_day: _omit, ...withoutPrice } = listing();
+    expect(messages(parseSeedData({ cities: [city()], users: [user()], listings: [withoutPrice] })))
+      .toEqual([expect.stringContaining("в шапке нет колонок: price_day")]);
+  });
+
+  // Человек правит таблицу в редакторе: список всех ошибок разом экономит ему
+  // десять прогонов подряд.
+  it("ошибки копятся, а не обрываются на первой", () => {
+    const res = parse({
+      listings: [
+        listing({ price_day: "дорого" }),
+        listing({ title: "Болгарка", category: "Ерунда / Чепуха" }),
+      ],
+    });
+    expect(messages(res)).toHaveLength(2);
+  });
+
+  it("номера строк считаются с шапкой", () => {
+    const res = parse({ listings: [listing(), listing({ title: "Болгарка", quantity: "0" })] });
+    expect(messages(res)).toEqual([expect.stringContaining("listings.csv:3")]);
+  });
+
+  // Отбракованная строка не должна сдвигать номера последующих: раньше номер
+  // восстанавливался из позиции в отфильтрованном массиве, и человек шёл чинить
+  // строку, в которой ошибки нет.
+  it("отбракованная строка не сдвигает номера следующих", () => {
+    const res = parse({
+      listings: [
+        listing({ quantity: "0" }),
+        listing({ title: "Болгарка", owner: "petr" }),
+      ],
+    });
+    expect(messages(res)).toEqual([
+      expect.stringContaining("listings.csv:2"),
+      expect.stringContaining("listings.csv:3"),
+    ]);
+  });
+
+  // Форма объявления держит .max(10). Одиннадцатое фото от сида сделало бы
+  // объявление несохраняемым в кабинете: форма отвергла бы свои же данные.
+  it("больше десяти фотографий — ошибка", () => {
+    const photos = Array.from({ length: 11 }, (_, i) => `p${i}.webp`).join(";");
+    expect(messages(parse({ listings: [listing({ photos })] })))
+      .toEqual([expect.stringContaining("больше 10")]);
+    expect(parse({ listings: [listing({ photos: photos.split(";").slice(0, 10).join(";") })] }).ok)
+      .toBe(true);
+  });
+
+  it("путь вместо имени файла в photos — ошибка", () => {
+    expect(messages(parse({ listings: [listing({ photos: "../../secret.webp" })] })))
+      .toEqual([expect.stringContaining("без пути")]);
+    expect(messages(parse({ listings: [listing({ photos: "Фото/a.webp" })] })))
+      .toEqual([expect.stringContaining("без пути")]);
+  });
+});
+
+describe("parseHandover", () => {
+  it("оба способа через точку с запятой", () => {
+    expect(parseHandover("pickup;delivery")).toEqual({ pickup: true, delivery: true });
+  });
+
+  it("только доставка", () => {
+    expect(parseHandover("delivery")).toEqual({ pickup: false, delivery: true });
+  });
+
+  it("неизвестное слово — null, а не молчаливый самовывоз", () => {
+    expect(parseHandover("почтой")).toBeNull();
+    expect(parseHandover("")).toBeNull();
+  });
+});
+
+describe("parsePhotos", () => {
+  it("разделяет по точке с запятой и чистит пустые", () => {
+    expect(parsePhotos(" a.webp ; b.webp ;; ")).toEqual(["a.webp", "b.webp"]);
+  });
+
+  it("пустая ячейка — пустой список", () => {
+    expect(parsePhotos("")).toEqual([]);
+  });
+});
