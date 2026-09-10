@@ -6,7 +6,7 @@
 
 export type LimitKind =
   | "booking" | "booking_listing" | "login" | "register" | "resend" | "reset"
-  | "mail_ip" | "mail_daily" | "password_change"
+  | "mail_ip" | "mail_daily" | "mail_booking" | "password_change"
   | "chat_message" | "chat_thread" | "chat_read"
   | "realtime_sync";
 
@@ -48,6 +48,11 @@ const RULES: Record<LimitKind, Rule> = {
   // Третий контур, общий: и почта, и IP считаются по своему ключу, поэтому
   // рассылка с десятка адресов проходит оба и выедает суточную квоту провайдера.
   mail_daily: { windowMs: 24 * 60 * 60 * 1000, maxInWindow: MAIL_DAILY_CAP, gapMs: 0 },
+  /* Свой суточный потолок у писем брони, МЕНЬШЕ общего: активный день по
+   * заявкам не должен съедать квоту, без которой не уходят подтверждение почты
+   * и сброс пароля, — без них человек не может войти вовсе. Общая квота
+   * списывается тоже (в sendMail): провайдер считает все письма вместе. */
+  mail_booking: { windowMs: 24 * 60 * 60 * 1000, maxInWindow: 150, gapMs: 0 },
   // Ключ — userId. Без лимита поле «текущий пароль» — оракул для перебора.
   password_change: { windowMs: 15 * 60 * 1000, maxInWindow: 5, gapMs: 0 },
   // Переписка идёт очередями коротких реплик, поэтому паузы нет — как у login,

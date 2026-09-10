@@ -28,6 +28,7 @@ import { todayStr } from "@/lib/catalog/dates";
 import { notify } from "@/server/notifications";
 import { publish } from "@/server/realtime";
 import { writeDealNote } from "@/server/deal-note";
+import { queueBookingMail } from "@/server/booking-mail";
 import { requestNotify } from "@/lib/realtime/events";
 
 export type ActionResult<T = void> =
@@ -179,6 +180,13 @@ export async function createBookingRequest(
     throw e;
   }
 
+  queueBookingMail({
+    kind: "created",
+    recipientId: listing.ownerUserId,
+    listingTitle: listing.title,
+    dateFrom: sel.from,
+    dateTo: sel.to,
+  });
   revalidatePath("/cabinet/requests");
   return { ok: true, data: { requestId } };
 }
@@ -188,6 +196,7 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
   if (!session?.user?.id) return { ok: false, error: "auth_required" };
 
   const db = getDb();
+  let mail: Parameters<typeof queueBookingMail>[0] | null = null;
   try {
     await db.transaction(async (tx) => {
       /* ПЕРВЫМ лочится объявление — то же правило, что в actions/owner.ts.
@@ -242,6 +251,15 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
         kind: "request_cancelled",
         meta: { requestId, from: req.dateFrom, to: req.dateTo, qty: req.qty },
       });
+      const titleRows = await tx.select({ title: listings.title })
+        .from(listings).where(eq(listings.id, req.listingId)).limit(1);
+      mail = {
+        kind: "cancelled",
+        recipientId: req.ownerUserId,
+        listingTitle: titleRows[0]?.title ?? "",
+        dateFrom: req.dateFrom,
+        dateTo: req.dateTo,
+      };
       // Отменяет арендатор — узнать об этом должен владелец.
       const notified = await notify(tx, {
         recipientId: req.ownerUserId,
@@ -262,6 +280,7 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
     throw e;
   }
 
+  if (mail) queueBookingMail(mail);
   revalidatePath("/cabinet/requests");
   return { ok: true, data: undefined };
 }

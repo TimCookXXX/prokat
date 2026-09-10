@@ -36,6 +36,7 @@ import {
 import { canTransition } from "@/lib/catalog/booking-status";
 import { kindForDecision, type OwnerDecision } from "@/lib/notifications/kinds";
 import { writeDealNote } from "@/server/deal-note";
+import { queueBookingMail } from "@/server/booking-mail";
 import { notify } from "@/server/notifications";
 import { publish } from "@/server/realtime";
 import { requestNotify } from "@/lib/realtime/events";
@@ -183,6 +184,7 @@ async function transitionRequest(
   const userId = owner.userId;
 
   const db = getDb();
+  let mail: Parameters<typeof queueBookingMail>[0] | null = null;
   try {
     await db.transaction(async (tx) => {
       // Какая это вещь — читаем без блокировки: лочить надо объявление, а его
@@ -345,6 +347,18 @@ async function transitionRequest(
         kind: `request_${to}`,
         meta: { requestId, from: req.dateFrom, to: req.dateTo, qty: req.qty },
       });
+      // Письмо — только там, где арендатору есть о чём узнать срочно:
+      // подтверждение (пора договариваться), отказ и отмена (планы рухнули).
+      // completed/no_show — итоги прожитых дат, им хватает ленты.
+      if (to === "confirmed" || to === "declined" || to === "cancelled") {
+        mail = {
+          kind: to,
+          recipientId: req.customerUserId,
+          listingTitle: listing.title,
+          dateFrom: req.dateFrom,
+          dateTo: req.dateTo,
+        };
+      }
       // Решение принимает владелец — узнать о нём должен арендатор.
       const notified = await notify(tx, {
         recipientId: req.customerUserId,
@@ -369,6 +383,7 @@ async function transitionRequest(
 
   // Лента одна на обе роли, поэтому адрес тоже один. Сводка — отдельно:
   // решение принимают и там, и карточка «требует действия» обязана уйти.
+  if (mail) queueBookingMail(mail);
   revalidatePath("/cabinet/requests");
   revalidatePath("/cabinet");
   return { ok: true, data: undefined };

@@ -19,6 +19,8 @@ vi.mock("@/server/notifications", () => ({ notify: notifyMock }));
 vi.mock("@/server/realtime", () => ({ publish: vi.fn() }));
 vi.mock("@/server/deal-note", () => ({ writeDealNote: dealNoteMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// after() живёт только внутри запроса — в тесте его нет, письмо мокается.
+vi.mock("@/server/booking-mail", () => ({ queueBookingMail: vi.fn() }));
 
 import { confirmRequest } from "@/server/actions/owner";
 
