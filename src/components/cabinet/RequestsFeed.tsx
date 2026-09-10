@@ -32,9 +32,7 @@ export type FeedRow = Omit<CabinetRequestRow, "createdAt" | "expiresAt"> & {
   overdue: boolean;
   /** ≈ стоимость: сутки уже посчитаны сервером — там знает цену вещь. */
   estimate: number | null;
-  /** Срок подтверждённой: «через N дней» до начала или «идёт». Считается на
-   *  сервере от делового «сегодня» — клиентские часы на границе суток врут. */
-  deadline: string | null;
+
 };
 
 // Цифрами, не словами: период стоит парой, и «8 сентября — 14 сентября» не
@@ -307,10 +305,13 @@ export function RequestsFeed({
           <thead>
             <tr className="[&>th]:px-3 [&>th]:py-2.5 [&>th]:text-left [&>th]:font-mono [&>th]:text-2xs [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-mono [&>th]:text-muted-foreground">
               <th scope="col">вещь</th>
+              {/* Колонки «срок» нет намеренно: у подтверждённой он —
+                * арифметика от периода, а срочность новой заявки уже несут
+                * полоса, бейдж и сортировка. Точный таймер — в шторке, рядом
+                * с кнопками решения. Ширина ушла названию вещи. */}
               <th scope="col" className="w-[112px]">период</th>
-              <th scope="col" className="w-[104px]">кто</th>
+              <th scope="col" className="w-[120px]">кто</th>
               <th scope="col" className="w-[172px]">статус</th>
-              <th scope="col" className="w-[102px]">срок</th>
             </tr>
           </thead>
           <tbody>
@@ -346,11 +347,6 @@ export function RequestsFeed({
                   {row.peer.name ?? (row.side === "owner" ? "клиент" : "продавец")}
                 </td>
                 <td className="px-3 py-2.5"><StatusBadge row={row} /></td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-sm text-muted-foreground" suppressHydrationWarning>
-                  {row.status === "new"
-                    ? (formatTimeLeft(new Date(row.expiresAt)) ?? "—")
-                    : (row.deadline ?? "—")}
-                </td>
               </tr>
             ))}
           </tbody>

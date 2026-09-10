@@ -43,14 +43,6 @@ export function todayStr(now: Date = new Date()): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/* Целых дней между двумя ISO-датами (b − a): положительное — b позже.
- * Оба конца парсятся как UTC-полночь, поэтому переходы на летнее время и зона
- * процесса на разницу не влияют. */
-export function daysBetween(a: string, b: string): number {
-  const MS = 24 * 60 * 60 * 1000;
-  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / MS);
-}
-
 export function addDaysStr(dateStr: string, days: number): string {
   const t = Date.parse(`${dateStr}T00:00:00Z`) + days * DAY_MS;
   return new Date(t).toISOString().slice(0, 10);

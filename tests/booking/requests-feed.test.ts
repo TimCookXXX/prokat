@@ -47,25 +47,6 @@ describe("toFeedRow", () => {
     expect(toFeedRow(row({ ...past, side: "customer" }), TODAY).overdue).toBe(false);
   });
 
-  /* Срок есть у каждого живого статуса. У новой — таймер протухания (его
-   * рисует клиент), у подтверждённой — до начала или «идёт», у закрытых и
-   * просроченных срока нет: первым всё позади, о вторых говорит бейдж. */
-  it("подтверждённой до начала — «старт: N дн.» — что наступит, названо", () => {
-    const c = { status: "confirmed" as const };
-    expect(toFeedRow(row({ ...c, dateFrom: "2026-09-11", dateTo: "2026-09-12" }), TODAY).deadline)
-      .toBe("старт: 1 дн.");
-    expect(toFeedRow(row({ ...c, dateFrom: "2026-09-15", dateTo: "2026-09-16" }), TODAY).deadline)
-      .toBe("старт: 5 дн.");
-  });
-
-  it("идущая подтверждённая — «идёт», просроченная и закрытые — без срока", () => {
-    const c = { status: "confirmed" as const };
-    expect(toFeedRow(row({ ...c, dateFrom: "2026-09-09", dateTo: "2026-09-12" }), TODAY).deadline)
-      .toBe("идёт");
-    expect(toFeedRow(row({ ...c, dateFrom: "2026-09-01", dateTo: "2026-09-05" }), TODAY).deadline)
-      .toBeNull();
-    expect(toFeedRow(row({ status: "declined" }), TODAY).deadline).toBeNull();
-  });
 });
 
 describe("sortFeedRows", () => {
