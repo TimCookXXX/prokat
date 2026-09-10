@@ -1,5 +1,5 @@
 import {
-  pgTable, text, varchar, integer, bigint, timestamp, pgEnum, jsonb,
+  pgTable, text, varchar, integer, bigint, timestamp, pgEnum, jsonb, check,
   boolean, date, doublePrecision, index, primaryKey, uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -290,10 +290,22 @@ export const notificationKind = pgEnum("notification_kind", [
   "request_no_show",
 ]);
 
+// Сторона получателя в событии по заявке. Хранится, а не выводится из вида,
+// потому что вид её не задаёт: `request_cancelled` адресован владельцу, когда
+// отменил арендатор, и арендатору, когда отменит владелец.
+//
+// Второй случай кода пока не имеет — отменять умеет только арендатор, — и
+// именно поэтому бэкфил по старому правилу верен: неправильных строк в базе
+// никогда не было. Право владельца отменять бронь появится следующим этапом, и
+// с ним прежнее правило перестало бы работать молча.
+export const notificationSide = pgEnum("notification_side", ["owner", "customer"]);
+
 export const notifications = pgTable("notifications", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   kind: notificationKind("kind").notNull(),
+  /** Пусто у `chat_message`: у сообщения сторон сделки нет. */
+  side: notificationSide("side"),
   entityId: text("entity_id").notNull(),
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -318,15 +330,48 @@ export const notifications = pgTable("notifications", {
 // chat_messages — id это ULID, он лексикографически сортируется по времени.
 // Поэтому история листается курсором (WHERE thread_id = ? AND id < ?), без
 // OFFSET, который деградирует на длинных переписках.
+// Вид сообщения. `user` — реплика человека, остальное — запись о событии
+// сделки: тред по вещи служит её журналом. Текст системной записи НЕ хранится,
+// он собирается из вида и meta при выводе — иначе правка формулировки
+// потребовала бы переписывать историю.
+//
+// Протухания в списке нет намеренно: `expireStaleRequests` — массовый UPDATE,
+// который зовут перед чтением списков, и запись в треды превратила бы его в
+// N+1 внутри чужого рендера. Самый частый терминальный исход остаётся вне
+// журнала; цена названа в ADR.
+export const chatMessageKind = pgEnum("chat_message_kind", [
+  "user",
+  "request_created",
+  "request_confirmed",
+  "request_declined",
+  "request_cancelled",
+  "request_completed",
+  "request_no_show",
+]);
+
 export const chatMessages = pgTable("chat_messages", {
   id: text("id").primaryKey(),
   threadId: text("thread_id").notNull().references(() => chatThreads.id, { onDelete: "cascade" }),
-  senderUserId: text("sender_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** Пусто у системной записи: её пишет сделка, а не человек. */
+  senderUserId: text("sender_user_id").references(() => users.id, { onDelete: "cascade" }),
+  kind: chatMessageKind("kind").notNull().default("user"),
   // Предел длины держит zod в lib/chat/validation, а не БД: сообщение приходит
   // извне, и отказать надо до похода в базу.
-  body: text("body").notNull(),
+  /** Пусто у системной записи — её текст собирается из kind и meta. */
+  body: text("body"),
+  /** Данные системной записи: id заявки, даты, количество. */
+  metaJson: jsonb("meta_json"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => ({
+  /* Форма строки определена видом: у реплики есть автор и текст, у записи о
+   * сделке нет ни того, ни другого. Констрейнтом, а не договорённостью,
+   * потому что на «реплике без автора» две половины одного правила расходятся:
+   * в JS `null === viewerId` ложно и сообщение считается непрочитанным, в SQL
+   * `sender_user_id <> $1` при NULL даёт NULL и строка выпадает. Пока такое
+   * состояние невозможно, расхождению неоткуда взяться. */
+  kindShape: check("chat_messages_kind_shape", sql`
+    (${t.kind} = 'user' and ${t.senderUserId} is not null and ${t.body} is not null)
+    or (${t.kind} <> 'user' and ${t.senderUserId} is null and ${t.body} is null)`),
   threadIdx: index("chat_messages_thread_idx").on(t.threadId, t.id),
   // Без него каскад при удалении пользователя пойдёт сиквеншл-сканом.
   senderIdx: index("chat_messages_sender_idx").on(t.senderUserId),

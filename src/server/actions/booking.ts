@@ -137,6 +137,7 @@ export async function createBookingRequest(
       recipientId: listing.ownerUserId,
       actorId: session.user.id,
       kind: "request_created",
+      side: "owner",
       entityId: requestId,
     });
     if (notified) {
@@ -193,6 +194,7 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
         recipientId: req.ownerUserId,
         actorId: session.user.id,
         kind: "request_cancelled",
+        side: "owner",
         entityId: requestId,
       });
       if (notified) {

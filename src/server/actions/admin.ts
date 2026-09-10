@@ -276,9 +276,19 @@ export async function adminBanUser(userId: string, reason: unknown): Promise<Act
         .set({ status: "hidden", hiddenByBan: true, updatedAt: now })
         .where(and(eq(listings.ownerUserId, userId), eq(listings.status, "active")));
 
+      // Сторона получателя называется здесь, рядом с counterpartId, а не
+      // выводится из вида события ниже: вид сторону не задаёт. Входящую заявку
+      // забаненного владельца отклоняют — узнаёт её автор, арендатор; исходящую
+      // заявку забаненного арендатора отменяют — узнаёт владелец вещи.
       const touched = [
-        ...incoming.map((r) => ({ ...r, kind: "request_declined" as const, event: "request_declined" })),
-        ...outgoing.map((r) => ({ ...r, kind: "request_cancelled" as const, event: "cancel_request" })),
+        ...incoming.map((r) => ({
+          ...r, kind: "request_declined" as const, side: "customer" as const,
+          event: "request_declined",
+        })),
+        ...outgoing.map((r) => ({
+          ...r, kind: "request_cancelled" as const, side: "owner" as const,
+          event: "cancel_request",
+        })),
       ];
 
       const toPublish: Array<{ kind: RequestNotificationKind; requestId: string; recipientId: string }> = [];
@@ -295,6 +305,7 @@ export async function adminBanUser(userId: string, reason: unknown): Promise<Act
           recipientId: req.counterpartId,
           actorId: adminId,
           kind: req.kind,
+          side: req.side,
           entityId: req.id,
         });
         if (notified) {

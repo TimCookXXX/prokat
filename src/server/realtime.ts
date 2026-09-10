@@ -14,7 +14,7 @@ import { bookingRequests, chatMessages, chatThreads, listings, users } from "@db
 import { canReadThread } from "@/lib/chat/rules";
 import { toPreview } from "@/server/chat";
 import { notificationTarget } from "@/lib/notifications/target";
-import { sideForKind, type RequestNotificationKind } from "@/lib/notifications/kinds";
+import type { RequestNotificationKind } from "@/lib/notifications/kinds";
 import { content } from "@theme/content";
 import {
   REALTIME_CHANNEL, serializeNotify, type NotifyPayload,
@@ -45,6 +45,7 @@ export async function readMessageToast(
 ): Promise<ToastContent | null> {
   const rows = await getDb().select({
     body: chatMessages.body,
+    kind: chatMessages.kind,
     senderUserId: chatMessages.senderUserId,
     ownerUserId: chatThreads.ownerUserId,
     customerUserId: chatThreads.customerUserId,
@@ -59,6 +60,11 @@ export async function readMessageToast(
   if (!row || !canReadThread(viewerId, row)) return null;
   // Своё же сообщение всплывать не должно: эхо приходит и отправителю.
   if (row.senderUserId === viewerId) return null;
+  // Запись о сделке всплывашки не даёт: о ней уже сказало событие по заявке, и
+  // второй раз одно и то же выскакивать не должно. Отправителя у неё нет,
+  // поэтому innerJoin выше её и так не вернёт — но полагаться на это нельзя,
+  // условие должно быть названо.
+  if (row.kind !== "user" || row.body === null) return null;
 
   return {
     title: row.senderName ?? "Новое сообщение",
@@ -89,6 +95,8 @@ export async function readRequestToast(
     title: content.notifications.kinds[kind],
     text: row.listingTitle,
     href: notificationTarget(kind, requestId).href,
-    side: sideForKind(kind),
+    // Сторона — из самой заявки, а не из вида события: вид её не задаёт.
+    // Смотрящий обязан быть одной из сторон, это проверено выше.
+    side: row.ownerUserId === viewerId ? "owner" : "customer",
   };
 }

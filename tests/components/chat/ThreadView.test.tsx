@@ -28,7 +28,8 @@ const { ThreadView } = await import("@/components/chat/ThreadView");
 const { content } = await import("@theme/content");
 
 const message = (id: string, sender: string, body: string) => ({
-  id, senderUserId: sender, body, createdAt: new Date("2026-08-31T10:00:00Z"),
+  id, senderUserId: sender, kind: "user" as const, body, meta: null,
+  createdAt: new Date("2026-08-31T10:00:00Z"),
 });
 
 const base = {

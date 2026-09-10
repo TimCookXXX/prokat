@@ -230,6 +230,7 @@ async function transitionRequest(
         recipientId: req.customerUserId,
         actorId: userId,
         kind: kindForDecision(to),
+        side: "customer",
         entityId: requestId,
       });
       if (notified) {

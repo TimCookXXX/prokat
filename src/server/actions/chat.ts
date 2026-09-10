@@ -32,11 +32,17 @@ export type ActionResult<T = void> =
   | { ok: true; data: T }
   | { ok: false; error: string };
 
+/* Отправленное человеком сообщение. Вид и meta заданы константами: этим путём
+ * пишутся только реплики, записи о сделке приходят из мутаций заявки. Поля
+ * нужны, чтобы эхо в ленте было структурно тем же, что приезжает с сервера, —
+ * иначе только что отправленный пузырь считался бы записью и не рисовался. */
 export type SentMessage = {
   id: string;
   threadId: string;
   senderUserId: string;
+  kind: "user";
   body: string;
+  meta: null;
   createdAt: Date;
 };
 
@@ -56,7 +62,7 @@ async function insertMessage(
   // Монотонный id: он же курсор пагинации и единственный ключ сортировки ленты.
   const id = newSortableId();
   const inserted = await tx.insert(chatMessages)
-    .values({ id, threadId, senderUserId, body })
+    .values({ id, threadId, senderUserId, kind: "user", body })
     .returning({ id: chatMessages.id, createdAt: chatMessages.createdAt });
   const createdAt = inserted[0].createdAt;
 
@@ -83,6 +89,8 @@ async function insertMessage(
     recipientId,
     actorId: senderUserId,
     kind: "chat_message",
+    // У сообщения сторон сделки нет — поле обязательное, значение явное.
+    side: null,
     entityId: threadId,
   });
 
@@ -97,7 +105,7 @@ async function insertMessage(
     inserted: notified?.inserted ?? false,
   }));
 
-  return { id, threadId, senderUserId, body, createdAt };
+  return { id, threadId, senderUserId, kind: "user", body, meta: null, createdAt };
 }
 
 export async function startThread(
