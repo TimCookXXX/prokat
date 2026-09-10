@@ -64,6 +64,16 @@ export function formatDayMonthShort(dateStr: string): string {
   return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]}`;
 }
 
+/* «08.09» — для колонок и узких строк, где даже «8 сен» в диапазоне не
+ * помещается: период стоит парой, и словесный месяц удваивается. Ноль ведущий
+ * нарочно — в колонке даты выравниваются, а «8.09 — 14.09» рвёт ряд. */
+export function formatDayMonthNum(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}.${mm}`;
+}
+
 export function formatDayMonth(dateStr: string): string {
   const d = new Date(`${dateStr}T00:00:00Z`);
   return `${d.getUTCDate()} ${MONTHS_GEN[d.getUTCMonth()]}`;

@@ -19,7 +19,7 @@ import { Sheet, SheetBody, SheetFooter, SheetHeader } from "@/components/ui/Shee
 import { RequestActions } from "@/components/cabinet/RequestActions";
 import { STATUS_BADGE_CLASSES, STATUS_LABELS } from "@/lib/booking/status-labels";
 import { requestListingHref } from "@/lib/booking/listing-link";
-import { formatDayMonth, formatTimeLeft } from "@/lib/catalog/dates";
+import { formatDayMonthNum, formatTimeLeft } from "@/lib/catalog/dates";
 import { formatPrice } from "@/lib/catalog/format";
 import type { CabinetRequestRow } from "@/server/cabinet";
 
@@ -34,10 +34,12 @@ export type FeedRow = Omit<CabinetRequestRow, "createdAt" | "expiresAt"> & {
   estimate: number | null;
 };
 
+// Цифрами, не словами: период стоит парой, и «8 сентября — 14 сентября» не
+// влезал ни в колонку таблицы, ни в строку на телефоне.
 const period = (r: FeedRow) =>
   r.dateFrom === r.dateTo
-    ? formatDayMonth(r.dateFrom)
-    : `${formatDayMonth(r.dateFrom)} — ${formatDayMonth(r.dateTo)}`;
+    ? formatDayMonthNum(r.dateFrom)
+    : `${formatDayMonthNum(r.dateFrom)} — ${formatDayMonthNum(r.dateTo)}`;
 
 const roleWord = (r: FeedRow) => (r.side === "owner" ? "вы сдаёте" : "вы арендуете");
 
@@ -334,7 +336,7 @@ export function RequestsFeed({
                     </span>
                   </div>
                 </td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-sm">
+                <td className="whitespace-nowrap px-3 py-2.5 text-sm tabular-nums">
                   {period(row)}{row.qty > 1 ? ` · ${row.qty} шт.` : ""}
                 </td>
                 <td className="overflow-hidden truncate whitespace-nowrap px-3 py-2.5 text-sm">
