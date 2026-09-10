@@ -166,3 +166,33 @@ describe("createBookingRequest: журнал сделки", () => {
     expect(note.meta).toMatchObject({ from: TODAY, to: TODAY, qty: 1 });
   });
 });
+
+/* Дубль ловится индексом, а не проверкой перед вставкой, и наружу выходит
+ * человеческим отказом. Контракт с драйвером хрупкий — code и constraint лежат
+ * на самой ошибке pg, и обёртка drizzle новых версий могла бы его сломать
+ * молча. Тест фиксирует ровно ту форму, которую разбирает catch. */
+describe("createBookingRequest: дубль", () => {
+  beforeEach(() => {
+    authMock.mockResolvedValue({ user: { id: "u1", bannedAt: null } });
+    availWhere.mockResolvedValue([]);
+    listingLimit.mockResolvedValue([{
+      listing: { id: "l1", ownerUserId: "owner", status: "active", quantity: 1 },
+      ownerBannedAt: null,
+    }]);
+  });
+
+  it("нарушение своего индекса становится duplicate_request", async () => {
+    transaction.mockRejectedValue(Object.assign(new Error("duplicate key"), {
+      code: "23505", constraint: "booking_requests_live_dup_uq",
+    }));
+    const r = await createBookingRequest(form(TODAY, TODAY));
+    expect(r).toEqual({ ok: false, error: "duplicate_request" });
+  });
+
+  it("чужое нарушение уникальности пробрасывается", async () => {
+    transaction.mockRejectedValue(Object.assign(new Error("duplicate key"), {
+      code: "23505", constraint: "some_other_uq",
+    }));
+    await expect(createBookingRequest(form(TODAY, TODAY))).rejects.toThrow("duplicate key");
+  });
+});
