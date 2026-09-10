@@ -15,15 +15,14 @@ export type NotificationTarget = {
   href: string;
 };
 
-// Отдельного роута на заявку в проекте нет — есть два списка. Поэтому шесть
-// видов схлопываются в два адреса, и entity_id в адресе не участвует.
-// Делит их не слово «заявка», а получатель: request_cancelled достаётся
-// ВЛАДЕЛЬЦУ (отменил арендатор), и смотреть он идёт во входящие.
-const OWNER_FACING: ReadonlySet<NotificationKind> = new Set([
-  "request_created",
-  "request_cancelled",
-]);
-
+// Отдельного роута на заявку в проекте нет, а списков больше не два: обе роли
+// живут одной лентой. Поэтому шесть видов схлопываются в один адрес, и
+// entity_id в адресе не участвует.
+//
+// Адрес НЕ несёт ?role: его сравнивают с usePathname() в RealtimeProvider,
+// чтобы не показывать всплывашку о том, что человек и так видит на экране, а
+// pathname query не содержит. С параметром это сравнение молча перестало бы
+// срабатывать.
 export function notificationTarget(
   kind: NotificationKind,
   entityId: string,
@@ -31,8 +30,5 @@ export function notificationTarget(
   if (kind === "chat_message") {
     return { entity: "thread", href: `/chat/${entityId}` };
   }
-  return {
-    entity: "booking_request",
-    href: OWNER_FACING.has(kind) ? "/cabinet/requests" : "/requests",
-  };
+  return { entity: "booking_request", href: "/cabinet/requests" };
 }

@@ -309,9 +309,10 @@ export async function adminBanUser(userId: string, reason: unknown): Promise<Act
     throw e;
   }
 
+  // Бан закрывает живые заявки по обе стороны, а лента у них теперь общая.
   revalidatePath("/admin/users");
-  revalidatePath("/requests");
   revalidatePath("/cabinet/requests");
+  revalidatePath("/cabinet");
   return { ok: true, data: undefined };
 }
 

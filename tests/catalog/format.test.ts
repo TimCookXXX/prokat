@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatHandover, formatHandoverShort } from "@/lib/catalog/format";
+import { formatDeposit, formatHandover, formatHandoverShort } from "@/lib/catalog/format";
 
 describe("formatHandover()", () => {
   it("оба способа — выбор остаётся за людьми", () => {
@@ -45,5 +45,20 @@ describe("formatHandoverShort()", () => {
 
   it("ни одного способа — говорит об этом прямо", () => {
     expect(formatHandoverShort(false, false)).toBe("По договорённости");
+  });
+});
+
+// Тип «деньги» без суммы достижим: в форме поле необязательное, а ноль она
+// принимает. Голое слово «залог» не сообщало ничего.
+describe("formatDeposit: деньги без суммы", () => {
+  it("ноль и пустое поле называются вслух", () => {
+    expect(formatDeposit("money", 0)).toBe("залог не указан");
+    expect(formatDeposit("money", null)).toBe("залог не указан");
+  });
+
+  it("сумма показывается, когда она есть", () => {
+    // Разряды formatPrice разделяет неразрывным пробелом — в ожидании он
+    // приводится к обычному, иначе тест падает на невидимой разнице.
+    expect(formatDeposit("money", 3000).replace(/\u00A0/g, " ")).toBe("залог 3 000 ₽");
   });
 });

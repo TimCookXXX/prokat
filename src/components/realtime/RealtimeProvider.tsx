@@ -53,10 +53,17 @@ const MAX_PULL_FAILURES = 3;
 // Refresh нужен только там, где есть что чинить: список переписок, галочки,
 // серверные бейджи. На каталоге его нет вовсе, а страницы там force-dynamic —
 // вызывать его значило бы гонять полный SSR выдачи на каждое чужое сообщение.
+/* Показана ли сейчас та сторона, которой касается событие. Без стороны (чат)
+ * и без фильтра в адресе — показана всегда. */
+function sideIsOnScreen(side: "owner" | "customer" | undefined): boolean {
+  if (!side) return true;
+  const role = new URLSearchParams(window.location.search).get("role");
+  return role !== "owner" && role !== "customer" ? true : role === side;
+}
+
 function refreshableRoute(pathname: string): boolean {
   return pathname.startsWith("/chat")
     || pathname.startsWith("/cabinet")
-    || pathname.startsWith("/requests")
     || pathname.startsWith("/profile");
 }
 
@@ -127,7 +134,13 @@ export function RealtimeProvider({
     if (!t) return;
     // Всплывашка не нужна там, где человек и так смотрит: своя же переписка
     // открыта — сообщение приедет прямо в ленту.
-    if (pathRef.current === t.href) return;
+    //
+    // У заявок этого мало: лента показывает обе роли и умеет фильтроваться по
+    // одной. Событие чужой стороны при активном фильтре на экран не попадёт, и
+    // погасив всплывашку по одному лишь адресу, мы бы его потеряли совсем.
+    // Роль читаем в момент события, а не хуком: usePathname query не отдаёт, а
+    // useSearchParams в корневом провайдере тянет за собой Suspense.
+    if (pathRef.current === t.href && sideIsOnScreen(t.side)) return;
     toast(t.title, {
       description: t.text,
       action: { label: content.notifications.open, onClick: () => router.push(t.href as never) },

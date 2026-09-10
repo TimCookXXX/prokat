@@ -9,6 +9,7 @@
 // JS и на размере страницы стоит ничего.
 
 import { and, asc, desc, eq, gt, inArray, lt, ne, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/lib/db";
 import { categories, chatMessages, chatThreads, cities, listings, users } from "@db/schema";
 import { canReadThread } from "@/lib/chat/rules";
@@ -88,6 +89,62 @@ function unreadCursor(userId: string) {
 export function toPreview(body: string): string {
   const flat = body.replace(/\s+/g, " ").trim();
   return flat.length > PREVIEW_LENGTH ? `${flat.slice(0, PREVIEW_LENGTH)}…` : flat;
+}
+
+export interface ListingThread {
+  id: string;
+  peerId: string;
+  peerName: string | null;
+  peerImage: string | null;
+  lastMessageAt: Date;
+  unread: number;
+}
+
+/* Переписки по одной вещи — для её страницы в кабинете. Отдельно от
+ * getThreadList намеренно: тот собирает ленту всех переписок обеих ролей с
+ * обложками объявлений и превью, шестью запросами. Здесь вещь одна и известна,
+ * превью не нужно — хватает собеседника, свежести и числа непрочитанных.
+ *
+ * Только сторона владельца: чужая вещь в кабинет не попадает. */
+export async function getListingThreads(
+  listingId: string,
+  ownerUserId: string,
+): Promise<ListingThread[]> {
+  const db = getDb();
+  const peer = alias(users, "peer");
+
+  const rows = await db
+    .select({
+      id: chatThreads.id,
+      peerId: peer.id,
+      peerName: peer.name,
+      peerImage: peer.image,
+      lastMessageAt: chatThreads.lastMessageAt,
+    })
+    .from(chatThreads)
+    .innerJoin(peer, eq(peer.id, chatThreads.customerUserId))
+    .where(and(
+      eq(chatThreads.listingId, listingId),
+      eq(chatThreads.ownerUserId, ownerUserId),
+    ))
+    .orderBy(desc(chatThreads.lastMessageAt))
+    .limit(THREADS_PAGE_SIZE);
+
+  if (rows.length === 0) return [];
+
+  const unreadRows = await db
+    .select({ threadId: chatMessages.threadId, cnt: sql<number>`count(*)::int` })
+    .from(chatMessages)
+    .innerJoin(chatThreads, eq(chatThreads.id, chatMessages.threadId))
+    .where(and(
+      inArray(chatMessages.threadId, rows.map((r) => r.id)),
+      ne(chatMessages.senderUserId, ownerUserId),
+      gt(chatMessages.id, unreadCursor(ownerUserId)),
+    ))
+    .groupBy(chatMessages.threadId);
+
+  const unreadByThread = new Map(unreadRows.map((u) => [u.threadId, u.cnt]));
+  return rows.map((r) => ({ ...r, unread: unreadByThread.get(r.id) ?? 0 }));
 }
 
 export async function getThreadList(userId: string): Promise<ThreadListItem[]> {

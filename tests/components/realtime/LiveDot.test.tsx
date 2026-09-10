@@ -80,6 +80,15 @@ describe("точка объяснима меню", () => {
     expect(sum("all")).toBe(sum("messages") + sum("incoming") + sum("mine"));
   });
 
+  // Счётчик может быть покрыт не только одноимённым пунктом: заявки обеих
+  // ролей живут одной лентой, и её пункт показывает other — сумму incoming и
+  // mine. Важно, что точка объяснима, а не что имена совпали.
+  const COVERING_SCOPES: Record<string, readonly string[]> = {
+    messages: ["messages", "all"],
+    incoming: ["incoming", "other", "all"],
+    mine: ["mine", "other", "all"],
+  };
+
   it("каждый счётчик покрыт пунктом меню", async () => {
     const { LINKS } = await import("@/components/auth/UserMenu");
     const covered = new Set(
@@ -88,7 +97,8 @@ describe("точка объяснима меню", () => {
     // Ключи стора берутся с живого объекта: добавили счётчик и забыли пункт —
     // тест падает, а не молча появляется необъяснимая точка.
     for (const key of Object.keys({ messages: 0, incoming: 0, mine: 0 })) {
-      expect(covered, `нет пункта меню для «${key}»`).toContain(key);
+      const ok = COVERING_SCOPES[key]!.some((scope) => covered.has(scope));
+      expect(ok, `нет пункта меню, объясняющего «${key}»`).toBe(true);
     }
   });
 });

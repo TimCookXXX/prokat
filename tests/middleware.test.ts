@@ -15,7 +15,9 @@ import { middleware, config } from "@/middleware";
 // ровно тем, что этот модуль и убирает.
 import { SESSION_COOKIE_NAMES } from "@/lib/auth/cookie-name";
 const SESSION_COOKIES = [...SESSION_COOKIE_NAMES];
-const PROTECTED = ["/requests", "/profile", "/cabinet", "/admin", "/chat"];
+// /requests в списке больше нет: адрес удалён вместе с переездом заявок в
+// общую ленту кабинета.
+const PROTECTED = ["/profile", "/cabinet", "/admin", "/chat"];
 
 function request(path: string, cookie?: string): NextRequest {
   return new NextRequest(new URL(`https://inrenta.ru${path}`), {

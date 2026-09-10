@@ -41,11 +41,14 @@ export function CabinetHub({
     <div className="flex flex-col gap-4 md:hidden">
       <CabinetHubHeader me={me} editable={editable} />
 
-      {sections.map((group) => (
-        <div key={group.title} className="flex flex-col gap-2">
-          <span className="px-1 font-mono text-2xs uppercase tracking-mono text-muted-foreground">
-            {group.title}
-          </span>
+      {sections.map((group, gi) => (
+        /* Заголовка может не быть — см. AccountShell: кабинет плоский. */
+        <div key={group.title ?? gi} className="flex flex-col gap-2">
+          {group.title && (
+            <span className="px-1 font-mono text-2xs uppercase tracking-mono text-muted-foreground">
+              {group.title}
+            </span>
+          )}
           <div className="surface flex flex-col p-1">
             {group.items.map((it, i) => {
               const Icon = it.icon ? icons[it.icon] : null;

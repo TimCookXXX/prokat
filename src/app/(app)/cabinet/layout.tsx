@@ -28,8 +28,6 @@ export default async function CabinetLayout({ children }: { children: React.Reac
         newRequestsCount: newCount,
         unreadMessages: unread,
         activeListings: identity?.activeListings,
-        upcomingBookings: identity?.upcomingBookings,
-        pendingMine: identity?.pendingMine,
       })}
       identity={identity}
     >

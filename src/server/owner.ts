@@ -3,28 +3,12 @@
 
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { bookingRequests, listings, users } from "@db/schema";
+import { bookingRequests, categories, cities, listings } from "@db/schema";
 import { expireStaleRequests } from "@/server/actions/booking";
 
-// Заявки на товары юзера: новые сверху (критический путь), затем по свежести.
-export async function getOwnerRequests(userId: string) {
-  await expireStaleRequests();
-  return getDb()
-    .select({
-      request: bookingRequests,
-      listingTitle: listings.title,
-      customerName: users.name,
-    })
-    .from(bookingRequests)
-    .innerJoin(listings, eq(listings.id, bookingRequests.listingId))
-    .innerJoin(users, eq(users.id, bookingRequests.customerUserId))
-    .where(eq(bookingRequests.ownerUserId, userId))
-    .orderBy(
-      sql`CASE WHEN ${bookingRequests.status} = 'new' THEN 0 ELSE 1 END`,
-      desc(bookingRequests.createdAt),
-    );
-}
-
+// Ленту заявок обеих ролей отдаёт getCabinetRequests в server/cabinet.ts.
+// Здесь остался только счётчик: он про другое число — сколько ждёт МОЕГО
+// ответа, — и его зовут три layout'а и профиль.
 export async function countNewRequests(userId: string): Promise<number> {
   await expireStaleRequests();
   const rows = await getDb()
@@ -37,6 +21,22 @@ export async function countNewRequests(userId: string): Promise<number> {
   return rows[0]?.cnt ?? 0;
 }
 
+/* Сколько заявок ждёт ответа по каждой вещи — для колонки в списке объявлений.
+ * Одним группированным запросом, а не выборкой заявок: списку нужно число, а не
+ * строки, и вытягивать их ради счётчика значило бы читать всю ленту заново. */
+export async function countNewRequestsByListing(userId: string): Promise<Map<string, number>> {
+  await expireStaleRequests();
+  const rows = await getDb()
+    .select({ listingId: bookingRequests.listingId, cnt: sql<number>`count(*)::int` })
+    .from(bookingRequests)
+    .where(and(
+      eq(bookingRequests.ownerUserId, userId),
+      eq(bookingRequests.status, "new"),
+    ))
+    .groupBy(bookingRequests.listingId);
+  return new Map(rows.map((r) => [r.listingId, r.cnt]));
+}
+
 // Все товары юзера (включая скрытые/архив) для кабинета.
 export async function getOwnerListings(userId: string) {
   return getDb().select().from(listings)
@@ -44,9 +44,22 @@ export async function getOwnerListings(userId: string) {
     .orderBy(desc(listings.createdAt));
 }
 
+/* Одна вещь для её страницы в кабинете. Слаги города и категории — чтобы
+ * собрать адрес витрины: со страницы вещи туда есть ссылка, а других данных
+ * для listingPath() в строке объявления нет. Обе колонки notNull, поэтому
+ * innerJoin строк не теряет. */
 export async function getOwnerListing(userId: string, listingId: string) {
-  const rows = await getDb().select().from(listings)
+  const rows = await getDb()
+    .select({
+      listing: listings,
+      citySlug: cities.slug,
+      categorySlug: categories.slug,
+    })
+    .from(listings)
+    .innerJoin(cities, eq(cities.id, listings.cityId))
+    .innerJoin(categories, eq(categories.id, listings.categoryId))
     .where(and(eq(listings.id, listingId), eq(listings.ownerUserId, userId)))
     .limit(1);
-  return rows[0] ?? null;
+  const row = rows[0];
+  return row ? { ...row.listing, citySlug: row.citySlug, categorySlug: row.categorySlug } : null;
 }
