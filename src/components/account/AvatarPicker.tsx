@@ -190,6 +190,11 @@ export function AvatarPickerButton({
         aria-describedby={undefined}
         className="md:max-w-md"
         showClose={!busy}
+        // Пока идёт загрузка, лист нельзя утянуть жестом: отказ в onOpenChange
+        // оставил бы его повисшим на полпути — vaul не возвращает лист на
+        // место, когда закрытие отвергли. Атрибут понимает только vaul,
+        // десктопной шкуре он безвреден.
+        {...(busy ? { "data-vaul-no-drag": "" } : {})}
         onEscapeKeyDown={(e) => { if (busy) e.preventDefault(); }}
         onPointerDownOutside={(e) => { if (busy) e.preventDefault(); }}
         onInteractOutside={(e) => { if (busy) e.preventDefault(); }}

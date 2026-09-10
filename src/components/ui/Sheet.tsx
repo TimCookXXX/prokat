@@ -23,22 +23,7 @@ import * as React from "react";
 import { Drawer } from "vaul";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const DESKTOP = "(min-width: 768px)"; // тот же md, что у Modal
-
-function useIsDesktop(): boolean {
-  const subscribe = React.useCallback((cb: () => void) => {
-    const mq = window.matchMedia(DESKTOP);
-    mq.addEventListener("change", cb);
-    return () => mq.removeEventListener("change", cb);
-  }, []);
-  return React.useSyncExternalStore(
-    subscribe,
-    () => window.matchMedia(DESKTOP).matches,
-    // Серверное значение не влияет: закрытая шторка не рендерит контент.
-    () => false,
-  );
-}
+import { useIsDesktop } from "@/components/ui/use-desktop";
 
 export function Sheet({
   open, onOpenChange, label, children,
@@ -56,9 +41,7 @@ export function Sheet({
    * панель и перещёлкивал её вниз посреди входной анимации. На сервере ширины
    * нет, но там шторка и не открывается. */
   const [side, setSide] = React.useState<"right" | "bottom">(() =>
-    typeof window === "undefined" || window.matchMedia(DESKTOP).matches
-      ? "right"
-      : "bottom");
+    desktop ? "right" : "bottom");
   React.useEffect(() => {
     // desktop нарочно не в зависимостях: направление меняется только на
     // открытии, а не при каждой смене ширины под открытой шторкой.
