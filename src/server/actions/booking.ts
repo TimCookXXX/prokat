@@ -90,10 +90,12 @@ export async function createBookingRequest(
     { from: form.from, to: form.to, qty: String(form.qty) },
     { today: todayStr(), maxQty: listing.quantity },
   );
-  // TODO: qty клампится к quantity по-прежнему молча. Владелец может уменьшить
-  // количество, пока форма открыта, и заявка уйдёт на меньшее число единиц, чем
-  // человек видел в диалоге, — тот же класс, что dates_stale.
   if (isSelectionShifted(form, sel)) return { ok: false, error: "dates_stale" };
+  // Количество клампится к quantity так же молча, как когда-то даты: владелец
+  // мог уменьшить его, пока форма открыта, и заявка ушла бы на меньшее число
+  // единиц, чем человек видел в диалоге. Отдельный код, а не dates_stale:
+  // причина другая, и текст человеку нужен другой.
+  if (sel.qty !== form.qty) return { ok: false, error: "qty_stale" };
 
   const availRows = await db.select().from(availability).where(and(
     eq(availability.listingId, listing.id),
@@ -108,55 +110,68 @@ export async function createBookingRequest(
 
   const requestId = newId();
   const now = new Date();
-  await db.transaction(async (tx) => {
-    await tx.insert(bookingRequests).values({
-      id: requestId,
-      listingId: listing.id,
-      ownerUserId: listing.ownerUserId,
-      customerUserId: session.user.id,
-      dateFrom: sel.from,
-      dateTo: sel.to,
-      qty: sel.qty,
-      status: "new",
-      customerPhone: form.phone,
-      customerComment: form.comment || null,
-      expiresAt: new Date(now.getTime() + EXPIRES_HOURS * 60 * 60 * 1000),
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(bookingRequests).values({
+        id: requestId,
+        listingId: listing.id,
+        ownerUserId: listing.ownerUserId,
+        customerUserId: session.user.id,
+        dateFrom: sel.from,
+        dateTo: sel.to,
+        qty: sel.qty,
+        status: "new",
+        customerPhone: form.phone,
+        customerComment: form.comment || null,
+        expiresAt: new Date(now.getTime() + EXPIRES_HOURS * 60 * 60 * 1000),
+      });
+      // Телефон из первой заявки запоминаем в профиле для предзаполнения.
+      await tx.update(users)
+        .set({ phone: form.phone })
+        .where(and(eq(users.id, session.user.id), sql`${users.phone} IS NULL`));
+      await tx.insert(events).values({
+        id: newId(),
+        entityType: "listing",
+        entityId: listing.id,
+        event: "submit_request",
+        userId: session.user.id,
+        metaJson: { requestId, from: sel.from, to: sel.to, qty: sel.qty },
+      });
+      // Заявка заводит переписку и открывает журнал сделки. До этого у владельца
+      // канала к клиенту не было вовсе: свой тред он начать не может, а телефон
+      // и комментарий при отклонении — весь его инструмент.
+      await writeDealNote(tx, {
+        listingId: listing.id,
+        ownerUserId: listing.ownerUserId,
+        customerUserId: session.user.id,
+        kind: "request_created",
+        meta: { requestId, from: sel.from, to: sel.to, qty: sel.qty },
+      });
+      const notified = await notify(tx, {
+        recipientId: listing.ownerUserId,
+        actorId: session.user.id,
+        kind: "request_created",
+        side: "owner",
+        entityId: requestId,
+      });
+      if (notified) {
+        await publish(tx, requestNotify({
+          kind: "request_created", requestId, recipientId: listing.ownerUserId,
+        }));
+      }
     });
-    // Телефон из первой заявки запоминаем в профиле для предзаполнения.
-    await tx.update(users)
-      .set({ phone: form.phone })
-      .where(and(eq(users.id, session.user.id), sql`${users.phone} IS NULL`));
-    await tx.insert(events).values({
-      id: newId(),
-      entityType: "listing",
-      entityId: listing.id,
-      event: "submit_request",
-      userId: session.user.id,
-      metaJson: { requestId, from: sel.from, to: sel.to, qty: sel.qty },
-    });
-    // Заявка заводит переписку и открывает журнал сделки. До этого у владельца
-    // канала к клиенту не было вовсе: свой тред он начать не может, а телефон
-    // и комментарий при отклонении — весь его инструмент.
-    await writeDealNote(tx, {
-      listingId: listing.id,
-      ownerUserId: listing.ownerUserId,
-      customerUserId: session.user.id,
-      kind: "request_created",
-      meta: { requestId, from: sel.from, to: sel.to, qty: sel.qty },
-    });
-    const notified = await notify(tx, {
-      recipientId: listing.ownerUserId,
-      actorId: session.user.id,
-      kind: "request_created",
-      side: "owner",
-      entityId: requestId,
-    });
-    if (notified) {
-      await publish(tx, requestNotify({
-        kind: "request_created", requestId, recipientId: listing.ownerUserId,
-      }));
+  } catch (e) {
+    /* Дубль ловим индексом, а не проверкой перед вставкой: между чтением и
+     * записью помещается вторая вкладка, и от гонки проверка не спасает.
+     * 23505 — нарушение уникальности; свой индекс отличаем по имени, чужое
+     * нарушение пробрасываем. */
+    const code = (e as { code?: string })?.code;
+    const detail = String((e as { constraint?: string })?.constraint ?? "");
+    if (code === "23505" && detail === "booking_requests_live_dup_uq") {
+      return { ok: false, error: "duplicate_request" };
     }
-  });
+    throw e;
+  }
 
   revalidatePath("/cabinet/requests");
   return { ok: true, data: { requestId } };

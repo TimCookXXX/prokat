@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS "booking_requests_live_dup_uq" ON "booking_requests" USING btree ("listing_id","customer_user_id","date_from","date_to") WHERE "booking_requests"."status" = 'new';

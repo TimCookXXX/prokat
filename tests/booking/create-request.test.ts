@@ -97,3 +97,34 @@ describe("createBookingRequest: своё объявление", () => {
     expect(res).toEqual({ ok: false, error: "own_listing" });
   });
 });
+
+/* Количество клампилось молча: владелец мог уменьшить quantity, пока форма
+ * открыта, и заявка уходила на меньшее число единиц, чем человек видел. Тот же
+ * класс, что и сдвиг дат, — и отказ такой же явный. */
+describe("createBookingRequest: количество", () => {
+  beforeEach(() => {
+    authMock.mockResolvedValue({ user: { id: "u1", bannedAt: null } });
+    availWhere.mockResolvedValue([]);
+  });
+
+  it("отказывает, если количество урезалось клампом", async () => {
+    listingLimit.mockResolvedValue([{
+      listing: { id: "l1", ownerUserId: "owner", status: "active", quantity: 1 },
+      ownerBannedAt: null,
+    }]);
+    const r = await createBookingRequest({
+      ...form(TODAY, TODAY), qty: 3,
+    });
+    expect(r).toEqual({ ok: false, error: "qty_stale" });
+  });
+
+  it("количество в пределах остатка пропускает", async () => {
+    listingLimit.mockResolvedValue([{
+      listing: { id: "l1", ownerUserId: "owner", status: "active", quantity: 5 },
+      ownerBannedAt: null,
+    }]);
+    transaction.mockResolvedValue(undefined);
+    const r = await createBookingRequest({ ...form(TODAY, TODAY), qty: 3 });
+    expect(r.ok).toBe(true);
+  });
+});
