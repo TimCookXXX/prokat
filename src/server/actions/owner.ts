@@ -6,11 +6,19 @@
 // Инварианты (см. lib/catalog/booking-status):
 // - подтверждение заявки увеличивает bookedQty на диапазон в ТОЙ ЖЕ транзакции,
 //   что и смена статуса; перед этим занятость перепроверяется под блокировкой;
-// - completed/no_show дат не освобождают; отмена confirmed — освобождает
-//   (реализована в cancelBookingRequest, здесь не дублируется);
+// - completed/no_show дат не освобождают; отмена confirmed — освобождает, и
+//   веток теперь две: у арендатора в actions/booking.ts, у владельца здесь.
+//   Свести их в одну нельзя — права и набор блокировок у путей разные;
 // - blocked_qty — ручные закрытия владельцем, не пересекается с booked_qty.
+//
+// LOCK ORDER. Всё, что трогает заявки или занятость одного объявления, лочит
+// СНАЧАЛА строку объявления, и только потом заявки и availability. Правило
+// действует и здесь, и в actions/booking.ts, и нарушать его нельзя: до него
+// подтверждение брало свою строку заявки, потом набор по объявлению, а вторая
+// транзакция — в обратном порядке, и два подтверждения по одной вещи вставали
+// в дедлок. Одна точка сериализации на объявление снимает это целиком.
 
-import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
@@ -177,46 +185,59 @@ async function transitionRequest(
   const db = getDb();
   try {
     await db.transaction(async (tx) => {
-      const rows = await tx.select().from(bookingRequests)
+      // Какая это вещь — читаем без блокировки: лочить надо объявление, а его
+      // id иначе неоткуда взять.
+      const idRows = await tx
+        .select({ listingId: bookingRequests.listingId, ownerUserId: bookingRequests.ownerUserId })
+        .from(bookingRequests)
         .where(eq(bookingRequests.id, requestId))
-        .for("update")
         .limit(1);
-      const req = rows[0];
+      const head = idRows[0];
+      if (!head || head.ownerUserId !== userId) throw new Error("not_found");
+
+      /* ПЕРВЫМ лочится объявление — правило на весь модуль, см. LOCK ORDER в
+       * шапке файла. Оно даёт одну точку сериализации на вещь, и порядок
+       * захвата строк заявок дальше уже не важен.
+       *
+       * Без него было так: одна транзакция брала свою строку заявки, потом
+       * набор по объявлению; вторая — свою, потом тот же набор. Порядок
+       * встречный, и два подтверждения по одной вещи вставали в дедлок.
+       * Воспроизводилось двумя сессиями за секунды. */
+      const lrows = await tx.select().from(listings)
+        .where(eq(listings.id, head.listingId)).for("update").limit(1);
+      const listing = lrows[0];
+      if (!listing) throw new Error("not_found");
+      const listingQuantity = listing.quantity;
+
+      /* Заявка и её соседи — одним упорядоченным запросом. Подтверждение
+       * занимает даты, и пересекающиеся заявки становятся невыполнимыми:
+       * раньше они висели сутки, а владелец узнавал об этом, только нажав
+       * «Подтвердить» и получив «даты заняты».
+       *
+       * Пересечение диапазонов обязательно. Без него закрывались бы и заявки,
+       * к которым это подтверждение отношения не имеет, — например лежащие на
+       * датах, закрытых руками полгода назад. */
+      const locked = await tx.select().from(bookingRequests)
+        .where(and(
+          eq(bookingRequests.listingId, head.listingId),
+          or(eq(bookingRequests.id, requestId), eq(bookingRequests.status, "new")),
+        ))
+        .orderBy(asc(bookingRequests.id))
+        .for("update")
+        .limit(RIVALS_LIMIT);
+
+      const req = locked.find((r) => r.id === requestId);
       if (!req || req.ownerUserId !== userId) throw new Error("not_found");
       if (!canTransition(req.status, to)) throw new Error("bad_status");
 
-      /* Подтверждение занимает даты, и соседние заявки на них становятся
-       * невыполнимыми. Раньше они висели сутки, а владелец узнавал об этом,
-       * только нажав «Подтвердить» и получив «даты заняты» — уборка за системой
-       * руками.
-       *
-       * Весь набор лочится ОДНИМ упорядоченным запросом, а не построчно: два
-       * параллельных подтверждения по одному объявлению иначе берут строки во
-       * встречном порядке и встают в дедлок. Порядок по id детерминирован
-       * (LockRows стоит над Sort) и совпадает с порядком в adminBanUser. */
+      // Соседи — только пересекающиеся по датам и только ждущие ответа.
       const rivals = to === "confirmed"
-        ? await tx.select().from(bookingRequests)
-          .where(and(
-            eq(bookingRequests.listingId, req.listingId),
-            eq(bookingRequests.status, "new"),
-          ))
-          .orderBy(asc(bookingRequests.id))
-          .for("update")
-          .limit(RIVALS_LIMIT)
+        ? locked.filter((r) => r.id !== requestId
+          && r.status === "new"
+          && r.dateFrom <= req.dateTo && r.dateTo >= req.dateFrom)
         : [];
 
-      // Количество живёт снаружи ветки: по нему же считается, помещаются ли
-      // соседние заявки после того, как эта заняла даты.
-      let listingQuantity = 0;
-
       if (to === "confirmed") {
-        // Лочим листинг (source of truth по quantity) и перепроверяем занятость.
-        const lrows = await tx.select().from(listings)
-          .where(eq(listings.id, req.listingId)).for("update").limit(1);
-        const listing = lrows[0];
-        if (!listing) throw new Error("not_found");
-        listingQuantity = listing.quantity;
-
         const availRows = await tx.select().from(availability)
           .where(and(
             eq(availability.listingId, req.listingId),

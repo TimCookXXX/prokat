@@ -222,8 +222,8 @@ const banReasonSchema = z.string().trim().min(5, "Причина от 5 симв
 // listings, потому что встречный порядок даёт ABBA с transitionRequest: тот
 // лочит заявку, а потом объявление (actions/owner.ts, ветка confirmed).
 // Уведомления идут после обеих таблиц — этот порядок описан в server/
-// notifications.ts. publish уходит последним оператором, как требует
-// server/realtime.ts.
+// notifications.ts. События заявок копятся в toPublish и уходят в конце; своё
+// событие writeDealNote публикует сам, сразу за своей записью.
 // Сколько записей о сделке бан дописывает в переписки. Закрывает он все
 // заявки, а рассказывает о первых — см. цикл ниже.
 const BAN_JOURNAL_LIMIT = 50;

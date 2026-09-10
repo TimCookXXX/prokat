@@ -3,11 +3,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Моки через vi.hoisted: экшен импортируется статически, фабрики vi.mock
 // исполняются раньше тела модуля.
-const { authMock, listingLimit, availWhere, transaction, db } = vi.hoisted(() => {
+const { authMock, listingLimit, availWhere, transaction, db, dealNoteMock } = vi.hoisted(() => {
+  const dealNoteMock = vi.fn();
   const listingLimit = vi.fn();
   const availWhere = vi.fn();
   const transaction = vi.fn();
   return {
+    dealNoteMock,
     authMock: vi.fn(),
     listingLimit,
     availWhere,
@@ -29,6 +31,7 @@ vi.mock("@/lib/db", () => ({ getDb: () => db }));
 vi.mock("@/lib/rate-limit", () => ({ checkLimit: () => ({ ok: true }) }));
 vi.mock("@/server/notifications", () => ({ notify: vi.fn() }));
 vi.mock("@/server/realtime", () => ({ publish: vi.fn() }));
+vi.mock("@/server/deal-note", () => ({ writeDealNote: dealNoteMock }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { createBookingRequest } from "@/server/actions/booking";
@@ -126,5 +129,40 @@ describe("createBookingRequest: количество", () => {
     transaction.mockResolvedValue(undefined);
     const r = await createBookingRequest({ ...form(TODAY, TODAY), qty: 3 });
     expect(r.ok).toBe(true);
+  });
+});
+
+/* Журнал сделки — главный инвариант этапа: пропуск одной записи оставляет в
+ * треде дыру, которую ничем потом не восполнить. Без этой проверки удаление
+ * вызова из мутации прошло бы все тесты. */
+describe("createBookingRequest: журнал сделки", () => {
+  beforeEach(() => {
+    authMock.mockResolvedValue({ user: { id: "u1", bannedAt: null } });
+    availWhere.mockResolvedValue([]);
+    listingLimit.mockResolvedValue([{
+      listing: { id: "l1", ownerUserId: "owner", status: "active", quantity: 1 },
+      ownerBannedAt: null,
+    }]);
+    dealNoteMock.mockClear();
+    // Транзакция настоящая по форме: колбэк исполняется, писатель зовётся.
+    transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
+      const tx = {
+        insert: () => ({ values: async () => undefined }),
+        update: () => ({ set: () => ({ where: async () => undefined }) }),
+      };
+      await fn(tx);
+    });
+  });
+
+  it("открывает журнал записью о заявке", async () => {
+    const r = await createBookingRequest(form(TODAY, TODAY));
+    expect(r.ok).toBe(true);
+    expect(dealNoteMock).toHaveBeenCalledTimes(1);
+    const note = dealNoteMock.mock.calls[0][1];
+    expect(note).toMatchObject({
+      listingId: "l1", ownerUserId: "owner", customerUserId: "u1",
+      kind: "request_created",
+    });
+    expect(note.meta).toMatchObject({ from: TODAY, to: TODAY, qty: 1 });
   });
 });

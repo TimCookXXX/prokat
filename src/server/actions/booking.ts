@@ -190,6 +190,20 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
   const db = getDb();
   try {
     await db.transaction(async (tx) => {
+      /* ПЕРВЫМ лочится объявление — то же правило, что в actions/owner.ts.
+       * Без него отмена брала строку заявки, а подтверждение — объявление, и
+       * два пути вставали во встречном порядке: подтверждение держит
+       * объявление и тянется к заявке, отмена держит заявку и тянется к
+       * занятости, которую подтверждение уже забрало. */
+      const idRows = await tx
+        .select({ listingId: bookingRequests.listingId })
+        .from(bookingRequests)
+        .where(eq(bookingRequests.id, requestId))
+        .limit(1);
+      if (!idRows[0]) throw new Error("not_found");
+      await tx.select({ id: listings.id }).from(listings)
+        .where(eq(listings.id, idRows[0].listingId)).for("update").limit(1);
+
       const rows = await tx.select().from(bookingRequests)
         .where(eq(bookingRequests.id, requestId))
         .for("update")

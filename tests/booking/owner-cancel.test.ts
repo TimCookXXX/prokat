@@ -9,10 +9,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * подтверждённой (машина разрешает и `new → cancelled`, а экшен доступен по
  * сети мимо интерфейса) и она освобождает даты. */
 
-const { authMock, transaction, forUpdate, availUpdate } = vi.hoisted(() => ({
+const { authMock, transaction, availUpdate } = vi.hoisted(() => ({
   authMock: vi.fn(),
   transaction: vi.fn(),
-  forUpdate: vi.fn(),
   availUpdate: vi.fn(),
 }));
 
@@ -26,10 +25,11 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 import { cancelConfirmedByOwner } from "@/server/actions/owner";
 
 const OWNER = "01OWNER";
+const LISTING = "01LISTING";
 
 const request = (status: string) => ({
   id: "01REQ",
-  listingId: "01LISTING",
+  listingId: LISTING,
   ownerUserId: OWNER,
   customerUserId: "01CUSTOMER",
   status,
@@ -40,13 +40,28 @@ const request = (status: string) => ({
 
 // Транзакция подставляет заявку в нужном статусе и запоминает, обновлялась ли
 // занятость.
+/* Фейковая транзакция повторяет НАСТОЯЩИЙ порядок обращений мутации:
+ * 1) заявка без блокировки — узнать, какая это вещь;
+ * 2) объявление FOR UPDATE — правило LOCK ORDER в шапке owner.ts;
+ * 3) заявка и соседи одним упорядоченным запросом FOR UPDATE.
+ * Порядок зафиксирован: сломается он в коде — тест это заметит. */
 function runWith(status: string) {
   transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
+    const req = request(status);
     const tx = {
       select: () => ({
-        from: () => ({ where: () => ({ for: () => ({ limit: forUpdate }) }) }),
+        from: () => ({
+          where: () => ({
+            // Шаг 1: без блокировки.
+            limit: async () => [{ listingId: LISTING, ownerUserId: req.ownerUserId }],
+            // Шаг 2: объявление под блокировкой.
+            for: () => ({ limit: async () => [{ id: LISTING, quantity: 1 }] }),
+            // Шаг 3: набор заявок под блокировкой.
+            orderBy: () => ({ for: () => ({ limit: async () => [req] }) }),
+          }),
+        }),
       }),
-      update: (table: { toString?: () => string }) => ({
+      update: () => ({
         set: (values: Record<string, unknown>) => ({
           where: async () => {
             if ("bookedQty" in values) availUpdate(values);
@@ -55,7 +70,6 @@ function runWith(status: string) {
       }),
       insert: () => ({ values: async () => undefined }),
     };
-    forUpdate.mockResolvedValue([request(status)]);
     await fn(tx);
   });
 }
