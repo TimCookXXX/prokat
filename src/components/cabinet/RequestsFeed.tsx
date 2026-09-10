@@ -67,7 +67,9 @@ function TimeLeft({ row }: { row: FeedRow }) {
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-sm bg-selected px-2 py-0.5 text-2xs font-semibold text-selected-foreground">
       <Clock className="h-3 w-3" aria-hidden="true" />
-      осталось {left}
+      {/* SSR и гидрация считают от разных моментов: на минутной границе текст
+        * расходится, и React шумел бы. */}
+      <span suppressHydrationWarning>осталось {left}</span>
     </span>
   );
 }
@@ -339,7 +341,7 @@ export function RequestsFeed({
                   {row.peer.name ?? (row.side === "owner" ? "клиент" : "продавец")}
                 </td>
                 <td className="px-3 py-2.5"><StatusBadge row={row} /></td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-sm text-muted-foreground">
+                <td className="whitespace-nowrap px-3 py-2.5 text-sm text-muted-foreground" suppressHydrationWarning>
                   {row.status === "new" ? (formatTimeLeft(new Date(row.expiresAt)) ?? "—") : "—"}
                 </td>
               </tr>

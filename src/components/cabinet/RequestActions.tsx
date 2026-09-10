@@ -92,7 +92,7 @@ export function RequestActions({ requestId, side, status }: {
           </Button>
           {/* Комментарий у неявки — как у отказа: это терминальный ярлык на
             * человека, и возразить ему нечем. Пусть хотя бы знает причину. */}
-          <Button size="sm" variant="ghost" pending={pending} onClick={() => run(() => noShowRequest(requestId, comment))}>
+          <Button size="sm" variant="ghost" pending={pending} onClick={() => run(() => noShowRequest(requestId, comment || undefined))}>
             Неявка
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setShowComment((s) => !s)}>
@@ -116,7 +116,9 @@ export function RequestActions({ requestId, side, status }: {
             confirmLabel="Отменить бронь"
             destructive
             onConfirm={async () => {
-              const r = await cancelConfirmedByOwner(requestId, comment);
+              // Пустая строка стёрла бы комментарий, оставленный при
+              // подтверждении: undefined значит «не трогать».
+              const r = await cancelConfirmedByOwner(requestId, comment || undefined);
               if (!r.ok) throw new Error(humanError(r.error ?? ""));
             }}
           />

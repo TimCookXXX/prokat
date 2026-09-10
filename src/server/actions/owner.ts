@@ -185,6 +185,7 @@ async function transitionRequest(
 
   const db = getDb();
   let mail: Parameters<typeof queueBookingMail>[0] | null = null;
+  const rivalMails: Parameters<typeof queueBookingMail>[0][] = [];
   try {
     await db.transaction(async (tx) => {
       // Какая это вещь — читаем без блокировки: лочить надо объявление, а его
@@ -318,6 +319,16 @@ async function transitionRequest(
           kind: "request_declined",
           meta: { requestId: rival.id, from: rival.dateFrom, to: rival.dateTo, qty: rival.qty },
         });
+        // Для арендатора конкурента это тот же отказ, что и ручной, — и
+        // письмо то же. Копим и шлём после коммита: писем внутри транзакции
+        // не бывает. Набор ограничен RIVALS_LIMIT, ящик — квотой получателя.
+        rivalMails.push({
+          kind: "declined",
+          recipientId: rival.customerUserId,
+          listingTitle: listing.title,
+          dateFrom: rival.dateFrom,
+          dateTo: rival.dateTo,
+        });
         const rivalNotified = await notify(tx, {
           recipientId: rival.customerUserId,
           actorId: userId,
@@ -384,6 +395,7 @@ async function transitionRequest(
   // Лента одна на обе роли, поэтому адрес тоже один. Сводка — отдельно:
   // решение принимают и там, и карточка «требует действия» обязана уйти.
   if (mail) queueBookingMail(mail);
+  for (const m of rivalMails) queueBookingMail(m);
   revalidatePath("/cabinet/requests");
   revalidatePath("/cabinet");
   return { ok: true, data: undefined };

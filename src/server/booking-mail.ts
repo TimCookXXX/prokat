@@ -11,9 +11,10 @@
 // приложении уже горит, письмо здесь — дублирующий канал. sendMail сам пишет
 // причину в лог.
 //
-// Квоты две. Своя (mail_booking) МЕНЬШЕ общей и проверяется первой: активный
-// день по заявкам не должен съедать квоту, без которой не уходят письма входа.
-// Общую (mail_daily) списывает sendMail — провайдер считает все письма вместе.
+// Квоты две. Своя (mail_booking) считается ПО ПОЛУЧАТЕЛЮ: общий на сервис
+// бакет позволял бы циклом «создал заявку → отменил» выесть суточную квоту
+// всего сервиса и заодно бомбить один ящик. Общую (mail_daily) списывает
+// sendMail — провайдер считает все письма вместе, она и защищает сервис.
 //
 // Забаненным не шлём: подписки на письма у сервиса нет, а бан — единственный
 // случай, когда аккаунт жив, но писать ему уже не о чем.
@@ -39,9 +40,8 @@ export function queueBookingMail(input: {
 
   after(async () => {
     try {
-      const quota = checkLimit("service", "mail_booking");
-      if (!quota.ok) return;
-
+      // Получатель раньше квоты: забаненный или безадресный не должен тратить
+      // слот, которого потом не хватит настоящему письму.
       const rows = await getDb()
         .select({ email: users.email, bannedAt: users.bannedAt })
         .from(users)
@@ -50,14 +50,25 @@ export function queueBookingMail(input: {
       const recipient = rows[0];
       if (!recipient?.email || recipient.bannedAt) return;
 
+      const quota = checkLimit(input.recipientId, "mail_booking");
+      if (!quota.ok) {
+        // sendMail сюда не дошёл и в лог ничего не написал — пишем сами,
+        // иначе пропавшие письма неотличимы от неотправлявшихся.
+        console.warn(`[mail] booking mail skipped: recipient quota, kind=${input.kind}`);
+        return;
+      }
+
       const period = input.dateFrom === input.dateTo
         ? formatDayMonth(input.dateFrom)
         : `${formatDayMonth(input.dateFrom)} — ${formatDayMonth(input.dateTo)}`;
       const link = `${getEnv().NEXTAUTH_URL.replace(/\/$/, "")}/cabinet/requests`;
 
       await sendMail(bookingEmail(input.kind, recipient.email, input.listingTitle, period, link));
-    } catch {
-      // Причина уже в логе sendMail; ронять нечего — ответ давно ушёл.
+    } catch (e) {
+      // sendMail пишет причину сетевых отказов сам, но исчерпание общей квоты
+      // он бросает ДО отправки — фиксируем и его, ронять нечего: ответ ушёл.
+      const reason = e instanceof Error ? e.message : String(e);
+      console.warn(`[mail] booking mail failed: kind=${input.kind}: ${reason}`);
     }
   });
 }

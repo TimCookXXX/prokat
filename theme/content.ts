@@ -185,6 +185,8 @@ export const content = {
     declinedIntro: "Владелец отклонил вашу заявку.",
     cancelledSubject: "Бронь отменена",
     cancelledIntro: "Бронь по вашей сделке отменена.",
+    withdrawnSubject: "Заявку отозвали",
+    withdrawnIntro: "Человек отозвал свою заявку на бронь.",
     open: "Открыть заявки:",
   },
   chatSystem: {

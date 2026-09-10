@@ -322,12 +322,7 @@ async function deals(
       listingTitle: listings.title,
       listingSlug: listings.slug,
       listingStatus: listings.status,
-      // Обложка в SQL, как в getThreadList: весь photos_json ради миниатюры
-      // не тянем.
-      listingImage: sql<string | null>`${listings.photosJson}->0->>'url'`,
-      listingPriceDay: listings.priceDay,
       listerBannedAt: lister.bannedAt,
-      threadId: chatThreads.id,
       citySlug: cities.slug,
       categorySlug: categories.slug,
       dateFrom: bookingRequests.dateFrom,

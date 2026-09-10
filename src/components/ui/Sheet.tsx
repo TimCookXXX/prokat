@@ -50,8 +50,15 @@ export function Sheet({
   children: React.ReactNode;
 }) {
   const desktop = useIsDesktop();
-  // Направление фиксируется на момент открытия (см. шапку файла).
-  const [side, setSide] = React.useState<"right" | "bottom">("right");
+  /* Направление фиксируется на момент открытия. Инициализация ленивая и
+   * читает экран сразу: со стартовым "right" первый open на телефоне (и любой
+   * deep-link из мессенджера — типично мобильный сценарий) коммитил правую
+   * панель и перещёлкивал её вниз посреди входной анимации. На сервере ширины
+   * нет, но там шторка и не открывается. */
+  const [side, setSide] = React.useState<"right" | "bottom">(() =>
+    typeof window === "undefined" || window.matchMedia(DESKTOP).matches
+      ? "right"
+      : "bottom");
   React.useEffect(() => {
     // desktop нарочно не в зависимостях: направление меняется только на
     // открытии, а не при каждой смене ширины под открытой шторкой.
@@ -63,8 +70,12 @@ export function Sheet({
     <Drawer.Root open={open} onOpenChange={onOpenChange} direction={side}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        {/* Настоящий Title, а не aria-label: Radix ищет элемент по id и
+          * пишет console.error на каждое открытие, не глядя на aria-label.
+          * aria-describedby гасим — описания у шторки нет, а Radix проставляет
+          * ссылку всегда. */}
         <Drawer.Content
-          aria-label={label}
+          aria-describedby={undefined}
           className={cn(
             "fixed z-50 flex flex-col border-border bg-card focus:[outline:none]",
             right
@@ -78,6 +89,7 @@ export function Sheet({
               <div className="mx-auto h-1 w-10 rounded-pill bg-border" />
             </div>
           )}
+          <Drawer.Title className="sr-only">{label}</Drawer.Title>
           <Drawer.Close
             aria-label="Закрыть"
             className="absolute right-3 top-3 z-10 rounded-sm p-1.5 text-muted-foreground transition-colors hoverable hover:text-foreground"

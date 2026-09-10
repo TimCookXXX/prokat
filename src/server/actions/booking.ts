@@ -254,7 +254,9 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
       const titleRows = await tx.select({ title: listings.title })
         .from(listings).where(eq(listings.id, req.listingId)).limit(1);
       mail = {
-        kind: "cancelled",
+        // Отзыв new и отмена confirmed — разные события: во втором случае
+        // рушится существующая договорённость, в первом её ещё не было.
+        kind: req.status === "confirmed" ? "cancelled" : "withdrawn",
         recipientId: req.ownerUserId,
         listingTitle: titleRows[0]?.title ?? "",
         dateFrom: req.dateFrom,

@@ -10,7 +10,9 @@ import type { FeedRow } from "@/components/cabinet/RequestsFeed";
 
 export function toFeedRow(r: CabinetRequestRow, today: string): FeedRow {
   const hot = r.side === "owner" && r.status === "new";
-  const overdue = r.status === "confirmed" && r.dateTo < today;
+  // Только владельцу: отметить итог может он один, и охряный призыв к
+  // действию у арендатора звал бы туда, где кнопок нет.
+  const overdue = r.side === "owner" && r.status === "confirmed" && r.dateTo < today;
   const days = rentalDaysCount({ from: r.dateFrom, to: r.dateTo, qty: r.qty });
   return {
     ...r,

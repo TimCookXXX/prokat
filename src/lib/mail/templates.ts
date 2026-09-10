@@ -42,7 +42,11 @@ function bookingBody(intro: string, listingTitle: string, period: string, link: 
   return `${intro}\n\n${listingTitle}\n${period}\n\n${b.open}\n${link}\n\n— ${m.brand}`;
 }
 
-export type BookingMailKind = "created" | "confirmed" | "declined" | "cancelled";
+export type BookingMailKind =
+  | "created" | "confirmed" | "declined" | "cancelled"
+  /** Арендатор отозвал НОВУЮ заявку: брони не существовало, и письмо
+   *  «бронь отменена» владельцу врало бы. */
+  | "withdrawn";
 
 export function bookingEmail(
   kind: BookingMailKind,
@@ -56,6 +60,7 @@ export function bookingEmail(
     confirmed: [b.confirmedSubject, b.confirmedIntro],
     declined: [b.declinedSubject, b.declinedIntro],
     cancelled: [b.cancelledSubject, b.cancelledIntro],
+    withdrawn: [b.withdrawnSubject, b.withdrawnIntro],
   } as const;
   const [subject, intro] = map[kind];
   return { to, subject, text: bookingBody(intro, listingTitle, period, link) };
