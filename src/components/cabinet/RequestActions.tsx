@@ -13,7 +13,7 @@ import {
   cancelConfirmedByOwner, completeRequest, confirmRequest, declineRequest, noShowRequest,
 } from "@/server/actions/owner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { CancelRequestButton } from "@/components/booking/CancelRequestButton";
+import { cancelBookingRequest } from "@/server/actions/booking";
 import { field } from "@/components/ui/field";
 import { canTransition, type BookingStatus } from "@/lib/catalog/booking-status";
 import type { RequestSide } from "@/lib/booking/request-access";
@@ -45,13 +45,33 @@ export function RequestActions({ requestId, side, status }: {
     });
   };
 
-  // Арендатор решений по заявке не принимает — он может только отозвать свою.
+  // Арендатор решений по заявке не принимает — он может только закрыть свою.
+  // Отзыв новой и отмена подтверждённой — разные события с разными словами:
+  // во втором случае рушится договорённость, в первом её ещё не было. Журнал
+  // и письма это уже различают — кнопка не должна их смешивать.
   if (side === "customer") {
     if (!canTransition(status, "cancelled")) return null;
+    const confirmed = status === "confirmed";
     return (
-      <div className="flex justify-end">
-        <CancelRequestButton requestId={requestId} />
-      </div>
+      <ConfirmDialog
+        trigger={
+          <Button size="sm" variant="outline" className="text-destructive">
+            {confirmed ? "Отменить бронь" : "Отозвать заявку"}
+          </Button>
+        }
+        title={confirmed ? "Отменить бронь?" : "Отозвать заявку?"}
+        description={confirmed
+          ? "Бронь закроется, даты освободятся, владелец получит уведомление. "
+            + "Если планы снова изменятся, придётся подать заявку заново."
+          : "Заявка закроется, владелец получит уведомление. "
+            + "Передумаете — просто подайте заявку ещё раз."}
+        confirmLabel={confirmed ? "Отменить бронь" : "Отозвать"}
+        destructive
+        onConfirm={async () => {
+          const r = await cancelBookingRequest(requestId);
+          if (!r.ok) throw new Error(humanError(r.error ?? ""));
+        }}
+      />
     );
   }
 

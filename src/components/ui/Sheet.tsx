@@ -35,22 +35,16 @@ export function Sheet({
   children: React.ReactNode;
 }) {
   const desktop = useIsDesktop();
-  /* Направление фиксируется на момент открытия. Инициализация ленивая и
-   * читает экран сразу: со стартовым "right" первый open на телефоне (и любой
-   * deep-link из мессенджера — типично мобильный сценарий) коммитил правую
-   * панель и перещёлкивал её вниз посреди входной анимации. На сервере ширины
-   * нет, но там шторка и не открывается. */
-  const [side, setSide] = React.useState<"right" | "bottom">(() =>
-    desktop ? "right" : "bottom");
-  React.useEffect(() => {
-    // desktop нарочно не в зависимостях: направление меняется только на
-    // открытии, а не при каждой смене ширины под открытой шторкой.
-    if (open) setSide(desktop ? "right" : "bottom");
-  }, [open]);
-
-  const right = side === "right";
+  /* Направление выводится из ширины НАПРЯМУЮ, без заморозки на открытии.
+   * Заморозка здесь была и сломала deep-link: по ?request= шторка открыта с
+   * первого рендера, а useSyncExternalStore на гидрационном проходе обязан
+   * вернуть серверный снапшот («мобайл») — и десктоп получал лист снизу,
+   * закреплённый навсегда. Цена прямого вывода — редкий ресайз под открытой
+   * шторкой переанкерит её; это мельче, чем неверная сторона у каждой
+   * пересланной ссылки. */
+  const right = desktop;
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange} direction={side}>
+    <Drawer.Root open={open} onOpenChange={onOpenChange} direction={right ? "right" : "bottom"}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-50 bg-black/50" />
         {/* Настоящий Title, а не aria-label: Radix ищет элемент по id и
