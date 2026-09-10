@@ -304,10 +304,10 @@ export function RequestsFeed({
           <thead>
             <tr className="[&>th]:px-3 [&>th]:py-2.5 [&>th]:text-left [&>th]:font-mono [&>th]:text-2xs [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-mono [&>th]:text-muted-foreground">
               <th scope="col">вещь</th>
-              <th scope="col" className="w-[120px]">период</th>
-              <th scope="col" className="w-[130px]">кто</th>
-              <th scope="col" className="w-[136px]">статус</th>
-              <th scope="col" className="w-[104px]">срок</th>
+              <th scope="col" className="w-[112px]">период</th>
+              <th scope="col" className="w-[118px]">кто</th>
+              <th scope="col" className="w-[172px]">статус</th>
+              <th scope="col" className="w-[88px]">срок</th>
             </tr>
           </thead>
           <tbody>
