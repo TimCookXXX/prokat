@@ -65,7 +65,9 @@ export default async function CabinetListingPage({
   if (!listing) notFound();
 
   const isArchived = listing.status === "archived";
-  const backHref = isArchived ? "/cabinet/listings/archive" : "/cabinet/listings";
+  // Архив — вид фильтра в списке, а не отдельная страница: возвращаемся туда,
+  // откуда пришли, а не в общий список, где архивной вещи не видно.
+  const backHref = isArchived ? "/cabinet/listings?view=archived" : "/cabinet/listings";
   const selfHref = `/cabinet/listings/${listing.id}`;
   const publicHref = listingPath(
     listing.citySlug, listing.categorySlug, listing.slug, listing.id,
@@ -140,10 +142,13 @@ export default async function CabinetListingPage({
 
       {/* Шапка вещи — карточка, а не голый текст: страница целиком стояла на
         * фоне без единой подложки и читалась документом, а не экраном. */}
-      <header className="surface flex flex-col gap-4 p-4 sm:flex-row sm:p-5">
-        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
+      <header className="surface flex items-start gap-3 p-3 sm:gap-4 sm:p-5">
+        {/* На телефоне снимок и кегли на ступень мельче: справа стоит пара
+          * «статус + меню», и в полном размере название ломалось на две строки,
+          * а «залог» отрывался от суммы. */}
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted sm:h-20 sm:w-20">
           {photo ? (
-            <Image src={photo.url} alt="" fill sizes="80px" className="object-cover" />
+            <Image src={photo.url} alt="" fill sizes="(max-width: 640px) 56px, 80px" className="object-cover" />
           ) : (
             <span className="flex h-full items-center justify-center text-muted-foreground">
               <ImageOff className="h-6 w-6" aria-hidden="true" />
@@ -151,50 +156,57 @@ export default async function CabinetListingPage({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
-            <h2 className="min-w-0 flex-1 break-words font-display text-xl font-bold leading-tight">
-              {listing.title}
-            </h2>
-            <span className="shrink-0 rounded-sm bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              {STATUS_WORD[listing.status]}
-            </span>
-          </div>
-          <p className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5">
-            <span className="font-mark text-lg font-bold tracking-mark">
-              {formatPrice(listing.priceDay)}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              в сутки · {formatDeposit(listing.depositType, listing.depositAmount)}
-              {listing.quantity > 1 ? ` · ${listing.quantity} шт.` : ""}
-            </span>
-          </p>
-          <p className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <Link
-              href={`${selfHref}?tab=edit` as never}
-              className="rounded-sm border border-border px-2.5 py-1 hoverable"
-            >
-              Править
-            </Link>
-            {/* Витрина только у активного: у скрытого и архивного публичной
-              * страницы нет, ссылка вела бы в 404. */}
-            {listing.status === "active" && (
+          {/* Название ведёт на само объявление — туда, где его видят арендаторы.
+            * Ссылка только у активного: у скрытого и архивного публичной страницы
+            * нет, и переход отдал бы 404. У них название остаётся текстом, а
+            * почему — говорит плашка статуса рядом. */}
+          <h2 className="break-words font-display text-base font-bold leading-tight sm:text-xl">
+            {listing.status === "active" ? (
               <Link
                 href={publicHref as never}
-                className="rounded-sm border border-border px-2.5 py-1 hoverable"
+                className="transition-colors hover:text-accent"
               >
-                Смотреть на витрине
+                {listing.title}
               </Link>
+            ) : listing.title}
+          </h2>
+          <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-xs text-muted-foreground sm:mt-1.5 sm:text-sm">
+            <span className="font-mark text-base font-bold tracking-mark text-foreground sm:text-lg">
+              {formatPrice(listing.priceDay)}
+            </span>
+            <span>в сутки</span>
+            {/* Залог целиком: без nowrap «залог» отрывался от суммы и уезжал
+              * на свою строку. */}
+            <span className="whitespace-nowrap">
+              · {formatDeposit(listing.depositType, listing.depositAmount)}
+            </span>
+            {listing.quantity > 1 && (
+              <span className="whitespace-nowrap">· {listing.quantity} шт.</span>
             )}
-            {/* Скрыть, показать, убрать в архив — тем же меню, что в списке.
-              * Без него страница вещи не умела единственного, что умеет список,
-              * и «всё про вещь в одном месте» было неправдой. */}
-            <ListingRowActions
-              listingId={listing.id}
-              status={listing.status}
-              title={listing.title}
-              publicHref={publicHref}
-            />
           </p>
+        </div>
+
+        {/* self-start: группа держится уровня ПЕРВОЙ строки названия, а не
+          * середины блока, когда название переносится. Явно, а не в надежде на
+          * items-start родителя — тот легко поменять, не заметив следствия.
+          *
+          * Отрицательный отступ сверху — оптическое выравнивание, а не сдвиг
+          * «на глаз»: кнопка меню высотой 36px, а первая строка названия — 20px
+          * на мобиле и 25px от sm. Содержимое группы центрируется в её 36
+          * пикселях и без этой поправки висит ниже строки на половину разницы.
+          *
+          * Кнопками «Править» и «Смотреть объявление» шапка занимала третий ряд
+          * ради двух переходов; в меню они и так есть. */}
+        <div className="-mt-2 flex shrink-0 items-center gap-1 self-start sm:-mt-1.5 sm:gap-2">
+          <span className="whitespace-nowrap rounded-sm bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground sm:px-2 sm:text-xs">
+            {STATUS_WORD[listing.status]}
+          </span>
+          <ListingRowActions
+            listingId={listing.id}
+            status={listing.status}
+            title={listing.title}
+            publicHref={publicHref}
+          />
         </div>
       </header>
 

@@ -1,0 +1,28 @@
+// Чип фильтра: один ряд взаимоисключающих видов над списком. Строкой классов,
+// а не компонентом, по образцу ui/card-frame.ts — потребители у чипа разные по
+// природе: где-то это <Link> со сменой адреса, где-то <button>.
+//
+// Скругление 8px, а не капсула: по theme/tokens.schema.md капсула отдана
+// счётчикам-кружкам и полосе лоадера, а чипу положен --radius-sm.
+//
+// Ховер висит только на невыбранном: у выбранного подсветка спорила бы с
+// заливкой состояния. Гасить её через .hoverable не нужно — класса там просто
+// нет.
+const BASE =
+  "inline-flex h-8 items-center gap-1.5 rounded-sm border px-3 text-xs font-medium "
+  + "ring-offset-background transition-[color,background-color,border-color,transform] "
+  + "duration-150 ease-out active:scale-[0.97] focus-visible:[outline:none] "
+  + "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 "
+  + "motion-reduce:transition-none motion-reduce:active:scale-100";
+
+export function filterChip(active: boolean): string {
+  return active
+    ? `${BASE} border-selected bg-selected font-semibold text-selected-foreground`
+    : `${BASE} border-border text-muted-foreground hoverable hover:text-foreground`;
+}
+
+/* Счётчик внутри чипа. Не окрашен: охра в этом ряду уже занята состоянием
+ * «выбрано», и второй охряной элемент спорил бы с ним. Приглушаем кеглем, а не
+ * альфой: 12px под opacity-70 дают на холсте 2.95 при норме 4.5, а число здесь
+ * единственный носитель «сколько вещей в виде». */
+export const filterChipCount = "text-2xs tabular-nums";

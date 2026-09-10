@@ -197,7 +197,9 @@ export function ListingsList({ rows }: { rows: ListingRow[] }) {
         {rows.map((row, i) => (
           <li
             key={row.id}
-            className={`flex items-center gap-3 p-3 ${i > 0 ? "border-t border-border" : ""}`}
+            /* items-start, а не center: у длинного названия строка переносится,
+             * и по центру меню с фотографией уезжали бы к середине блока. */
+            className={`flex items-start gap-3 p-3 ${i > 0 ? "border-t border-border" : ""}`}
           >
             <Thumb row={row} size={44} />
             <div className={`min-w-0 flex-1 ${row.status === "active" ? "" : "text-muted-foreground"}`}>

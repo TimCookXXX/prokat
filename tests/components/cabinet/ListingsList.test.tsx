@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 // Меню строки клиентское и зовёт server action — тот тянет next-auth и
@@ -107,6 +107,21 @@ describe("ListingsList", () => {
     render(<ListingsList rows={[row()]} />);
     const triggers = screen.getAllByRole("button", { name: /Действия: Перфоратор/ });
     expect(triggers.length).toBeGreaterThan(0);
+  });
+
+  // Меню — единственное место, где живут смена статуса и архивация, поэтому
+  // его состав проверяем: пропавший пункт иначе заметить нечем.
+  it("в меню строки есть переходы и смена статуса", async () => {
+    const { container } = render(<ListingsList rows={[row()]} />);
+    const trigger = within(container.querySelector("table")!)
+      .getByRole("button", { name: /Действия: Перфоратор/ });
+    // Radix раскрывает меню по pointerdown, а не по click.
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
+
+    expect(await screen.findByRole("menuitem", { name: /Править/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Смотреть объявление/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Скрыть/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /В архив/ })).toBeInTheDocument();
   });
 
   it("обе раскладки показывают один и тот же список", () => {
