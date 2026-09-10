@@ -87,12 +87,14 @@ export function RequestActions({ requestId, side, status }: {
     return (
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" pending={pending} onClick={() => run(() => completeRequest(requestId))}>
+          {/* Зелёная одна на ряд — она и делает остальные опознаваемыми
+            * кнопками: ряд из одних ghost читался голым текстом. */}
+          <Button size="sm" pending={pending} onClick={() => run(() => completeRequest(requestId))}>
             Завершена
           </Button>
           {/* Комментарий у неявки — как у отказа: это терминальный ярлык на
             * человека, и возразить ему нечем. Пусть хотя бы знает причину. */}
-          <Button size="sm" variant="ghost" pending={pending} onClick={() => run(() => noShowRequest(requestId, comment || undefined))}>
+          <Button size="sm" variant="outline" pending={pending} onClick={() => run(() => noShowRequest(requestId, comment || undefined))}>
             Неявка
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setShowComment((s) => !s)}>
@@ -103,7 +105,7 @@ export function RequestActions({ requestId, side, status }: {
             * Подтверждение обязательно — действие терминально. */}
           <ConfirmDialog
             trigger={
-              <Button size="sm" variant="ghost" className="text-destructive">
+              <Button size="sm" variant="outline" className="text-destructive">
                 Отменить бронь
               </Button>
             }
