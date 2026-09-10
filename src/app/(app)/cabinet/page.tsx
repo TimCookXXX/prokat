@@ -4,7 +4,8 @@ import { Bell, ArrowRight } from "lucide-react";
 import { requireAuthState } from "@/lib/auth/guard";
 import { getCabinetSummary, type CabinetDeal } from "@/server/cabinet";
 import { formatDayMonth, formatTimeLeft } from "@/lib/catalog/dates";
-import { listingPath } from "@/lib/catalog/listing-path";
+import { requestListingHref } from "@/lib/booking/listing-link";
+import type { RequestSide } from "@/lib/booking/request-access";
 import { Stats } from "@/components/cabinet/StatTile";
 import { RequestActions } from "@/components/cabinet/RequestActions";
 import { Button } from "@/components/ui/button";
@@ -54,7 +55,7 @@ export default async function CabinetIndex() {
           linkLabel="Все заявки"
         >
           {lending.map((d) => (
-            <DealRow key={d.id} deal={d} peerPrefix="у" />
+            <DealRow key={d.id} deal={d} peerPrefix="у" side="owner" />
           ))}
         </Section>
       )}
@@ -67,7 +68,7 @@ export default async function CabinetIndex() {
           linkLabel="Все мои заявки"
         >
           {borrowing.map((d) => (
-            <DealRow key={d.id} deal={d} peerPrefix="от" />
+            <DealRow key={d.id} deal={d} peerPrefix="от" side="customer" />
           ))}
         </Section>
       )}
@@ -160,15 +161,26 @@ function PendingCard({ deal }: { deal: CabinetDeal }) {
   );
 }
 
-function DealRow({ deal, peerPrefix }: { deal: CabinetDeal; peerPrefix: string }) {
+function DealRow({
+  deal, peerPrefix, side,
+}: {
+  deal: CabinetDeal;
+  peerPrefix: string;
+  /** Сторона известна секцией и решает, куда вести с убранной вещи. */
+  side: RequestSide;
+}) {
+  const href = requestListingHref(deal.listing, side);
   return (
     <article className="surface flex flex-wrap items-center gap-x-4 gap-y-1 p-4">
-      <Link
-        href={listingPath(deal.citySlug, deal.categorySlug, deal.listingSlug, deal.listingId) as never}
-        className="min-w-0 flex-1 font-medium hover:text-accent"
-      >
-        {deal.listingTitle}
-      </Link>
+      {/* Сделка подтверждена, но вещь могли убрать посреди аренды — ссылки
+        * тогда может и не быть, см. lib/booking/listing-link. */}
+      {href ? (
+        <Link href={href as never} className="min-w-0 flex-1 font-medium hover:text-accent">
+          {deal.listingTitle}
+        </Link>
+      ) : (
+        <p className="min-w-0 flex-1 font-medium">{deal.listingTitle}</p>
+      )}
       <span className="text-sm text-muted-foreground">{dates(deal)}</span>
       <span className="text-sm text-muted-foreground">
         {peerPrefix} {peerLabel(deal)}

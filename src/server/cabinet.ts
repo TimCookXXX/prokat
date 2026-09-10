@@ -10,14 +10,14 @@ import type { BookingStatus } from "@/lib/catalog/booking-status";
 import {
   disclosedPhone, requestSide, type RequestSide,
 } from "@/lib/booking/request-access";
+import type { LinkableListing } from "@/lib/booking/listing-link";
 
 export interface CabinetDeal {
   id: string;
-  listingId: string;
   listingTitle: string;
-  listingSlug: string;
-  citySlug: string;
-  categorySlug: string;
+  /** Та же тройка полей, что и у строки ленты, и по той же причине: сводка
+   *  показывает подтверждённые сделки, а вещь могли убрать посреди аренды. */
+  listing: LinkableListing;
   dateFrom: string;
   dateTo: string;
   qty: number;
@@ -40,13 +40,9 @@ export interface CabinetRequestRow {
   expiresAt: Date;
   ownerComment: string | null;
   customerComment: string | null;
-  listing: {
-    id: string;
-    title: string;
-    slug: string;
-    citySlug: string;
-    categorySlug: string;
-  };
+  /** Всё, что нужно ссылке на вещь: публичный контур закрывают и статус, и бан
+   *  владельца — см. lib/booking/listing-link. */
+  listing: LinkableListing & { title: string };
   peer: { id: string; name: string | null };
   /** Телефон второй стороны или null — см. lib/booking/request-access. */
   peerPhone: string | null;
@@ -98,6 +94,9 @@ export async function getCabinetRequests(
   await expireStaleRequests();
 
   const peer = alias(users, "peer");
+  // Владелец вещи отдельным join'ом, а не через peer: peer им оказывается
+  // только когда смотрит арендатор, а бан нужен знать в обоих случаях.
+  const lister = alias(users, "lister");
 
   const query = getDb()
     .select({
@@ -116,6 +115,8 @@ export async function getCabinetRequests(
       listingId: listings.id,
       listingTitle: listings.title,
       listingSlug: listings.slug,
+      listingStatus: listings.status,
+      listerBannedAt: lister.bannedAt,
       citySlug: cities.slug,
       categorySlug: categories.slug,
       peerId: peer.id,
@@ -126,6 +127,7 @@ export async function getCabinetRequests(
     .innerJoin(listings, eq(listings.id, bookingRequests.listingId))
     .innerJoin(cities, eq(cities.id, listings.cityId))
     .innerJoin(categories, eq(categories.id, listings.categoryId))
+    .innerJoin(lister, eq(lister.id, listings.ownerUserId))
     // Вторая сторона одним join'ом: кто именно — решает та же колонка, что и
     // права, поэтому условие вычисляется, а не выбирается снаружи.
     .innerJoin(peer, sql`${peer.id} = case
@@ -167,6 +169,8 @@ export async function getCabinetRequests(
         slug: r.listingSlug,
         citySlug: r.citySlug,
         categorySlug: r.categorySlug,
+        status: r.listingStatus,
+        ownerBannedAt: r.listerBannedAt,
       },
       peer: { id: r.peerId, name: r.peerName },
       // peer.phone — профиль второй стороны, и владельцем она оказывается
@@ -290,15 +294,18 @@ async function deals(
   status: "new" | "confirmed",
 ): Promise<CabinetDeal[]> {
   const peer = alias(users, "peer");
+  const lister = alias(users, "lister");
   const mineColumn = side === "owner" ? bookingRequests.ownerUserId : bookingRequests.customerUserId;
   const peerColumn = side === "owner" ? bookingRequests.customerUserId : bookingRequests.ownerUserId;
 
-  return getDb()
+  const rows = await getDb()
     .select({
       id: bookingRequests.id,
       listingId: bookingRequests.listingId,
       listingTitle: listings.title,
       listingSlug: listings.slug,
+      listingStatus: listings.status,
+      listerBannedAt: lister.bannedAt,
       citySlug: cities.slug,
       categorySlug: categories.slug,
       dateFrom: bookingRequests.dateFrom,
@@ -311,8 +318,27 @@ async function deals(
     .innerJoin(listings, eq(listings.id, bookingRequests.listingId))
     .innerJoin(cities, eq(cities.id, listings.cityId))
     .innerJoin(categories, eq(categories.id, listings.categoryId))
+    .innerJoin(lister, eq(lister.id, listings.ownerUserId))
     .innerJoin(peer, eq(peer.id, peerColumn))
     .where(and(eq(mineColumn, userId), eq(bookingRequests.status, status)))
     .orderBy(status === "new" ? asc(bookingRequests.expiresAt) : asc(bookingRequests.dateFrom))
     .limit(5);
+
+  return rows.map((r) => ({
+    id: r.id,
+    listingTitle: r.listingTitle,
+    listing: {
+      id: r.listingId,
+      slug: r.listingSlug,
+      citySlug: r.citySlug,
+      categorySlug: r.categorySlug,
+      status: r.listingStatus,
+      ownerBannedAt: r.listerBannedAt,
+    },
+    dateFrom: r.dateFrom,
+    dateTo: r.dateTo,
+    qty: r.qty,
+    expiresAt: r.expiresAt,
+    peerName: r.peerName,
+  }));
 }

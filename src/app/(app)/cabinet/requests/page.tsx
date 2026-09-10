@@ -6,10 +6,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { filterChip } from "@/components/ui/filter-chip";
 import { CountersSync } from "@/components/realtime/CountersSync";
 import { requireAuthState } from "@/lib/auth/guard";
 import { getCabinetRequests } from "@/server/cabinet";
-import { listingPath } from "@/lib/catalog/listing-path";
+import { requestListingHref } from "@/lib/booking/listing-link";
 import { STATUS_BADGE_CLASSES, STATUS_LABELS } from "@/lib/booking/status-labels";
 import { formatDayMonth } from "@/lib/catalog/dates";
 import { RequestActions } from "@/components/cabinet/RequestActions";
@@ -67,11 +68,7 @@ export default async function CabinetRequestsPage({
               key={f.label}
               href={(f.role ? `/cabinet/requests?role=${f.role}` : "/cabinet/requests") as never}
               aria-current={active ? "page" : undefined}
-              className={`rounded-pill border px-3 py-1.5 text-sm ${
-                active
-                  ? "border-selected bg-selected text-selected-foreground"
-                  : "border-border text-muted-foreground hoverable"
-              }`}
+              className={filterChip(active)}
             >
               {f.label}
             </Link>
@@ -97,6 +94,7 @@ export default async function CabinetRequestsPage({
               : `${formatDayMonth(row.dateFrom)} — ${formatDayMonth(row.dateTo)}`;
             // Комментарий показываем чужой: свой человек и так помнит.
             const peerComment = owner ? row.customerComment : row.ownerComment;
+            const listingHref = requestListingHref(row.listing, side);
             return (
               <li
                 key={row.id}
@@ -111,17 +109,17 @@ export default async function CabinetRequestsPage({
                     <p className="font-mono text-2xs uppercase tracking-mono text-muted-foreground">
                       {owner ? "вы сдаёте" : "вы арендуете"}
                     </p>
-                    <Link
-                      href={listingPath(
-                        row.listing.citySlug,
-                        row.listing.categorySlug,
-                        row.listing.slug,
-                        row.listing.id,
-                      ) as never}
-                      className="font-medium hover:underline underline-offset-2"
-                    >
-                      {row.listing.title}
-                    </Link>
+                    {/* Ссылки может не быть: правило — в requestListingHref. */}
+                    {listingHref ? (
+                      <Link
+                        href={listingHref as never}
+                        className="font-medium hover:underline underline-offset-2"
+                      >
+                        {row.listing.title}
+                      </Link>
+                    ) : (
+                      <p className="font-medium">{row.listing.title}</p>
+                    )}
                     <p className="mt-0.5 text-sm text-muted-foreground">
                       {period}
                       {row.qty > 1 ? ` · ${row.qty} шт.` : ""}
