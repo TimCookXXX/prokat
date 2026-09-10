@@ -25,7 +25,7 @@ import { parseSellerName } from "@/lib/owner/seller-name";
 import {
   unavailableDates, eachDate, type AvailabilityMap,
 } from "@/lib/catalog/availability";
-import { canTransition, type BookingStatus } from "@/lib/catalog/booking-status";
+import { canTransition } from "@/lib/catalog/booking-status";
 import { kindForDecision, type OwnerDecision } from "@/lib/notifications/kinds";
 import { writeDealNote } from "@/server/deal-note";
 import { notify } from "@/server/notifications";
