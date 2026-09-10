@@ -11,6 +11,7 @@ import { getDb } from "@/lib/db";
 import { bookingRequests, categories, cities, events, listings, users } from "@db/schema";
 import { auth } from "@/lib/auth";
 import { newId } from "@/lib/id";
+import { writeDealNote } from "@/server/deal-note";
 import { slugify } from "@/lib/slugify";
 import { notify } from "@/server/notifications";
 import { publish } from "@/server/realtime";
@@ -223,6 +224,10 @@ const banReasonSchema = z.string().trim().min(5, "Причина от 5 симв
 // Уведомления идут после обеих таблиц — этот порядок описан в server/
 // notifications.ts. publish уходит последним оператором, как требует
 // server/realtime.ts.
+// Сколько записей о сделке бан дописывает в переписки. Закрывает он все
+// заявки, а рассказывает о первых — см. цикл ниже.
+const BAN_JOURNAL_LIMIT = 50;
+
 export async function adminBanUser(userId: string, reason: unknown): Promise<ActionResult> {
   const adminId = await requireAdmin();
   if (!adminId) return { ok: false, error: "forbidden" };
@@ -255,7 +260,14 @@ export async function adminBanUser(userId: string, reason: unknown): Promise<Act
       const incoming = await tx.update(bookingRequests)
         .set({ status: "declined", respondedAt: now })
         .where(and(eq(bookingRequests.ownerUserId, userId), stillPending))
-        .returning({ id: bookingRequests.id, counterpartId: bookingRequests.customerUserId });
+        .returning({
+          id: bookingRequests.id,
+          counterpartId: bookingRequests.customerUserId,
+          listingId: bookingRequests.listingId,
+          dateFrom: bookingRequests.dateFrom,
+          dateTo: bookingRequests.dateTo,
+          qty: bookingRequests.qty,
+        });
 
       // Исходящие: забаненный не доведёт аренду до конца, а чужой владелец,
       // ничего не зная, подтвердил бы её и занял даты под аккаунт, которого на
@@ -263,7 +275,14 @@ export async function adminBanUser(userId: string, reason: unknown): Promise<Act
       const outgoing = await tx.update(bookingRequests)
         .set({ status: "cancelled", respondedAt: now })
         .where(and(eq(bookingRequests.customerUserId, userId), stillPending))
-        .returning({ id: bookingRequests.id, counterpartId: bookingRequests.ownerUserId });
+        .returning({
+          id: bookingRequests.id,
+          counterpartId: bookingRequests.ownerUserId,
+          listingId: bookingRequests.listingId,
+          dateFrom: bookingRequests.dateFrom,
+          dateTo: bookingRequests.dateTo,
+          qty: bookingRequests.qty,
+        });
 
       // Подтверждённые заявки бан не трогает по обе стороны: это сделка в
       // реальном мире, вещь может быть уже у арендатора, и даты она держит по
@@ -284,14 +303,19 @@ export async function adminBanUser(userId: string, reason: unknown): Promise<Act
         ...incoming.map((r) => ({
           ...r, kind: "request_declined" as const, side: "customer" as const,
           event: "request_declined",
+          // Забанен владелец: он и есть хозяин вещи, вторая сторона — клиент.
+          ownerUserId: userId, customerUserId: r.counterpartId,
         })),
         ...outgoing.map((r) => ({
           ...r, kind: "request_cancelled" as const, side: "owner" as const,
           event: "cancel_request",
+          // Забанен арендатор: хозяин вещи — вторая сторона.
+          ownerUserId: r.counterpartId, customerUserId: userId,
         })),
       ];
 
       const toPublish: Array<{ kind: RequestNotificationKind; requestId: string; recipientId: string }> = [];
+      let notesLeft = BAN_JOURNAL_LIMIT;
       for (const req of touched) {
         await tx.insert(events).values({
           id: newId(),
@@ -301,6 +325,21 @@ export async function adminBanUser(userId: string, reason: unknown): Promise<Act
           userId: adminId,
           metaJson: { fromStatus: "new", reason: "user_banned" },
         });
+        /* Журнал сделки дописываем, но с потолком. Закрыть заявки обязаны все —
+         * это правильность; запись в тред — рассказ о случившемся, и на бане
+         * тяжёлого аккаунта их могут быть сотни, каждая с find-or-create треда
+         * и вставкой внутри одной транзакции. Что обрезано — видно по числу,
+         * молча этого не происходит. */
+        if (notesLeft > 0) {
+          notesLeft -= 1;
+          await writeDealNote(tx, {
+            listingId: req.listingId,
+            ownerUserId: req.ownerUserId,
+            customerUserId: req.customerUserId,
+            kind: req.kind,
+            meta: { requestId: req.id, from: req.dateFrom, to: req.dateTo, qty: req.qty },
+          });
+        }
         const notified = await notify(tx, {
           recipientId: req.counterpartId,
           actorId: adminId,

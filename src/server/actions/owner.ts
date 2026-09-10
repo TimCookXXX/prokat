@@ -27,6 +27,7 @@ import {
 } from "@/lib/catalog/availability";
 import { canTransition, type BookingStatus } from "@/lib/catalog/booking-status";
 import { kindForDecision, type OwnerDecision } from "@/lib/notifications/kinds";
+import { writeDealNote } from "@/server/deal-note";
 import { notify } from "@/server/notifications";
 import { publish } from "@/server/realtime";
 import { requestNotify } from "@/lib/realtime/events";
@@ -224,6 +225,13 @@ async function transitionRequest(
         event: `request_${to}`,
         userId,
         metaJson: { fromStatus: req.status },
+      });
+      await writeDealNote(tx, {
+        listingId: req.listingId,
+        ownerUserId: req.ownerUserId,
+        customerUserId: req.customerUserId,
+        kind: `request_${to}`,
+        meta: { requestId, from: req.dateFrom, to: req.dateTo, qty: req.qty },
       });
       // Решение принимает владелец — узнать о нём должен арендатор.
       const notified = await notify(tx, {

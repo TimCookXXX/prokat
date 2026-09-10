@@ -27,6 +27,7 @@ import { canTransition, availabilityDelta } from "@/lib/catalog/booking-status";
 import { todayStr } from "@/lib/catalog/dates";
 import { notify } from "@/server/notifications";
 import { publish } from "@/server/realtime";
+import { writeDealNote } from "@/server/deal-note";
 import { requestNotify } from "@/lib/realtime/events";
 
 export type ActionResult<T = void> =
@@ -133,6 +134,16 @@ export async function createBookingRequest(
       userId: session.user.id,
       metaJson: { requestId, from: sel.from, to: sel.to, qty: sel.qty },
     });
+    // Заявка заводит переписку и открывает журнал сделки. До этого у владельца
+    // канала к клиенту не было вовсе: свой тред он начать не может, а телефон
+    // и комментарий при отклонении — весь его инструмент.
+    await writeDealNote(tx, {
+      listingId: listing.id,
+      ownerUserId: listing.ownerUserId,
+      customerUserId: session.user.id,
+      kind: "request_created",
+      meta: { requestId, from: sel.from, to: sel.to, qty: sel.qty },
+    });
     const notified = await notify(tx, {
       recipientId: listing.ownerUserId,
       actorId: session.user.id,
@@ -188,6 +199,13 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
         event: "cancel_request",
         userId: session.user.id,
         metaJson: { fromStatus: req.status },
+      });
+      await writeDealNote(tx, {
+        listingId: req.listingId,
+        ownerUserId: req.ownerUserId,
+        customerUserId: req.customerUserId,
+        kind: "request_cancelled",
+        meta: { requestId, from: req.dateFrom, to: req.dateTo, qty: req.qty },
       });
       // Отменяет арендатор — узнать об этом должен владелец.
       const notified = await notify(tx, {
