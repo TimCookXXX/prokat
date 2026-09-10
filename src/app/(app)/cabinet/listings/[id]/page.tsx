@@ -74,22 +74,34 @@ export default async function CabinetListingPage({
   );
 
   const back = (
-    /* Только на десктопе: на мобиле кнопку «назад» рисует сама оболочка
-     * кабинета, и вторая шла бы сразу за ней. */
+    /* Только на десктопе: на мобиле круглую кнопку «назад» рисует сама оболочка
+     * кабинета, и вторая шла бы сразу за ней. Вид тот же — кружок с шевроном, —
+     * но с подписью: на широком экране есть место сказать, куда ведёт, а
+     * подчёркнутая ссылка над карточками читалась сноской, а не выходом.
+     *
+     * Из правки ведёт туда же, куда со страницы вещи, — в список. Прежде она
+     * вела на саму вещь, и человек, зашедший править прямо из списка, попадал
+     * на экран, которого не видел. Выходов и так два: «Сохранить» возвращает на
+     * вещь, стрелка — в список. */
     <Link
-      href={(editing ? selfHref : backHref) as never}
-      className="mb-3 hidden items-center gap-1 text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline md:inline-flex"
+      href={backHref as never}
+      className="hidden w-fit items-center gap-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground md:inline-flex"
     >
-      <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
-      {editing ? "К вещи" : isArchived ? "К архиву" : "К объявлениям"}
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+      </span>
+      {isArchived ? "К архиву" : "К объявлениям"}
     </Link>
   );
 
   // Справочники нужны только форме — на самой странице вещи их не читаем.
   if (editing) {
     const [cities, cats] = await Promise.all([getActiveCities(), getAllCategories()]);
+    // Та же раскладка, что и у страницы вещи: отступ под стрелкой задаёт gap
+    // родителя, а не собственный margin ссылки. Иначе он складывался с gap'ом
+    // на одном экране и не складывался на другом.
     return (
-      <main>
+      <main className="flex flex-col gap-4">
         {back}
         <ListingForm
           mode="edit"
@@ -142,13 +154,17 @@ export default async function CabinetListingPage({
 
       {/* Шапка вещи — карточка, а не голый текст: страница целиком стояла на
         * фоне без единой подложки и читалась документом, а не экраном. */}
-      <header className="surface flex items-start gap-3 p-3 sm:gap-4 sm:p-5">
-        {/* На телефоне снимок и кегли на ступень мельче: справа стоит пара
-          * «статус + меню», и в полном размере название ломалось на две строки,
-          * а «залог» отрывался от суммы. */}
-        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted sm:h-20 sm:w-20">
+      <header className="surface flex items-start gap-3 p-3 sm:gap-4 sm:p-4">
+        {/* Снимок 56px на любой ширине: он здесь опознаёт вещь, а не показывает
+          * её — для разглядывания есть публичная страница. В 80px шапка была
+          * выше своего содержимого и занимала треть первого экрана.
+          *
+          * Кегли на телефоне на ступень мельче: справа стоит пара «статус +
+          * меню», и в полном размере название ломалось на две строки, а «залог»
+          * отрывался от суммы. */}
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted">
           {photo ? (
-            <Image src={photo.url} alt="" fill sizes="(max-width: 640px) 56px, 80px" className="object-cover" />
+            <Image src={photo.url} alt="" fill sizes="56px" className="object-cover" />
           ) : (
             <span className="flex h-full items-center justify-center text-muted-foreground">
               <ImageOff className="h-6 w-6" aria-hidden="true" />
