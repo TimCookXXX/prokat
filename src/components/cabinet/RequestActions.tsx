@@ -10,8 +10,9 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  completeRequest, confirmRequest, declineRequest, noShowRequest,
+  cancelConfirmedByOwner, completeRequest, confirmRequest, declineRequest, noShowRequest,
 } from "@/server/actions/owner";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CancelRequestButton } from "@/components/booking/CancelRequestButton";
 import { field } from "@/components/ui/field";
 import { canTransition, type BookingStatus } from "@/lib/catalog/booking-status";
@@ -85,14 +86,49 @@ export function RequestActions({ requestId, side, status }: {
   if (status === "confirmed") {
     return (
       <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" pending={pending} onClick={() => run(() => completeRequest(requestId))}>
             Завершена
           </Button>
-          <Button size="sm" variant="ghost" pending={pending} onClick={() => run(() => noShowRequest(requestId))}>
+          {/* Комментарий у неявки — как у отказа: это терминальный ярлык на
+            * человека, и возразить ему нечем. Пусть хотя бы знает причину. */}
+          <Button size="sm" variant="ghost" pending={pending} onClick={() => run(() => noShowRequest(requestId, comment))}>
             Неявка
           </Button>
+          <Button size="sm" variant="ghost" onClick={() => setShowComment((s) => !s)}>
+            {showComment ? "Скрыть комментарий" : "+ Комментарий"}
+          </Button>
+          {/* Отмена — владелец тоже имеет выход из подтверждённой брони: вещь
+            * сломалась, планы изменились. Даты освобождаются, клиент узнаёт.
+            * Подтверждение обязательно — действие терминально. */}
+          <ConfirmDialog
+            trigger={
+              <Button size="sm" variant="ghost" className="text-destructive">
+                Отменить бронь
+              </Button>
+            }
+            title="Отменить бронь?"
+            description={
+              "Бронь закроется, даты освободятся, клиент получит уведомление. "
+              + "Вернуть отменённую бронь нельзя — если планы снова изменятся, "
+              + "человеку придётся подать заявку заново."
+            }
+            confirmLabel="Отменить бронь"
+            destructive
+            onConfirm={async () => {
+              const r = await cancelConfirmedByOwner(requestId, comment);
+              if (!r.ok) throw new Error(humanError(r.error ?? ""));
+            }}
+          />
         </div>
+        {showComment && (
+          <textarea
+            value={comment} maxLength={500} rows={2}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Клиент увидит этот комментарий"
+            className={`${field} px-3 py-2 text-sm`}
+          />
+        )}
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
       </div>
     );

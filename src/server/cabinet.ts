@@ -3,7 +3,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/lib/db";
-import { availability, bookingRequests, categories, cities, events, listings, users } from "@db/schema";
+import { availability, bookingRequests, categories, chatThreads, cities, events, listings, users } from "@db/schema";
 import { expireStaleRequests } from "@/server/actions/booking";
 import { todayStr, addDaysStr } from "@/lib/catalog/dates";
 import type { BookingStatus } from "@/lib/catalog/booking-status";
@@ -42,7 +42,10 @@ export interface CabinetRequestRow {
   customerComment: string | null;
   /** Всё, что нужно ссылке на вещь: публичный контур закрывают и статус, и бан
    *  владельца — см. lib/booking/listing-link. */
-  listing: LinkableListing & { title: string };
+  listing: LinkableListing & { title: string; image: string | null; priceDay: number };
+  /** Переписка пары (вещь, арендатор). Пусто у заявок, созданных до журнала
+   *  сделки, по которым ещё не принималось решение. */
+  threadId: string | null;
   peer: { id: string; name: string | null };
   /** Телефон второй стороны или null — см. lib/booking/request-access. */
   peerPhone: string | null;
@@ -116,7 +119,12 @@ export async function getCabinetRequests(
       listingTitle: listings.title,
       listingSlug: listings.slug,
       listingStatus: listings.status,
+      // Обложка в SQL, как в getThreadList: весь photos_json ради миниатюры
+      // не тянем.
+      listingImage: sql<string | null>`${listings.photosJson}->0->>'url'`,
+      listingPriceDay: listings.priceDay,
       listerBannedAt: lister.bannedAt,
+      threadId: chatThreads.id,
       citySlug: cities.slug,
       categorySlug: categories.slug,
       peerId: peer.id,
@@ -128,6 +136,12 @@ export async function getCabinetRequests(
     .innerJoin(cities, eq(cities.id, listings.cityId))
     .innerJoin(categories, eq(categories.id, listings.categoryId))
     .innerJoin(lister, eq(lister.id, listings.ownerUserId))
+    // Тред пары (вещь, арендатор) — leftJoin: у заявок старше журнала сделки
+    // его может не быть, и строка ленты обязана выжить без него.
+    .leftJoin(chatThreads, and(
+      eq(chatThreads.listingId, listings.id),
+      eq(chatThreads.customerUserId, bookingRequests.customerUserId),
+    ))
     // Вторая сторона одним join'ом: кто именно — решает та же колонка, что и
     // права, поэтому условие вычисляется, а не выбирается снаружи.
     .innerJoin(peer, sql`${peer.id} = case
@@ -171,7 +185,10 @@ export async function getCabinetRequests(
         categorySlug: r.categorySlug,
         status: r.listingStatus,
         ownerBannedAt: r.listerBannedAt,
+        image: r.listingImage,
+        priceDay: r.listingPriceDay,
       },
+      threadId: r.threadId,
       peer: { id: r.peerId, name: r.peerName },
       // peer.phone — профиль второй стороны, и владельцем она оказывается
       // только когда смотрит арендатор. Подставлять её как ownerPhone в другом
@@ -305,7 +322,12 @@ async function deals(
       listingTitle: listings.title,
       listingSlug: listings.slug,
       listingStatus: listings.status,
+      // Обложка в SQL, как в getThreadList: весь photos_json ради миниатюры
+      // не тянем.
+      listingImage: sql<string | null>`${listings.photosJson}->0->>'url'`,
+      listingPriceDay: listings.priceDay,
       listerBannedAt: lister.bannedAt,
+      threadId: chatThreads.id,
       citySlug: cities.slug,
       categorySlug: categories.slug,
       dateFrom: bookingRequests.dateFrom,
