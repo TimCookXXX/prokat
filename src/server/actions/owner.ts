@@ -210,6 +210,26 @@ async function transitionRequest(
         }
       }
 
+      /* Владелец отменяет подтверждённую бронь — даты освобождаются. Ветка
+       * повторяет ту, что в cancelBookingRequest у арендатора: держать
+       * освобождение дат в одном месте нельзя, потому что права и блокировки у
+       * этих двух путей разные.
+       *
+       * Ограничение статусом обязательно: машина разрешает и `new → cancelled`,
+       * а экшен доступен по сети мимо интерфейса. Без него владелец «отменял»
+       * бы новую заявку вместо отказа — другое уведомление, другой текст в
+       * журнале и никакого комментария клиенту. */
+      if (to === "cancelled") {
+        if (req.status !== "confirmed") throw new Error("bad_status");
+        await tx.update(availability)
+          .set({ bookedQty: sql`greatest(0, ${availability.bookedQty} - ${req.qty})` })
+          .where(and(
+            eq(availability.listingId, req.listingId),
+            gte(availability.date, req.dateFrom),
+            lte(availability.date, req.dateTo),
+          ));
+      }
+
       await tx.update(bookingRequests)
         .set({
           status: to,
@@ -271,8 +291,20 @@ export async function declineRequest(requestId: string, comment?: string): Promi
 export async function completeRequest(requestId: string): Promise<ActionResult> {
   return transitionRequest(requestId, "completed");
 }
-export async function noShowRequest(requestId: string): Promise<ActionResult> {
-  return transitionRequest(requestId, "no_show");
+// Комментарий принимается, как у отказа: «Неявка» — терминальный ярлык на
+// человека, и возразить ему он не может. Пусть хотя бы знает причину.
+export async function noShowRequest(requestId: string, comment?: string): Promise<ActionResult> {
+  return transitionRequest(requestId, "no_show", comment);
+}
+
+/* Владелец отменяет подтверждённую бронь. Раньше отменить её мог только
+ * арендатор, и владельцу, у которого вещь сломалась или он заболел, оставалась
+ * «Неявка» — то есть обвинить клиента в том, чего тот не делал. */
+export async function cancelConfirmedByOwner(
+  requestId: string,
+  comment?: string,
+): Promise<ActionResult> {
+  return transitionRequest(requestId, "cancelled", comment);
 }
 
 // ============================== Календарь ==============================

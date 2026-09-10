@@ -39,7 +39,7 @@ export type NotificationSide = "owner" | "customer";
 // есть только у четырёх, и `request_${to}` на полном union не типизируется.
 export type OwnerDecision = Extract<
   BookingStatus,
-  "confirmed" | "declined" | "completed" | "no_show"
+  "confirmed" | "declined" | "completed" | "no_show" | "cancelled"
 >;
 
 // Возвращаемый тип сужен до request_*: решение владельца не может дать
