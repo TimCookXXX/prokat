@@ -54,6 +54,12 @@ export async function createBookingRequest(
 
   const limit = checkLimit(session.user.id, "booking");
   if (!limit.ok) return { ok: false, error: `rate_limited:${limit.retryAfterSec}` };
+  // Второй контур — по паре с объявлением. Общий потолок поднят, чтобы не бить
+  // по честному «присматриваю шесть вещей за вечер»; долбёжку в одну вещь
+  // ловит этот ключ. Объявление ещё не прочитано, и это нормально: чужой id
+  // тратит квоту того, кто его прислал.
+  const perListing = checkLimit(`${session.user.id}:${form.listingId}`, "booking_listing");
+  if (!perListing.ok) return { ok: false, error: `rate_limited:${perListing.retryAfterSec}` };
 
   const db = getDb();
   // Владелец читается вместе с объявлением: публичность решает isPubliclyVisible,

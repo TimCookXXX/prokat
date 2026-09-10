@@ -5,7 +5,7 @@
 // писем — почта, IP или их пара.
 
 export type LimitKind =
-  | "booking" | "login" | "register" | "resend" | "reset"
+  | "booking" | "booking_listing" | "login" | "register" | "resend" | "reset"
   | "mail_ip" | "mail_daily" | "password_change"
   | "chat_message" | "chat_thread" | "chat_read"
   | "realtime_sync";
@@ -24,7 +24,15 @@ interface Rule { windowMs: number; maxInWindow: number; gapMs: number; }
 
 const RULES: Record<LimitKind, Rule> = {
   // Антиспам заявок вместо СМС-верификации: 5 заявок в час, пауза 30с.
-  booking: { windowMs: 60 * 60 * 1000, maxInWindow: 5,  gapMs: 30_000 },
+  // Ключ — человек, и это важно: по объявлению его делать нельзя, иначе один
+  // злоумышленник выжигает квоту популярной вещи и закрывает её для всех
+  // остальных на час.
+  booking: { windowMs: 60 * 60 * 1000, maxInWindow: 15, gapMs: 30_000 },
+  /* Второй контур — пара (человек, объявление). Общий потолок в пять заявок
+   * бьёт по честному сценарию: присматривать шесть вещей за вечер нормально, а
+   * шестая заявка не уходила. Потолок поэтому поднят, а от долбёжки в одну
+   * вещь защищает уже этот ключ. Паузы здесь нет — её держит общий контур. */
+  booking_listing: { windowMs: 60 * 60 * 1000, maxInWindow: 3, gapMs: 0 },
   // Вход: паузы нет, работает счётчик попыток.
   login:    { windowMs: 15 * 60 * 1000, maxInWindow: 10, gapMs: 0 },
   register: { windowMs: 60 * 60 * 1000, maxInWindow: 5,  gapMs: 5_000 },

@@ -10,7 +10,7 @@
 //   (реализована в cancelBookingRequest, здесь не дублируется);
 // - blocked_qty — ручные закрытия владельцем, не пересекается с booked_qty.
 
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
@@ -160,6 +160,11 @@ export async function setListingStatus(
 // to сужен до решений владельца: BookingStatus знает семь значений, а вид
 // уведомления есть только у четырёх, и `request_${to}` на полном union не
 // типизируется. Все вызывающие и так передают одно из этих четырёх.
+/* Сколько соседних заявок закрывает одно подтверждение. Потолок нужен: набор
+ * лочится целиком внутри транзакции подтверждения, и на популярной вещи он
+ * может быть большим. Что сверху — протухнет само, через сутки. */
+const RIVALS_LIMIT = 50;
+
 async function transitionRequest(
   requestId: string,
   to: OwnerDecision,
@@ -180,12 +185,37 @@ async function transitionRequest(
       if (!req || req.ownerUserId !== userId) throw new Error("not_found");
       if (!canTransition(req.status, to)) throw new Error("bad_status");
 
+      /* Подтверждение занимает даты, и соседние заявки на них становятся
+       * невыполнимыми. Раньше они висели сутки, а владелец узнавал об этом,
+       * только нажав «Подтвердить» и получив «даты заняты» — уборка за системой
+       * руками.
+       *
+       * Весь набор лочится ОДНИМ упорядоченным запросом, а не построчно: два
+       * параллельных подтверждения по одному объявлению иначе берут строки во
+       * встречном порядке и встают в дедлок. Порядок по id детерминирован
+       * (LockRows стоит над Sort) и совпадает с порядком в adminBanUser. */
+      const rivals = to === "confirmed"
+        ? await tx.select().from(bookingRequests)
+          .where(and(
+            eq(bookingRequests.listingId, req.listingId),
+            eq(bookingRequests.status, "new"),
+          ))
+          .orderBy(asc(bookingRequests.id))
+          .for("update")
+          .limit(RIVALS_LIMIT)
+        : [];
+
+      // Количество живёт снаружи ветки: по нему же считается, помещаются ли
+      // соседние заявки после того, как эта заняла даты.
+      let listingQuantity = 0;
+
       if (to === "confirmed") {
         // Лочим листинг (source of truth по quantity) и перепроверяем занятость.
         const lrows = await tx.select().from(listings)
           .where(eq(listings.id, req.listingId)).for("update").limit(1);
         const listing = lrows[0];
         if (!listing) throw new Error("not_found");
+        listingQuantity = listing.quantity;
 
         const availRows = await tx.select().from(availability)
           .where(and(
@@ -237,6 +267,47 @@ async function transitionRequest(
           ...(ownerComment !== undefined ? { ownerComment: ownerComment || null } : {}),
         })
         .where(eq(bookingRequests.id, requestId));
+
+      // Закрываем тех, кому подтверждение только что перекрыло даты. Пересчёт
+      // идёт по уже обновлённой занятости, поэтому «не помещается» здесь —
+      // факт, а не прогноз.
+      for (const rival of rivals) {
+        if (rival.id === requestId) continue;
+        const availRows = await tx.select().from(availability)
+          .where(and(
+            eq(availability.listingId, rival.listingId),
+            gte(availability.date, rival.dateFrom),
+            lte(availability.date, rival.dateTo),
+          ));
+        const map: AvailabilityMap = new Map(
+          availRows.map((r) => [r.date, { bookedQty: r.bookedQty, blockedQty: r.blockedQty }]),
+        );
+        if (unavailableDates(listingQuantity, map, rival.dateFrom, rival.dateTo, rival.qty).length === 0) {
+          continue;
+        }
+        await tx.update(bookingRequests)
+          .set({ status: "declined", respondedAt: new Date() })
+          .where(eq(bookingRequests.id, rival.id));
+        await writeDealNote(tx, {
+          listingId: rival.listingId,
+          ownerUserId: rival.ownerUserId,
+          customerUserId: rival.customerUserId,
+          kind: "request_declined",
+          meta: { requestId: rival.id, from: rival.dateFrom, to: rival.dateTo, qty: rival.qty },
+        });
+        const rivalNotified = await notify(tx, {
+          recipientId: rival.customerUserId,
+          actorId: userId,
+          kind: "request_declined",
+          side: "customer",
+          entityId: rival.id,
+        });
+        if (rivalNotified) {
+          await publish(tx, requestNotify({
+            kind: "request_declined", requestId: rival.id, recipientId: rival.customerUserId,
+          }));
+        }
+      }
 
       await tx.insert(events).values({
         id: newId(),
