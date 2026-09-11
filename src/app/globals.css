@@ -521,8 +521,8 @@
     display: grid;
     grid-template-columns: 36px minmax(0, 1fr);
     column-gap: 10px;
-    row-gap: 8px;
-    padding: 12px;
+    row-gap: 6px;
+    padding: 10px 12px;
   }
   /* Полоса слева у строки, где ждут вашего решения. Тот же приём и тот же
      токен, что у горящей строки в ленте заявок. */
@@ -537,6 +537,17 @@
   }
 
   .summary-thumb { grid-column: 1; grid-row: 1; }
+  /* Подвал строки: телефон слева, переписка справа, одной полосой. Колонки под
+     переписку на узкой панели нет намеренно — она отнимала ширину у названия и
+     ломала его на две строки во всех строках разом, включая те, где переписки
+     нет вовсе. */
+  .summary-foot {
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
   .summary-body { grid-column: 2; min-width: 0; }
   .summary-title {
     margin: 0;
@@ -574,6 +585,7 @@
   .summary-when { display: none; margin: 0; font-size: 13.5px; white-space: nowrap; }
   .summary-days { display: block; font-size: 11.5px; color: var(--color-muted-fg); }
 
+  .summary-phone { margin: 0; font-size: 13px; }
   .summary-sig { grid-column: 2; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
   /* Пустой слот не должен съедать строку сетки на телефоне. */
   .summary-sig:empty { display: none; }
@@ -584,17 +596,14 @@
     align-items: center;
     gap: 8px;
   }
-  .summary-ctl:empty { display: none; }
-  /* Телефон растягивается, иконка переписки — нет: номер длинный, а мишень у
-     иконки и так 44px. */
   /* Через .summary-panel, а не в один класс: h-11/w-11/min-w-11 приезжают
      утилитами, у которых та же специфичность, а в собранном листе слой utilities
      идёт ПОСЛЕ components — одиночный класс им проигрывал, и счётчик
      непрочитанного вылезал за скруглённый край кнопки. */
-  .summary-panel .summary-phone { flex: 1 1 auto; min-width: 0; gap: 6px; }
   .summary-panel .summary-chat {
     flex: none;
     gap: 5px;
+    height: 2.5rem;
     /* Ширина фиксирована и с запасом под счётчик. Сжимать её по содержимому
        нельзя: колонка управления прижата к правому краю, и строка со счётчиком
        уезжала бы левее соседней — телефоны вставали по разным линиям. Место под
@@ -634,7 +643,14 @@
     .summary-body { grid-column: 2; grid-row: 1; }
     .summary-when { display: block; grid-column: 3; grid-row: 1; padding-top: 1px; }
     .summary-sig { grid-column: 4; grid-row: 1; }
+    /* На широкой панели решения и переписка делят правую колонку: строки там
+       низкие, и угла над ними нет. */
     .summary-ctl { grid-column: 5; grid-row: 1; justify-self: end; }
+    /* Контейнер растворяется, и телефон с перепиской встают в сетку сами:
+       номер — строкой под названием, переписка — в колонку решений. */
+    .summary-foot { display: contents; }
+    .summary-phone { grid-column: 2; grid-row: 2; margin: 2px 0 0; }
+    .summary-chat { grid-column: 5; grid-row: 1; justify-self: end; }
     .summary-narrow { display: none; }
     /* Кнопки ужимаются до высоты строки: 44px здесь распирали бы её вдвое. */
     .summary-ctl :is(button, a) {
@@ -647,7 +663,6 @@
       padding-right: 0.75rem;
     }
     .summary-ctl > div > :is(button, a) { flex: 0 0 auto; }
-    .summary-panel .summary-phone { flex: 0 1 auto; }
     .summary-panel .summary-chat { width: 3.25rem; padding: 0; }
   }
 }
