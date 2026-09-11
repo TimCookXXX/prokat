@@ -3,9 +3,7 @@ import { describe, it, expect } from "vitest";
 import { toFeedRow, sortFeedRows } from "@/server/requests-feed";
 import type { CabinetRequestRow } from "@/server/cabinet";
 
-const TODAY = "2026-09-10";
-
-const row = (over: Partial<CabinetRequestRow> = {}): CabinetRequestRow => ({
+const row =(over: Partial<CabinetRequestRow> = {}): CabinetRequestRow => ({
   id: "01REQ",
   side: "owner",
   status: "new",
@@ -29,31 +27,23 @@ const row = (over: Partial<CabinetRequestRow> = {}): CabinetRequestRow => ({
 describe("toFeedRow", () => {
   // Диапазон включает обе границы: 12–14 сентября — трое суток.
   it("считает стоимость по включительным суткам", () => {
-    expect(toFeedRow(row(), TODAY).estimate).toBe(300 * 3);
-    expect(toFeedRow(row({ qty: 2 }), TODAY).estimate).toBe(300 * 3 * 2);
+    expect(toFeedRow(row()).estimate).toBe(300 * 3);
+    expect(toFeedRow(row({ qty: 2 })).estimate).toBe(300 * 3 * 2);
   });
 
   it("горит только новая заявка владельцу", () => {
-    expect(toFeedRow(row(), TODAY).hot).toBe(true);
-    expect(toFeedRow(row({ side: "customer" }), TODAY).hot).toBe(false);
-    expect(toFeedRow(row({ status: "confirmed" }), TODAY).hot).toBe(false);
+    expect(toFeedRow(row()).hot).toBe(true);
+    expect(toFeedRow(row({ side: "customer" })).hot).toBe(false);
+    expect(toFeedRow(row({ status: "confirmed" })).hot).toBe(false);
   });
-
-  // «Пора отметить» — только владельцу: отметить итог может он один.
-  it("просроченная подтверждённая — overdue, но не у арендатора", () => {
-    const past = { status: "confirmed" as const, dateFrom: "2026-09-01", dateTo: "2026-09-05" };
-    expect(toFeedRow(row(past), TODAY).overdue).toBe(true);
-    expect(toFeedRow(row({ ...past, side: "customer" }), TODAY).overdue).toBe(false);
-  });
-
 });
 
 describe("sortFeedRows", () => {
   it("требующее действия — выше идущего, закрытые позади", () => {
     const rows = [
-      toFeedRow(row({ id: "closed", status: "declined" }), TODAY),
-      toFeedRow(row({ id: "running", status: "confirmed" }), TODAY),
-      toFeedRow(row({ id: "hot" }), TODAY),
+      toFeedRow(row({ id: "closed", status: "declined" })),
+      toFeedRow(row({ id: "running", status: "confirmed" })),
+      toFeedRow(row({ id: "hot" })),
     ];
     expect(sortFeedRows(rows).map((r) => r.id)).toEqual(["hot", "running", "closed"]);
   });

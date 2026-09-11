@@ -11,7 +11,7 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  cancelConfirmedByOwner, completeRequest, confirmRequest, declineRequest, noShowRequest,
+  cancelConfirmedByOwner, completeRequest, confirmRequest, declineRequest,
 } from "@/server/actions/owner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { cancelBookingRequest } from "@/server/actions/booking";
@@ -90,40 +90,50 @@ export function RequestActions({ requestId, side, status }: {
     );
   }
 
+  /* Подтверждённая бронь. Итог аренды здесь не отмечают: он следует из
+   * календаря, и заявка закрывается сама, когда даты прошли. Осталось одно
+   * действие — отмена, и она же закрывает случай «клиент не пришёл»:
+   * освобождает даты, чтобы вещь можно было сдать другому. */
   if (status === "confirmed") {
     return (
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Зелёная одна на ряд — она и делает остальные опознаваемыми
-            * кнопками: ряд из одних ghost читался голым текстом. */}
-          <Button size="sm" pending={pending} onClick={() => run(() => completeRequest(requestId))}>
-            Завершена
-          </Button>
-          <Button size="sm" variant="outline" pending={pending} onClick={() => run(() => noShowRequest(requestId))}>
-            Неявка
-          </Button>
-          {/* Отмена — владелец тоже имеет выход из подтверждённой брони: вещь
-            * сломалась, планы изменились. Даты освобождаются, клиент узнаёт.
-            * Подтверждение обязательно — действие терминально. */}
+          {/* Вовремя завершённую бронь отмечать не нужно — она закроется сама,
+            * когда даты пройдут. Эта кнопка про то, чего календарь знать не
+            * может: вещь вернули раньше срока. */}
           <ConfirmDialog
-            trigger={
-              <Button size="sm" variant="outline" className="text-destructive">
-                Отменить бронь
-              </Button>
-            }
-            title="Отменить бронь?"
+            trigger={<Button size="sm">Вернули раньше</Button>}
+            title="Закрыть бронь досрочно?"
             description={
-              "Бронь закроется, даты освободятся, клиент получит уведомление. "
-              + "Вернуть отменённую бронь нельзя — если планы снова изменятся, "
-              + "человеку придётся подать заявку заново."
+              "Аренда засчитается состоявшейся, а оставшиеся дни вернутся "
+              + "в продажу — вещь снова можно будет забронировать. "
+              + "Прожитые дни останутся занятыми."
             }
-            confirmLabel="Отменить бронь"
-            destructive
+            confirmLabel="Закрыть"
             onConfirm={async () => {
-              const r = await cancelConfirmedByOwner(requestId);
+              const r = await completeRequest(requestId);
               if (!r.ok) throw new Error(humanError(r.error ?? ""));
             }}
           />
+        <ConfirmDialog
+          trigger={
+            <Button size="sm" variant="outline" className="text-destructive">
+              Отменить бронь
+            </Button>
+          }
+          title="Отменить бронь?"
+          description={
+            "Бронь закроется, даты освободятся, клиент получит уведомление. "
+            + "Вернуть отменённую бронь нельзя — если планы снова изменятся, "
+            + "человеку придётся подать заявку заново."
+          }
+          confirmLabel="Отменить бронь"
+          destructive
+          onConfirm={async () => {
+            const r = await cancelConfirmedByOwner(requestId);
+            if (!r.ok) throw new Error(humanError(r.error ?? ""));
+          }}
+        />
         </div>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
       </div>

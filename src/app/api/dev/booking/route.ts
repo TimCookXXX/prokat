@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEnv } from "@/lib/env";
 import { cancelBookingRequest, createBookingRequest } from "@/server/actions/booking";
 import {
-  confirmRequest, declineRequest, completeRequest, noShowRequest, setBlockedDates,
+  completeRequest, confirmRequest, declineRequest, setBlockedDates,
 } from "@/server/actions/owner";
 
 // Dev-only обвязка над server actions заявок: позволяет гонять e2e-флоу
@@ -33,7 +33,6 @@ export async function POST(req: NextRequest) {
     if (body.action === "confirm") return NextResponse.json(await confirmRequest(body.requestId));
     if (body.action === "decline") return NextResponse.json(await declineRequest(body.requestId));
     if (body.action === "complete") return NextResponse.json(await completeRequest(body.requestId));
-    if (body.action === "no_show") return NextResponse.json(await noShowRequest(body.requestId));
   }
   if (body.action === "block" && typeof body.listingId === "string") {
     return NextResponse.json(await setBlockedDates(body.listingId, body.from, body.to, body.qty));

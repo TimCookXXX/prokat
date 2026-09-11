@@ -109,6 +109,7 @@ export async function getCabinetRequests(
       qty: bookingRequests.qty,
       createdAt: bookingRequests.createdAt,
       expiresAt: bookingRequests.expiresAt,
+      confirmedAt: bookingRequests.confirmedAt,
       customerComment: bookingRequests.customerComment,
       ownerUserId: bookingRequests.ownerUserId,
       customerUserId: bookingRequests.customerUserId,
@@ -193,7 +194,7 @@ export async function getCabinetRequests(
       // владельца» под телефоном клиента — заготовленная утечка.
       peerPhone: disclosedPhone({
         ...parties,
-        status,
+        confirmedAt: r.confirmedAt,
         customerPhone: r.customerPhone,
         ownerPhone: side === "customer" ? r.peerPhone : null,
       }, userId),

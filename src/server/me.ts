@@ -51,8 +51,9 @@ export async function getCabinetIdentity(userId: string): Promise<AccountIdentit
           eq(bookingRequests.ownerUserId, userId),
           eq(bookingRequests.customerUserId, userId),
         ),
-        // Аренда состоялась: вещь вернули или не вернули, но событие было.
-        inArray(bookingRequests.status, ["completed", "no_show"]),
+        // Только доведённые до конца. Прежде сюда прибавлялась ещё и
+        // «неявка» — то есть аренда, которой не было; вида больше нет.
+        eq(bookingRequests.status, "completed"),
       )),
   ]);
 

@@ -6,9 +6,12 @@
 // Инварианты (см. lib/catalog/booking-status):
 // - подтверждение заявки увеличивает bookedQty на диапазон в ТОЙ ЖЕ транзакции,
 //   что и смена статуса; перед этим занятость перепроверяется под блокировкой;
-// - completed/no_show дат не освобождают; отмена confirmed — освобождает, и
-//   веток теперь две: у арендатора в actions/booking.ts, у владельца здесь.
-//   Свести их в одну нельзя — права и набор блокировок у путей разные;
+// - завершение вовремя дат не освобождает: диапазон прожит. Досрочный
+//   возврат освобождает ОСТАТОК — граница по дате, и живёт она здесь, а не
+//   в availabilityDelta: та чистая функция от пары статусов со знаком;
+// - отмена confirmed освобождает весь диапазон, и веток две: у арендатора в
+//   actions/booking.ts, у владельца здесь. Свести их в одну нельзя — права и
+//   набор блокировок у путей разные;
 // - blocked_qty — ручные закрытия владельцем, не пересекается с booked_qty.
 //
 // LOCK ORDER. Всё, что трогает заявки или занятость одного объявления, лочит
@@ -18,7 +21,7 @@
 // транзакция — в обратном порядке, и два подтверждения по одной вещи вставали
 // в дедлок. Одна точка сериализации на объявление снимает это целиком.
 
-import { and, asc, eq, gte, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
@@ -27,6 +30,7 @@ import {
 } from "@db/schema";
 import { auth } from "@/lib/auth";
 import { newId } from "@/lib/id";
+import { todayStr } from "@/lib/catalog/dates";
 import { slugify } from "@/lib/slugify";
 import { listingFormSchema } from "@/lib/owner/validation";
 import { parseSellerName } from "@/lib/owner/seller-name";
@@ -166,9 +170,6 @@ export async function setListingStatus(
 
 // ============================== Заявки ==============================
 
-// to сужен до решений владельца: BookingStatus знает семь значений, а вид
-// уведомления есть только у четырёх, и `request_${to}` на полном union не
-// типизируется. Все вызывающие и так передают одно из этих четырёх.
 /* Сколько соседних заявок закрывает одно подтверждение. Потолок нужен: набор
  * лочится целиком внутри транзакции подтверждения, и на популярной вещи он
  * может быть большим. Что сверху — протухнет само, через сутки. */
@@ -263,6 +264,30 @@ async function transitionRequest(
         }
       }
 
+      /* Вещь вернули раньше срока: аренда состоялась, но остаток дней должен
+       * вернуться в продажу. Освобождаем строго БУДУЩЕЕ — прожитые дни вещь
+       * действительно была занята, и делать вид, что она была свободна, нельзя.
+       *
+       * Здесь же умирает прежняя ловушка «завершил в первый день — даты
+       * заперты навсегда»: закрытие первым днём теперь освобождает всё, что
+       * после него, и это верный ответ — вещь вернулась.
+       *
+       * Частичное освобождение не выражается через availabilityDelta: та —
+       * чистая функция от пары статусов со знаком, а тут граница по дате. */
+      if (to === "completed") {
+        if (req.status !== "confirmed") throw new Error("bad_status");
+        const from = todayStr();
+        if (req.dateTo > from) {
+          await tx.update(availability)
+            .set({ bookedQty: sql`greatest(0, ${availability.bookedQty} - ${req.qty})` })
+            .where(and(
+              eq(availability.listingId, req.listingId),
+              gt(availability.date, from),
+              lte(availability.date, req.dateTo),
+            ));
+        }
+      }
+
       /* Владелец отменяет подтверждённую бронь — даты освобождаются. Ветка
        * повторяет ту, что в cancelBookingRequest у арендатора: держать
        * освобождение дат в одном месте нельзя, потому что права и блокировки у
@@ -287,6 +312,10 @@ async function transitionRequest(
         .set({
           status: to,
           respondedAt: new Date(),
+          // Ставится один раз и не стирается: на неё смотрит правило
+          // раскрытия телефона, а responded_at перезапишет любое следующее
+          // решение.
+          ...(to === "confirmed" ? { confirmedAt: new Date() } : {}),
         })
         .where(eq(bookingRequests.id, requestId));
 
@@ -358,7 +387,8 @@ async function transitionRequest(
       });
       // Письмо — только там, где арендатору есть о чём узнать срочно:
       // подтверждение (пора договариваться), отказ и отмена (планы рухнули).
-      // completed/no_show — итоги прожитых дат, им хватает ленты.
+      // Завершение не шлём: досрочное закрытие отмечает тот факт, что вещь
+      // ему же и вернули, — новостью это не является.
       if (to === "confirmed" || to === "declined" || to === "cancelled") {
         mail = {
           kind: to,
@@ -405,13 +435,12 @@ export async function confirmRequest(requestId: string): Promise<ActionResult> {
 export async function declineRequest(requestId: string): Promise<ActionResult> {
   return transitionRequest(requestId, "declined");
 }
+
+/* Закрыть бронь досрочно: вещь вернули раньше срока. Аренда засчитывается
+ * состоявшейся, остаток дней возвращается в продажу. Вовремя завершённую
+ * бронь нажимать не нужно — она закроется сама. */
 export async function completeRequest(requestId: string): Promise<ActionResult> {
   return transitionRequest(requestId, "completed");
-}
-// Причину неявки, как и причину отказа, владелец пишет в переписке: поля для
-// неё больше нет — см. ADR 0017.
-export async function noShowRequest(requestId: string): Promise<ActionResult> {
-  return transitionRequest(requestId, "no_show");
 }
 
 /* Владелец отменяет подтверждённую бронь. Раньше отменить её мог только

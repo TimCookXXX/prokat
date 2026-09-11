@@ -8,13 +8,11 @@ import { rentalDaysCount } from "@/lib/booking/params";
 import type { CabinetRequestRow } from "@/server/cabinet";
 import type { FeedRow } from "@/components/cabinet/RequestsFeed";
 
-export function toFeedRow(r: CabinetRequestRow, today: string): FeedRow {
+export function toFeedRow(r: CabinetRequestRow): FeedRow {
+  // Горит только новая заявка владельцу: ответить на неё может он один, и
+  // охряный призыв к действию у арендатора звал бы туда, где кнопок нет.
   const hot = r.side === "owner" && r.status === "new";
-  // Только владельцу: отметить итог может он один, и охряный призыв к
-  // действию у арендатора звал бы туда, где кнопок нет.
-  const overdue = r.side === "owner" && r.status === "confirmed" && r.dateTo < today;
   const days = rentalDaysCount({ from: r.dateFrom, to: r.dateTo, qty: r.qty });
-
 
   return {
     ...r,
@@ -23,7 +21,6 @@ export function toFeedRow(r: CabinetRequestRow, today: string): FeedRow {
     createdAt: r.createdAt.toISOString(),
     expiresAt: r.expiresAt.toISOString(),
     hot,
-    overdue,
     estimate: days > 0 ? r.listing.priceDay * days * r.qty : null,
   };
 }
@@ -33,7 +30,7 @@ export function toFeedRow(r: CabinetRequestRow, today: string): FeedRow {
  * рядом с лентой, а строк у человека десятки, не тысячи. */
 export function sortFeedRows(rows: FeedRow[]): FeedRow[] {
   const weight = (r: FeedRow) =>
-    r.hot || r.overdue ? 0 : r.status === "new" || r.status === "confirmed" ? 1 : 2;
+    r.hot ? 0 : r.status === "new" || r.status === "confirmed" ? 1 : 2;
   return [...rows].sort(
     (a, b) => weight(a) - weight(b) || (a.createdAt < b.createdAt ? 1 : -1),
   );

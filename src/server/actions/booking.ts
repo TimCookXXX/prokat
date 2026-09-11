@@ -12,6 +12,7 @@
 
 import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 import { getDb } from "@/lib/db";
 import {
   availability, bookingRequests, events, listings, users,
@@ -293,14 +294,42 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
   return { ok: true, data: undefined };
 }
 
-// Ленивое протухание: new-заявки с истёкшим expires_at помечаются expired.
-// Дешёвый UPDATE по индексу (owner_status_idx покрывает status).
-export async function expireStaleRequests(): Promise<void> {
-  await getDb().update(bookingRequests)
-    .set({ status: "expired", respondedAt: new Date() })
+/* Две ленивые уборки, обе перед чтением списков: крона в проде нет.
+ *
+ * Протухание: new с истёкшим expires_at становится expired.
+ * Закрытие: confirmed с прошедшим date_to становится completed — итог аренды
+ * следует из календаря, а не из нажатия владельца. Отмечать состоявшуюся
+ * аренду его больше не просят; единственное, чего календарь не знает, —
+ * «сдавать передумали», и для этого есть отмена.
+ *
+ * Ни та, ни другая не уведомляют и не пишут в журнал сделки: это массовые
+ * UPDATE внутри чужого рендера, и запись по строке превратила бы их в N+1.
+ * Исключение названо в ADR 0017 и расширено на закрытие в ADR 0018.
+ *
+ * Обёрнуто в cache(): за один рендер кабинета уборку зовут до трёх раз —
+ * счётчик в layout, сводка, список объявлений, — а работа у неё одна.
+ *
+ * День берём деловой (Europe/Moscow), а не current_date базы: у контейнера db
+ * зона не задана, и с полуночи до трёх ночи по Москве он отдавал бы вчерашний
+ * день — закрытие опаздывало бы на три часа.
+ *
+ * Даты закрытая бронь не освобождает, и это верно: диапазон уже прожит,
+ * история занятости честная. Прошлые дни всё равно никем не читаются —
+ * все выборки занятости начинаются с сегодня. */
+export const expireStaleRequests = cache(async (): Promise<void> => {
+  const db = getDb();
+  const now = new Date();
+  await db.update(bookingRequests)
+    .set({ status: "expired", respondedAt: now })
     .where(and(
       eq(bookingRequests.status, "new"),
-      lt(bookingRequests.expiresAt, new Date()),
+      lt(bookingRequests.expiresAt, now),
     ));
-}
+  await db.update(bookingRequests)
+    .set({ status: "completed", respondedAt: now })
+    .where(and(
+      eq(bookingRequests.status, "confirmed"),
+      lt(bookingRequests.dateTo, todayStr()),
+    ));
+});
 

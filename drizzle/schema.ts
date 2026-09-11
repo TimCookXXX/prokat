@@ -190,7 +190,7 @@ export const availability = pgTable("availability", {
 }));
 
 export const bookingStatus = pgEnum("booking_status", [
-  "new", "confirmed", "declined", "expired", "completed", "no_show", "cancelled",
+  "new", "confirmed", "declined", "expired", "completed", "cancelled",
 ]);
 
 // Заявка на бронь. Денег сервис не проводит; подтверждение — за владельцем.
@@ -219,6 +219,12 @@ export const bookingRequests = pgTable("booking_requests", {
   customerComment: text("customer_comment"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   respondedAt: timestamp("responded_at"),
+  /* Когда бронь подтвердили. Не то же, что responded_at: та перезаписывается
+   * КАЖДЫМ решением, и после отмены или автозакрытия времени подтверждения в
+   * ней уже нет. А правило раскрытия телефона спрашивает именно «подтверждали
+   * ли когда-нибудь»: по текущему статусу этого не узнать — cancelled бывает и
+   * у новой заявки, которую арендатор отозвал, не получив ничьего согласия. */
+  confirmedAt: timestamp("confirmed_at"),
   expiresAt: timestamp("expires_at").notNull(),
 }, (t) => ({
   ownerStatusIdx: index("booking_requests_owner_status_idx").on(t.ownerUserId, t.status, t.createdAt),
@@ -307,7 +313,6 @@ export const notificationKind = pgEnum("notification_kind", [
   "request_confirmed",
   "request_declined",
   "request_completed",
-  "request_no_show",
 ]);
 
 // Сторона получателя в событии по заявке. Хранится, а не выводится из вида,
@@ -366,7 +371,6 @@ export const chatMessageKind = pgEnum("chat_message_kind", [
   "request_declined",
   "request_cancelled",
   "request_completed",
-  "request_no_show",
 ]);
 
 export const chatMessages = pgTable("chat_messages", {

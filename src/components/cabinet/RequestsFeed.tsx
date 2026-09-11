@@ -28,8 +28,6 @@ export type FeedRow = Omit<CabinetRequestRow, "createdAt" | "expiresAt"> & {
   expiresAt: string;
   /** Ждёт решения владельца-меня: карточке — охряная полоса и таймер. */
   hot: boolean;
-  /** Даты прожиты, а бронь всё ещё «идёт» — пора отметить, чем кончилось. */
-  overdue: boolean;
   /** ≈ стоимость: сутки уже посчитаны сервером — там знает цену вещь. */
   estimate: number | null;
 
@@ -78,13 +76,6 @@ function TimeLeft({ row }: { row: FeedRow }) {
 }
 
 function StatusBadge({ row }: { row: FeedRow }) {
-  if (row.overdue) {
-    return (
-      <span className="whitespace-nowrap rounded-sm bg-selected px-2 py-0.5 text-2xs font-semibold text-selected-foreground">
-        Пора отметить
-      </span>
-    );
-  }
   return (
     <span className={`whitespace-nowrap rounded-sm px-2 py-0.5 text-2xs font-medium ${STATUS_BADGE_CLASSES[row.status]}`}>
       {STATUS_LABELS[row.status]}
@@ -171,12 +162,6 @@ function SheetContent({ row }: { row: FeedRow }) {
             Не ответите — заявка закроется сама, и человек уйдёт к другому владельцу.
           </p>
         )}
-        {row.overdue && owner && (
-          <p className="mt-4 text-xs text-muted-foreground">
-            Даты прошли. Отметьте, чем всё кончилось, — иначе бронь так и
-            останется среди идущих.
-          </p>
-        )}
         {!row.peerPhone && !owner && row.status === "new" && (
           <p className="mt-4 text-xs text-muted-foreground">
             Телефон продавца откроется, когда он подтвердит заявку.
@@ -257,7 +242,7 @@ export function RequestsFeed({
   const rowClass = (r: FeedRow) =>
     [
       "cursor-pointer transition-colors hoverable",
-      r.hot || r.overdue ? "shadow-[inset_3px_0_0_var(--color-accent)]" : "",
+      r.hot ? "shadow-[inset_3px_0_0_var(--color-accent)]" : "",
       isClosed(r) ? "text-muted-foreground" : "",
     ].join(" ");
 

@@ -15,7 +15,6 @@ export const NOTIFICATION_KINDS = [
   "request_confirmed",
   "request_declined",
   "request_completed",
-  "request_no_show",
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -34,12 +33,17 @@ export type RequestNotificationKind = Exclude<NotificationKind, "chat_message">;
  * колонкой. */
 export type NotificationSide = "owner" | "customer";
 
-// Решения владельца по заявке — подмножество BookingStatus. Сужение не
-// косметика: transitionRequest принимает все семь статусов, а вид уведомления
-// есть только у четырёх, и `request_${to}` на полном union не типизируется.
+/* Решения владельца — подмножество BookingStatus. Сужение не косметика:
+ * transitionRequest принимает все статусы, а вид уведомления есть не у
+ * каждого, и `request_${to}` на полном union не типизируется.
+ *
+ * Состоявшуюся вовремя аренду владелец не отмечает — она закрывается сама,
+ * когда даты прошли. Руками закрывают два случая, которых календарь знать не
+ * может: вещь вернули раньше срока (completed) и сделка расторгнута
+ * (cancelled). Неявки среди решений больше нет — см. ADR 0018. */
 export type OwnerDecision = Extract<
   BookingStatus,
-  "confirmed" | "declined" | "completed" | "no_show" | "cancelled"
+  "confirmed" | "declined" | "completed" | "cancelled"
 >;
 
 // Возвращаемый тип сужен до request_*: решение владельца не может дать

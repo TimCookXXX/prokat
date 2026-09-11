@@ -163,8 +163,7 @@ export const content = {
       request_cancelled: "Заявку отменили",
       request_confirmed: "Заявку подтвердили",
       request_declined: "Заявку отклонили",
-      request_completed: "Аренда отмечена состоявшейся",
-      request_no_show: "Отмечена неявка",
+      request_completed: "Аренда завершена",
     },
   },
   // Записи о сделке в переписке по вещи. Текст не хранится в базе — он
@@ -195,7 +194,6 @@ export const content = {
     request_declined: "Заявка отклонена",
     request_cancelled: "Бронь отменена",
     request_completed: "Аренда завершена",
-    request_no_show: "Отмечена неявка",
   },
   loading: {
     title: "Ищем рядом…",

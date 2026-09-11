@@ -471,7 +471,7 @@ export async function getSellerStats(userId: string): Promise<SellerStats> {
           eq(bookingRequests.ownerUserId, userId),
           eq(bookingRequests.customerUserId, userId),
         ),
-        inArray(bookingRequests.status, ["completed", "no_show"]),
+        eq(bookingRequests.status, "completed"),
       )),
     db
       .selectDistinct({ name: cities.name })

@@ -17,7 +17,6 @@ export const CHAT_SYSTEM_KINDS = [
   "request_declined",
   "request_cancelled",
   "request_completed",
-  "request_no_show",
 ] as const;
 
 export type ChatSystemKind = (typeof CHAT_SYSTEM_KINDS)[number];

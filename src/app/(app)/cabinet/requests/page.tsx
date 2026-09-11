@@ -15,7 +15,6 @@ import { CountersSync } from "@/components/realtime/CountersSync";
 import { requireAuthState } from "@/lib/auth/guard";
 import { getCabinetRequests } from "@/server/cabinet";
 import { toFeedRow, sortFeedRows } from "@/server/requests-feed";
-import { todayStr } from "@/lib/catalog/dates";
 import { RequestsFeed } from "@/components/cabinet/RequestsFeed";
 import type { RequestSide } from "@/lib/booking/request-access";
 import {
@@ -57,9 +56,8 @@ export default async function CabinetRequestsPage({
   }
   await purgeReadNotifications();
 
-  const today = todayStr();
   const rows = sortFeedRows(
-    (await getCabinetRequests(session.user.id, { role })).map((r) => toFeedRow(r, today)),
+    (await getCabinetRequests(session.user.id, { role })).map((r) => toFeedRow(r)),
   );
 
   return (

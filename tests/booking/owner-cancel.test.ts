@@ -24,19 +24,23 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 // after() живёт только внутри запроса — в тесте его нет, письмо мокается.
 vi.mock("@/server/booking-mail", () => ({ queueBookingMail: vi.fn() }));
 
-import { cancelConfirmedByOwner } from "@/server/actions/owner";
+import { cancelConfirmedByOwner, completeRequest } from "@/server/actions/owner";
+import { todayStr, addDaysStr } from "@/lib/catalog/dates";
 
 const OWNER = "01OWNER";
 const LISTING = "01LISTING";
 
+/* Даты — относительно сегодня, а не календарные: досрочное закрытие
+ * освобождает только будущее, и на фиксированных числах тест перестал бы
+ * проверять освобождение в тот день, когда они станут прошлым. */
 const request = (status: string) => ({
   id: "01REQ",
   listingId: LISTING,
   ownerUserId: OWNER,
   customerUserId: "01CUSTOMER",
   status,
-  dateFrom: "2026-09-12",
-  dateTo: "2026-09-14",
+  dateFrom: addDaysStr(todayStr(), 1),
+  dateTo: addDaysStr(todayStr(), 3),
   qty: 2,
 });
 
@@ -65,8 +69,8 @@ function runWith(status: string) {
       }),
       update: () => ({
         set: (values: Record<string, unknown>) => ({
-          where: async () => {
-            if ("bookedQty" in values) availUpdate(values);
+          where: async (cond: unknown) => {
+            if ("bookedQty" in values) availUpdate(values, cond);
           },
         }),
       }),
@@ -105,5 +109,80 @@ describe("cancelConfirmedByOwner", () => {
     runWith("confirmed");
     const r = await cancelConfirmedByOwner("01REQ");
     expect(r).toEqual({ ok: false, error: "not_found" });
+  });
+});
+
+/* Вещь вернули раньше срока. Аренда состоялась, но остаток дней обязан
+ * вернуться в продажу — иначе владелец, которому вещь принесли на день
+ * раньше, не может её сдать, а «Отменить бронь» тут врёт: аренда была. */
+describe("completeRequest — закрытие досрочно", () => {
+  beforeEach(() => {
+    authMock.mockResolvedValue({ user: { id: OWNER, bannedAt: null } });
+    availUpdate.mockReset();
+    transaction.mockReset();
+  });
+
+  it("закрывает подтверждённую и освобождает даты", async () => {
+    runWith("confirmed");
+    const r = await completeRequest("01REQ");
+    expect(r.ok).toBe(true);
+    expect(availUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  /* Граница по дате, а не по знаку: прожитые дни вещь действительно была
+   * занята, и делать вид, что она была свободна, нельзя. Поэтому условие
+   * освобождения несёт сегодняшнюю деловую дату. */
+  it("освобождает строго будущее — сегодняшняя дата в условии", () => {
+    const seen = new Set<unknown>();
+    const has = (node: unknown, needle: string): boolean => {
+      if (node === needle) return true;
+      if (typeof node !== "object" || node === null || seen.has(node)) return false;
+      seen.add(node);
+      return Object.values(node).some((v) => has(v, needle));
+    };
+    return (async () => {
+      runWith("confirmed");
+      await completeRequest("01REQ");
+      const [, cond] = availUpdate.mock.calls[0];
+      expect(has(cond, todayStr())).toBe(true);
+    })();
+  });
+
+  /* Вторая половина той же границы: закрытие в последний день аренды
+   * календарь не трогает вовсе. Освобождать нечего — будущего у брони не
+   * осталось, а запрос без строк всё равно списал бы блокировку. */
+  it("в последний день аренды календарь не трогает", async () => {
+    transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
+      const req = { ...request("confirmed"), dateTo: todayStr() };
+      const tx = {
+        select: () => ({
+          from: () => ({
+            where: () => ({
+              limit: async () => [{ listingId: LISTING, ownerUserId: OWNER }],
+              for: () => ({ limit: async () => [{ id: LISTING, quantity: 1 }] }),
+              orderBy: () => ({ for: () => ({ limit: async () => [req] }) }),
+            }),
+          }),
+        }),
+        update: () => ({
+          set: (values: Record<string, unknown>) => ({
+            where: async (cond: unknown) => {
+              if ("bookedQty" in values) availUpdate(values, cond);
+            },
+          }),
+        }),
+        insert: () => ({ values: async () => undefined }),
+      };
+      await fn(tx);
+    });
+    expect((await completeRequest("01REQ")).ok).toBe(true);
+    expect(availUpdate).not.toHaveBeenCalled();
+  });
+
+  // Закрывать нечего, пока бронь не подтверждена.
+  it("новую заявку закрыть нельзя", async () => {
+    runWith("new");
+    expect(await completeRequest("01REQ")).toEqual({ ok: false, error: "bad_status" });
+    expect(availUpdate).not.toHaveBeenCalled();
   });
 });

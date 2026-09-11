@@ -113,6 +113,20 @@
       "when": 1789113652531,
       "tag": "0015_fat_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1789115401205,
+      "tag": "0016_late_maria_hill",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789116268498,
+      "tag": "0017_elite_scarlet_witch",
+      "breakpoints": true
     }
   ]
 }

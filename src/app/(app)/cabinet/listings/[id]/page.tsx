@@ -146,7 +146,7 @@ export default async function CabinetListingPage({
   // Окно сводки — месяц: столько владелец и держит в голове, а календарь
   // ниже отвечает на всё остальное.
   const summary = occupancySummary(listing.quantity, map, from, addDaysStr(from, 30));
-  const feedRows = sortFeedRows(requests.map((r) => toFeedRow(r, from)));
+  const feedRows = sortFeedRows(requests.map((r) => toFeedRow(r)));
   const photo = listingPhotos(listing)[0];
 
   return (

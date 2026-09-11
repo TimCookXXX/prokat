@@ -6,7 +6,6 @@ export const STATUS_LABELS: Record<BookingStatus, string> = {
   declined: "Отклонена",
   expired: "Истекла",
   completed: "Завершена",
-  no_show: "Неявка",
   cancelled: "Отменена",
 };
 
@@ -17,6 +16,5 @@ export const STATUS_BADGE_CLASSES: Record<BookingStatus, string> = {
   declined: "bg-destructive/15 text-foreground",
   expired: "bg-muted text-muted-foreground",
   completed: "bg-muted text-foreground",
-  no_show: "bg-destructive/15 text-foreground",
   cancelled: "bg-muted text-muted-foreground",
 };

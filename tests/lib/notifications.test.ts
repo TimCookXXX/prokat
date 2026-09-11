@@ -12,7 +12,6 @@ describe("виды уведомлений", () => {
       "request_confirmed",
       "request_declined",
       "request_completed",
-      "request_no_show",
     ]);
   });
 
@@ -20,11 +19,11 @@ describe("виды уведомлений", () => {
     expect(kindForDecision("confirmed")).toBe("request_confirmed");
     expect(kindForDecision("declined")).toBe("request_declined");
     expect(kindForDecision("completed")).toBe("request_completed");
-    expect(kindForDecision("no_show")).toBe("request_no_show");
+    expect(kindForDecision("cancelled")).toBe("request_cancelled");
   });
 
   it("любое решение владельца даёт вид из общего списка", () => {
-    for (const to of ["confirmed", "declined", "completed", "no_show"] as const) {
+    for (const to of ["confirmed", "declined", "completed", "cancelled"] as const) {
       expect(NOTIFICATION_KINDS).toContain(kindForDecision(to));
     }
   });
