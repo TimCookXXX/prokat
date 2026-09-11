@@ -135,8 +135,12 @@ function Row({ row }: { row: FeedRow }) {
         {days > 0 && <span className="summary-days">{days} {ruPlural(days, "день", "дня", "дней")}</span>}
       </p>
 
-      <p className="summary-sig">
-        {decide && <TimeLeft row={row} />}
+      {/* Срок и статус — вплотную к названию, справа. Своей полосой внизу они
+        * добавляли строке седьмую линию: все разной длины и все прижаты влево,
+        * отчего край строки выглядел рваным. Здесь же они дают верху вторую
+        * точку опоры — и читаются первыми, а это про них и верно. */}
+      <p className="summary-flag">
+        {decide && <TimeLeft row={row} compact />}
         {!owner && row.status === "new" && <StatusBadge row={row} />}
       </p>
 

@@ -61,15 +61,20 @@ export function Thumb({ row, size }: { row: FeedRow; size: number }) {
   );
 }
 
-export function TimeLeft({ row }: { row: FeedRow }) {
-  const left = formatTimeLeft(new Date(row.expiresAt));
+export function TimeLeft({ row, compact = false }: { row: FeedRow; compact?: boolean }) {
+  const left = formatTimeLeft(new Date(row.expiresAt), undefined, compact);
   if (!left) return null;
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-sm bg-selected px-2 py-0.5 text-2xs font-semibold text-selected-foreground">
       <Clock className="h-3 w-3" aria-hidden="true" />
       {/* SSR и гидрация считают от разных моментов: на минутной границе текст
         * расходится, и React шумел бы. */}
-      <span suppressHydrationWarning>осталось {left}</span>
+      <span suppressHydrationWarning>
+        {/* Без «осталось» — там, где чип стоит вплотную к названию и места на
+          * слово нет. Рядом с заявкой, ждущей ответа, оно и так читается: часы
+          * и время могут значить только одно. */}
+        {compact ? left : `осталось ${left}`}
+      </span>
     </span>
   );
 }

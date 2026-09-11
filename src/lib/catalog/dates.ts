@@ -90,7 +90,15 @@ export function formatMonthYearGen(date: Date): string {
 
 /* Сколько осталось до срока, словами: «2 ч 40 мин», «6 ч», «завтра».
  * Возвращает null, когда срок уже прошёл — вызывающий решает, что показать. */
-export function formatTimeLeft(until: Date, now: Date = new Date()): string | null {
+export function formatTimeLeft(
+  until: Date,
+  now: Date = new Date(),
+  /* Только старшая единица: «23 ч» вместо «23 ч 51 мин». Для метки, стоящей
+   * вплотную к названию, точность до минуты не нужна и вредна — она отнимает
+   * ширину у самого названия. Решение принимают по порядку величины: сутки
+   * впереди или последний час. */
+  coarse = false,
+): string | null {
   const minutes = Math.floor((until.getTime() - now.getTime()) / 60000);
   if (minutes <= 0) return null;
   if (minutes < 60) return `${minutes} мин`;
@@ -98,7 +106,7 @@ export function formatTimeLeft(until: Date, now: Date = new Date()): string | nu
   const hours = Math.floor(minutes / 60);
   if (hours < 24) {
     const rest = minutes % 60;
-    return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
+    return rest && !coarse ? `${hours} ч ${rest} мин` : `${hours} ч`;
   }
   const days = Math.floor(hours / 24);
   return `${days} ${ruPlural(days, "день", "дня", "дней")}`;

@@ -574,9 +574,20 @@
   .summary-when { display: none; margin: 0; font-size: 13.5px; white-space: nowrap; }
   .summary-days { display: block; font-size: 11.5px; color: var(--color-muted-fg); }
 
-  .summary-sig { grid-column: 2; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-  /* Пустой слот не должен съедать строку сетки на телефоне. */
-  .summary-sig:empty { display: none; }
+  /* Срок и статус — поверх строки, в правом верхнем углу, а не колонкой сетки.
+     Колонка сужала бы тело строки ЦЕЛИКОМ — и период с суммой ломались бы на
+     две полосы, съедая больше, чем экономит снятая полоса чипа. Место под чип
+     освобождает только заголовок, которому это по карману. */
+  .summary-flag {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    margin: 0;
+    display: flex;
+    gap: 6px;
+  }
+  .summary-flag:empty { display: none; }
+  .summary-title { padding-right: 82px; }
 
   .summary-ctl {
     grid-column: 1 / -1;
@@ -637,7 +648,10 @@
     }
     .summary-body { grid-column: 2; grid-row: 1; }
     .summary-when { display: block; grid-column: 3; grid-row: 1; padding-top: 1px; }
-    .summary-sig { grid-column: 4; grid-row: 1; }
+    /* На широкой панели чип возвращается в сетку своей колонкой: места хватает,
+       и колонки должны стоять в линию. */
+    .summary-flag { position: static; grid-column: 4; grid-row: 1; }
+    .summary-title { padding-right: 0; }
     .summary-ctl { grid-column: 5; grid-row: 1; justify-self: end; }
     .summary-narrow { display: none; }
     /* Кнопки ужимаются до высоты строки: 44px здесь распирали бы её вдвое. */
