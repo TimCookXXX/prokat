@@ -42,8 +42,12 @@ export const isClosed = (r: FeedRow) =>
 
 export function Thumb({ row, size }: { row: FeedRow; size: number }) {
   return (
+    /* block обязателен, а не для красоты: это <span>, и в обычном потоке он
+     * строчный — ширину и высоту игнорирует, схлопываясь в ноль вместе с
+     * `fill`-картинкой внутри. В ленте он лежит во флексе и оболванивается в
+     * блок сам; в грид-ячейке сводки такого везения нет. */
     <span
-      className="relative shrink-0 overflow-hidden rounded-lg bg-muted"
+      className="relative block shrink-0 overflow-hidden rounded-lg bg-muted"
       style={{ width: size, height: size }}
     >
       {row.listing.image ? (
