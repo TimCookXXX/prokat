@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { formatMonthYearGen, todayStr } from "@/lib/catalog/dates";
+import { formatMonthYearGen, todayStr, formatDayMonthNum,
+} from "@/lib/catalog/dates";
 
 describe("todayStr", () => {
   it("takes the calendar day in the business zone, not in UTC", () => {
@@ -28,5 +29,15 @@ describe("formatMonthYearGen", () => {
     // подписывалась как «на сайте с августа».
     expect(formatMonthYearGen(new Date(Date.UTC(2026, 7, 31, 22, 0)))).toBe("сентября 2026");
     expect(formatMonthYearGen(new Date(Date.UTC(2025, 11, 31, 22, 0)))).toBe("января 2026");
+  });
+});
+
+/* Цифровой период для колонок: «8 сентября — 14 сентября» в парном виде не
+ * влезает никуда. Ведущий ноль обязателен — в колонке даты выравниваются. */
+describe("formatDayMonthNum", () => {
+  it("день и месяц с ведущими нулями", () => {
+    expect(formatDayMonthNum("2026-09-08")).toBe("08.09");
+    expect(formatDayMonthNum("2026-12-31")).toBe("31.12");
+    expect(formatDayMonthNum("2026-01-01")).toBe("01.01");
   });
 });

@@ -4,17 +4,19 @@
 // вперемешку, и решать, чьи кнопки рисовать, обязан он сам: снаружи это
 // решалось бы в каждом месте заново, а промах даёт арендатору «Подтвердить».
 //
-// Критический путь владельца «подтвердить» — один тап; комментарий (например,
-// предложить другие даты) — опционально, раскрывается.
+// Критический путь владельца «подтвердить» — один тап. Поля для причины здесь
+// нет: объяснение пишется в переписке по вещи, где клиент может ответить.
+// Цена этого решения названа в ADR 0017.
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  completeRequest, confirmRequest, declineRequest, noShowRequest,
+  cancelConfirmedByOwner, completeRequest, confirmRequest, declineRequest,
 } from "@/server/actions/owner";
-import { CancelRequestButton } from "@/components/booking/CancelRequestButton";
-import { field } from "@/components/ui/field";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { cancelBookingRequest } from "@/server/actions/booking";
 import { canTransition, type BookingStatus } from "@/lib/catalog/booking-status";
+import { todayStr } from "@/lib/catalog/dates";
 import type { RequestSide } from "@/lib/booking/request-access";
 
 function humanError(code: string): string {
@@ -22,17 +24,26 @@ function humanError(code: string): string {
     return "Эти даты уже заняты (другая бронь или закрытие) — отклоните заявку или освободите календарь.";
   }
   if (code === "bad_status") return "Статус уже изменился — обновите страницу.";
+  // Кнопки в этом случае нет, но экшен доступен по сети мимо интерфейса.
+  if (code === "not_started") {
+    return "Аренда ещё не началась — возвращать нечего. Если она сорвалась, отмените бронь.";
+  }
   return "Не получилось — обновите страницу.";
 }
 
-export function RequestActions({ requestId, side, status }: {
+export function RequestActions({ requestId, side, status, dateFrom, place = "sheet" }: {
   requestId: string;
   /** Обязателен: без стороны компонент нарисовал бы арендатору кнопки владельца. */
   side: RequestSide;
   status: BookingStatus;
+  /** Первый день брони — по нему видно, началась ли аренда. */
+  dateFrom: string;
+  /* Где стоят кнопки. В шторке под них отдана вся ширина, в строке сводки —
+   * колонка: там они на телефоне делят ширину пополам, а на широкой панели
+   * ужимаются до высоты строки. Размеры задаёт CSS панели по её собственной
+   * ширине, поэтому здесь только раскладка. */
+  place?: "sheet" | "panel";
 }) {
-  const [comment, setComment] = useState("");
-  const [showComment, setShowComment] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -44,56 +55,110 @@ export function RequestActions({ requestId, side, status }: {
     });
   };
 
-  // Арендатор решений по заявке не принимает — он может только отозвать свою.
+  // Арендатор решений по заявке не принимает — он может только закрыть свою.
+  // Отзыв новой и отмена подтверждённой — разные события с разными словами:
+  // во втором случае рушится договорённость, в первом её ещё не было. Журнал
+  // и письма это уже различают — кнопка не должна их смешивать.
   if (side === "customer") {
     if (!canTransition(status, "cancelled")) return null;
+    const confirmed = status === "confirmed";
     return (
-      <div className="flex justify-end">
-        <CancelRequestButton requestId={requestId} />
-      </div>
+      <ConfirmDialog
+        trigger={
+          <Button size="sm" variant="outline" className="text-destructive">
+            {confirmed ? "Отменить бронь" : "Отозвать заявку"}
+          </Button>
+        }
+        title={confirmed ? "Отменить бронь?" : "Отозвать заявку?"}
+        description={confirmed
+          ? "Бронь закроется, даты освободятся, владелец получит уведомление. "
+            + "Если планы снова изменятся, придётся подать заявку заново."
+          : "Заявка закроется, владелец получит уведомление. "
+            + "Передумаете — просто подайте заявку ещё раз."}
+        confirmLabel={confirmed ? "Отменить бронь" : "Отозвать"}
+        destructive
+        onConfirm={async () => {
+          const r = await cancelBookingRequest(requestId);
+          if (!r.ok) throw new Error(humanError(r.error ?? ""));
+        }}
+      />
     );
   }
 
   if (status === "new") {
+    const panel = place === "panel";
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" pending={pending} onClick={() => run(() => confirmRequest(requestId, comment))}>
+      <div className={panel ? "contents" : "flex flex-col gap-2"}>
+        <div className={panel ? "flex w-full gap-2" : "flex flex-wrap gap-2"}>
+          <Button
+            size={panel ? "default" : "sm"}
+            className={panel ? "grow basis-0" : undefined}
+            pending={pending}
+            onClick={() => run(() => confirmRequest(requestId))}
+          >
             Подтвердить
           </Button>
-          <Button size="sm" variant="outline" pending={pending}
-            onClick={() => run(() => declineRequest(requestId, comment))}>
+          <Button
+            size={panel ? "default" : "sm"}
+            variant="outline"
+            className={panel ? "grow basis-0" : undefined}
+            pending={pending}
+            onClick={() => run(() => declineRequest(requestId))}
+          >
             Отклонить
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setShowComment((s) => !s)}>
-            {showComment ? "Скрыть комментарий" : "+ Комментарий"}
-          </Button>
         </div>
-        {showComment && (
-          <textarea
-            value={comment} maxLength={500} rows={2}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Клиент увидит этот комментарий — например, предложите другие даты"
-            className={`${field} px-3 py-2 text-sm`}
-          />
-        )}
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
       </div>
     );
   }
 
+  /* Подтверждённая бронь. Состоявшуюся вовремя аренду здесь не отмечают: она
+   * закрывается сама, когда даты прошли. Руками закрывают два случая, которых
+   * календарь знать не может, — и это ровно две кнопки ниже. */
   if (status === "confirmed") {
+    // Пока аренда не началась, «вернули раньше» бессмысленно: возвращать
+    // нечего. Мутация это же и не пропустит (not_started) — здесь мы просто не
+    // предлагаем действие, которое обязано отказать. Сегодняшний день сходится
+    // с серверным: шторка монтируется только после клика, SSR её не рисует.
+    const started = dateFrom <= todayStr();
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" pending={pending} onClick={() => run(() => completeRequest(requestId))}>
-            Завершена
-          </Button>
-          <Button size="sm" variant="ghost" pending={pending} onClick={() => run(() => noShowRequest(requestId))}>
-            Неявка
-          </Button>
-        </div>
-        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        {started && (
+          <ConfirmDialog
+            trigger={<Button size="sm">Вернули раньше</Button>}
+            title="Закрыть бронь досрочно?"
+            description={
+              "Аренда засчитается состоявшейся, а оставшиеся дни вернутся "
+              + "в продажу — вещь снова можно будет забронировать. "
+              + "Прожитые дни останутся занятыми."
+            }
+            confirmLabel="Закрыть"
+            onConfirm={async () => {
+              const r = await completeRequest(requestId);
+              if (!r.ok) throw new Error(humanError(r.error ?? ""));
+            }}
+          />
+        )}
+        <ConfirmDialog
+          trigger={
+            <Button size="sm" variant="outline" className="text-destructive">
+              Отменить бронь
+            </Button>
+          }
+          title="Отменить бронь?"
+          description={
+            "Бронь закроется, даты освободятся, клиент получит уведомление. "
+            + "Вернуть отменённую бронь нельзя — если планы снова изменятся, "
+            + "человеку придётся подать заявку заново."
+          }
+          confirmLabel="Отменить бронь"
+          destructive
+          onConfirm={async () => {
+            const r = await cancelConfirmedByOwner(requestId);
+            if (!r.ok) throw new Error(humanError(r.error ?? ""));
+          }}
+        />
       </div>
     );
   }

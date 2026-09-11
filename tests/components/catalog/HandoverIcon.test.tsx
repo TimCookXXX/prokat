@@ -63,7 +63,8 @@ function widgetWith(pickup: boolean, delivery: boolean) {
     availability={{}}
     quantity={1}
     priceDay={500}
-    depositLabel="без залога"
+    depositType="none"
+    depositAmount={null}
     handoverPickup={pickup}
     handoverDelivery={delivery}
     sellerName="Артём"

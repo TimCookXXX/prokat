@@ -11,7 +11,19 @@ const THEM = "01THEM";
 const msg = (id: string, sender: string, minutes: number, body = "текст"): FeedMessage => ({
   id,
   senderUserId: sender,
+  kind: "user",
   body,
+  meta: null,
+  createdAt: new Date(`2026-08-31T10:${String(minutes).padStart(2, "0")}:00`),
+});
+
+// Запись о сделке: отправителя и текста нет, всё нужное лежит в meta.
+const note = (id: string, minutes: number, kind: FeedMessage["kind"] = "request_created"): FeedMessage => ({
+  id,
+  senderUserId: null,
+  kind,
+  body: null,
+  meta: { requestId: "01REQ", from: "2026-09-12", to: "2026-09-14", qty: 1 },
   createdAt: new Date(`2026-08-31T10:${String(minutes).padStart(2, "0")}:00`),
 });
 
@@ -78,7 +90,7 @@ describe("buildFeed(): разделители дат", () => {
 
   it("ставит разделитель на смене дня и не ставит внутри дня", () => {
     const yesterday: FeedMessage = {
-      id: "01A", senderUserId: ME, body: "вчера",
+      id: "01A", senderUserId: ME, body: "вчера", kind: "user", meta: null,
       createdAt: new Date("2026-08-30T10:00:00"),
     };
     const feed = buildFeed([yesterday, msg("01B", ME, 0), msg("01C", ME, 1)], { viewerId: ME, now });
@@ -92,11 +104,11 @@ describe("buildFeed(): разделители дат", () => {
   // иначе пузыри одной группы оказались бы по разные стороны разделителя.
   it("смена дня разбивает группу", () => {
     const late: FeedMessage = {
-      id: "01A", senderUserId: ME, body: "ночью",
+      id: "01A", senderUserId: ME, body: "ночью", kind: "user", meta: null,
       createdAt: new Date("2026-08-30T23:59:00"),
     };
     const early: FeedMessage = {
-      id: "01B", senderUserId: ME, body: "утром",
+      id: "01B", senderUserId: ME, body: "утром", kind: "user", meta: null,
       createdAt: new Date("2026-08-31T00:01:00"),
     };
     const feed = buildFeed([late, early], { viewerId: ME, now });
@@ -231,5 +243,40 @@ describe("filterThreads()", () => {
     const anon = [thread({ counterpartName: null })];
     expect(filterThreads(anon, "дрель", "all")).toHaveLength(1);
     expect(filterThreads(anon, "иван", "all")).toHaveLength(0);
+  });
+});
+
+/* Записи о сделке в ленте. Пока сторону выводили сравнением с отправителем,
+ * пустой отправитель делал запись чужой: она вставала серым пузырём слева и
+ * поднимала счётчик непрочитанного у обеих сторон. */
+describe("buildFeed() и записи о сделке", () => {
+  const now = new Date("2026-08-31T12:00:00");
+
+  it("запись — свой элемент ленты, а не пузырь", () => {
+    const feed = buildFeed([note("01A", 0)], { viewerId: ME, now });
+    expect(feed.map((i) => i.kind)).toEqual(["date", "system"]);
+  });
+
+  it("запись разрывает группу, а не встраивается в неё", () => {
+    const feed = buildFeed(
+      [msg("01A", ME, 0), note("01B", 1), msg("01C", ME, 2)],
+      { viewerId: ME, now },
+    );
+    expect(feed.map((i) => i.kind)).toEqual(["date", "group", "system", "group"]);
+  });
+
+  it("запись не считается непрочитанной ни одной из сторон", () => {
+    for (const viewer of [ME, THEM]) {
+      expect(unreadAnchor([note("01A", 0)], null, viewer)).toBeNull();
+    }
+  });
+
+  it("в счёт непрочитанного записи не идут", () => {
+    const messages = [note("01A", 0), msg("01B", THEM, 1)];
+    const anchor = unreadAnchor(messages, null, ME);
+    expect(anchor).toBe("01B");
+    const feed = buildFeed(messages, { viewerId: ME, unreadAnchorId: anchor, now });
+    const divider = feed.find((i) => i.kind === "unread");
+    expect(divider?.kind === "unread" && divider.count).toBe(1);
   });
 });

@@ -10,7 +10,7 @@ import { getDb, type Tx } from "@/lib/db";
 import { notifications } from "@db/schema";
 import { newId } from "@/lib/id";
 import {
-  CUSTOMER_EVENT_KINDS, OWNER_EVENT_KINDS, type NotificationKind, notificationRecipient,
+  type NotificationKind, type NotificationSide, notificationRecipient,
 } from "@/lib/notifications/kinds";
 
 // Сколько прочитанных строк удаляется за один проход. Крона нет, чистка
@@ -38,6 +38,10 @@ export async function notify(
     recipientId: string | null;
     actorId: string;
     kind: NotificationKind;
+    /* Сторона получателя. Обязательна у событий заявки и запрещена у
+     * сообщения: вид сторону не задаёт, а вывести её может только точка
+     * записи — она одна знает, кому адресует. */
+    side: NotificationSide | null;
     entityId: string;
   },
 ): Promise<NotifyResult | null> {
@@ -45,7 +49,9 @@ export async function notify(
   if (!userId) return null;
 
   const rows = await tx.insert(notifications)
-    .values({ id: newId(), userId, kind: input.kind, entityId: input.entityId })
+    .values({
+      id: newId(), userId, kind: input.kind, side: input.side, entityId: input.entityId,
+    })
     .onConflictDoUpdate({
       target: [notifications.userId, notifications.kind, notifications.entityId],
       // targetWhere обязателен: ON CONFLICT по частичному индексу без повторения
@@ -54,7 +60,10 @@ export async function notify(
       // Бамп created_at, а не пустой set: без него схлопнутое уведомление не
       // всплывает в списке, а снимок в markThreadRead гасит его вместе со
       // свежим сообщением — ровно та гонка, ради которой всё в транзакции.
-      set: { createdAt: sql`now()` },
+      // Сторону переписываем вместе с бампом: вызывающий назвал её для этого
+      // события, и молча оставить прежнюю значило бы поверить, что она не
+      // могла измениться.
+      set: { createdAt: sql`now()`, side: input.side },
     })
     // id из RETURNING, а не сгенерированный: при схлопывании возвращается id
     // существующей строки. xmax = 0 отличает настоящую вставку от обновления.
@@ -71,14 +80,16 @@ export async function notify(
 //
 // Одной выборкой с FILTER, а не двумя запросами: обе идут по одному индексу и
 // по одному и тому же набору строк.
+/* Считаем по стороне, записанной в строке, а не по виду события: вид сторону
+ * не задаёт (см. drizzle/schema.ts рядом с колонкой). Гашение в
+ * markRequestNotificationsSeen ходит по тому же полю — разъехаться этим двум
+ * нельзя, иначе точка горит по одному правилу, а гаснет по другому. */
 export async function countUnseenEvents(
   userId: string,
 ): Promise<{ incoming: number; mine: number }> {
-  const owner = OWNER_EVENT_KINDS.join("','");
-  const customer = CUSTOMER_EVENT_KINDS.join("','");
   const rows = await getDb().select({
-    incoming: sql<number>`count(*) filter (where ${notifications.kind}::text in ('${sql.raw(owner)}'))::int`,
-    mine: sql<number>`count(*) filter (where ${notifications.kind}::text in ('${sql.raw(customer)}'))::int`,
+    incoming: sql<number>`count(*) filter (where ${notifications.side} = 'owner')::int`,
+    mine: sql<number>`count(*) filter (where ${notifications.side} = 'customer')::int`,
   })
     .from(notifications)
     .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
@@ -111,13 +122,32 @@ export async function markRequestNotificationsSeen(
   userId: string,
   side: "owner" | "customer",
 ): Promise<void> {
-  const kinds = side === "owner" ? OWNER_EVENT_KINDS : CUSTOMER_EVENT_KINDS;
-
   await getDb().update(notifications)
     .set({ readAt: sql`now()` })
     .where(and(
       eq(notifications.userId, userId),
-      inArray(notifications.kind, [...kinds]),
+      eq(notifications.side, side),
+      isNull(notifications.readAt),
+    ));
+}
+
+/* Гашение по КОНКРЕТНЫМ заявкам. Нужно там, где экран показывает не всё:
+ * сводка держит только живое и только восемь строк, а «увидел» обязано
+ * означать «увидел именно это». Гасить по стороне она не вправе — под нож
+ * попали бы отказ, отмена и завершение, строк по которым в панели нет
+ * никогда, и человек не узнал бы о них вовсе.
+ *
+ * Пустой список — ничего не делаем: inArray пустого массива не принимает. */
+export async function markRequestsSeen(
+  userId: string,
+  requestIds: readonly string[],
+): Promise<void> {
+  if (requestIds.length === 0) return;
+  await getDb().update(notifications)
+    .set({ readAt: sql`now()` })
+    .where(and(
+      eq(notifications.userId, userId),
+      inArray(notifications.entityId, [...requestIds]),
       isNull(notifications.readAt),
     ));
 }

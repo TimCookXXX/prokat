@@ -11,19 +11,28 @@
 // рвёт её в другом месте, и компоненту пришлось бы заново выводить границы дней.
 
 import { content } from "@theme/content";
+import { isUnreadFor } from "@/lib/chat/unread";
+import { isSystemKind, type ChatMessageKind, type ChatSystemMeta } from "@/lib/chat/system-message";
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
 export type FeedMessage = {
   id: string;
-  senderUserId: string;
-  body: string;
+  /** Пусто у записи о сделке. */
+  senderUserId: string | null;
+  kind: ChatMessageKind;
+  body: string | null;
+  meta: ChatSystemMeta | null;
   createdAt: Date;
 };
 
+/* Запись о сделке — свой вид элемента, а не пузырь: она ничья, и уложить её в
+ * группу «моё/чужое» нельзя. Пока сторону выводили сравнением с отправителем,
+ * пустой отправитель делал её чужой, и она вставала серым пузырём слева. */
 export type FeedItem =
   | { kind: "date"; key: string; label: string }
   | { kind: "unread"; key: string; count: number }
+  | { kind: "system"; key: string; message: FeedMessage }
   | { kind: "group"; key: string; mine: boolean; messages: FeedMessage[] };
 
 const MONTHS = [
@@ -59,8 +68,7 @@ export function unreadAnchor(
   viewerId: string,
 ): string | null {
   const first = messages
-    .filter((m) => m.senderUserId !== viewerId)
-    .filter((m) => !viewerCursor || m.id > viewerCursor)
+    .filter((m) => isUnreadFor(m, viewerId, viewerCursor))
     .sort((a, b) => (a.id < b.id ? -1 : 1))[0];
   return first?.id ?? null;
 }
@@ -80,8 +88,10 @@ export function buildFeed(
   const ordered = [...messages].sort((a, b) => (a.id < b.id ? -1 : 1));
   const at = now ?? new Date();
 
+  // Курсором служит сам якорь: всё от него и ниже — непрочитанное. Записи о
+  // сделке в счёт не идут, за это отвечает то же правило, что и в SQL.
   const unreadCount = unreadAnchorId
-    ? ordered.filter((m) => m.id >= unreadAnchorId && m.senderUserId !== viewerId).length
+    ? ordered.filter((m) => m.id >= unreadAnchorId && isUnreadFor(m, viewerId, null)).length
     : 0;
 
   const feed: FeedItem[] = [];
@@ -112,6 +122,12 @@ export function buildFeed(
     if (unreadAnchorId && message.id === unreadAnchorId) {
       flush();
       feed.push({ kind: "unread", key: `u-${message.id}`, count: unreadCount });
+    }
+
+    if (isSystemKind(message.kind)) {
+      flush();
+      feed.push({ kind: "system", key: `s-${message.id}`, message });
+      continue;
     }
 
     const previous = group?.messages[group.messages.length - 1];

@@ -1,5 +1,5 @@
 import {
-  pgTable, text, varchar, integer, bigint, timestamp, pgEnum, jsonb,
+  pgTable, text, varchar, integer, bigint, timestamp, pgEnum, jsonb, check,
   boolean, date, doublePrecision, index, primaryKey, uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -190,7 +190,7 @@ export const availability = pgTable("availability", {
 }));
 
 export const bookingStatus = pgEnum("booking_status", [
-  "new", "confirmed", "declined", "expired", "completed", "no_show", "cancelled",
+  "new", "confirmed", "declined", "expired", "completed", "cancelled",
 ]);
 
 // Заявка на бронь. Денег сервис не проводит; подтверждение — за владельцем.
@@ -205,21 +205,66 @@ export const bookingRequests = pgTable("booking_requests", {
   dateFrom: date("date_from").notNull(),
   dateTo: date("date_to").notNull(),
   qty: integer("qty").notNull().default(1),
+  /* Условия сделки НА МОМЕНТ ЗАЯВКИ. Денормализованы из объявления по той же
+   * причине, что owner_user_id, но с обратным знаком: владелец не меняется, а
+   * цена и залог меняются в любой момент.
+   *
+   * Без снимка «стоимость» пересчитывалась из текущей цены вещи, и заявка
+   * недельной давности дорожала задним числом — человек видел не ту сумму, на
+   * которую соглашался. Считать нужно по тому, что показали в момент выбора
+   * дат; смотреть на вещь вправе только чип «вот эта вещь стоит столько».
+   *
+   * Сервис денег не проводит, так что это не договор, а честная запись о том,
+   * из чего человек исходил. Она же уезжает копией в журнал сделки. */
+  priceDay: integer("price_day").notNull(),
+  depositType: depositType("deposit_type").notNull().default("none"),
+  depositAmount: integer("deposit_amount"),
   status: bookingStatus("status").notNull().default("new"),
   customerPhone: varchar("customer_phone", { length: 20 }).notNull(),
+  /* Комментарий клиента к заявке. Живёт колонкой, потому что читается в
+   * момент решения — в шторке прямо над кнопками, — и тянуть его туда из
+   * переписки значило бы джойнить чат ради одной строки. В журнал сделки он
+   * попадает копией, в meta системной записи: у читателей разные экраны.
+   *
+   * Комментария владельца здесь больше нет. Он появился, когда у владельца не
+   * было канала к клиенту вовсе, и снят вместе с этой причиной: решения
+   * объясняются в переписке. Цена снятия названа в ADR 0017 — у владельца
+   * скрытой вещи канала снова нет, отказ приходит без причины. */
   customerComment: text("customer_comment"),
-  ownerComment: text("owner_comment"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   respondedAt: timestamp("responded_at"),
+  /* Когда бронь подтвердили. Не то же, что responded_at: та перезаписывается
+   * КАЖДЫМ решением, и после отмены или автозакрытия времени подтверждения в
+   * ней уже нет. А правило раскрытия телефона спрашивает именно «подтверждали
+   * ли когда-нибудь»: по текущему статусу этого не узнать — cancelled бывает и
+   * у новой заявки, которую арендатор отозвал, не получив ничьего согласия. */
+  confirmedAt: timestamp("confirmed_at"),
   expiresAt: timestamp("expires_at").notNull(),
 }, (t) => ({
   ownerStatusIdx: index("booking_requests_owner_status_idx").on(t.ownerUserId, t.status, t.createdAt),
   customerIdx: index("booking_requests_customer_idx").on(t.customerUserId, t.createdAt),
   listingIdx: index("booking_requests_listing_idx").on(t.listingId),
-  // Под ленивое протухание: expireStaleRequests фильтрует по (status,
-  // expires_at) и без этого индекса идёт сиквеншл-сканом с записью — а
-  // дёргается он теперь и при каждом обновлении счётчиков по событию сокета.
+  /* Под ленивую уборку: без него expireStaleRequests идёт сиквеншл-сканом с
+   * записью — а дёргается она теперь и при каждом обновлении счётчиков по
+   * событию сокета.
+   *
+   * Уборок в ней две, и вторая, закрытие аренды по прошедшим датам, ходит по
+   * (status, date_to) — этим индексом она пользуется только префиксом
+   * `status`. Своего ей пока не заводим: подтверждённых броней на порядки
+   * меньше, чем заявок, и префикс отсекает почти всё. */
   staleIdx: index("booking_requests_stale_idx").on(t.status, t.expiresAt),
+  /* Двойное нажатие «Забронировать» давало владельцу две одинаковые заявки:
+   * подтвердит одну, вторая сутки висит и протухает. Индексом, а не проверкой
+   * перед записью, — та от гонки не защищает, между чтением и вставкой
+   * помещается вторая вкладка.
+   *
+   * Ровно те же даты, а не пересечение: пересечение запретило бы взять вторую
+   * единицу вещи, у которой quantity больше одной, и стык «1–5, потом 5–8» —
+   * границы диапазона включительные. Только среди ждущих ответа: отклонённую
+   * заявку человек вправе отправить заново. */
+  liveDupUq: uniqueIndex("booking_requests_live_dup_uq")
+    .on(t.listingId, t.customerUserId, t.dateFrom, t.dateTo)
+    .where(sql`${t.status} = 'new'`),
 }));
 
 // events — сырые продуктовые события (view_listing, view_phone, submit_request...).
@@ -287,13 +332,24 @@ export const notificationKind = pgEnum("notification_kind", [
   "request_confirmed",
   "request_declined",
   "request_completed",
-  "request_no_show",
 ]);
+
+// Сторона получателя в событии по заявке. Хранится, а не выводится из вида,
+// потому что вид её не задаёт: `request_cancelled` адресован владельцу, когда
+// отменил арендатор, и арендатору, когда отменит владелец.
+//
+// Второй случай кода пока не имеет — отменять умеет только арендатор, — и
+// именно поэтому бэкфил по старому правилу верен: неправильных строк в базе
+// никогда не было. Право владельца отменять бронь появится следующим этапом, и
+// с ним прежнее правило перестало бы работать молча.
+export const notificationSide = pgEnum("notification_side", ["owner", "customer"]);
 
 export const notifications = pgTable("notifications", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   kind: notificationKind("kind").notNull(),
+  /** Пусто у `chat_message`: у сообщения сторон сделки нет. */
+  side: notificationSide("side"),
   entityId: text("entity_id").notNull(),
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -318,15 +374,47 @@ export const notifications = pgTable("notifications", {
 // chat_messages — id это ULID, он лексикографически сортируется по времени.
 // Поэтому история листается курсором (WHERE thread_id = ? AND id < ?), без
 // OFFSET, который деградирует на длинных переписках.
+// Вид сообщения. `user` — реплика человека, остальное — запись о событии
+// сделки: тред по вещи служит её журналом. Текст системной записи НЕ хранится,
+// он собирается из вида и meta при выводе — иначе правка формулировки
+// потребовала бы переписывать историю.
+//
+// Ленивой уборки в списке нет намеренно: `expireStaleRequests` — массовый
+// UPDATE, который зовут перед чтением списков, и запись в треды превратила бы
+// его в N+1 внутри чужого рендера. Оба её исхода — протухание и закрытие
+// аренды по прошедшим датам — остаются вне журнала; цена названа в ADR 0017.
+export const chatMessageKind = pgEnum("chat_message_kind", [
+  "user",
+  "request_created",
+  "request_confirmed",
+  "request_declined",
+  "request_cancelled",
+  "request_completed",
+]);
+
 export const chatMessages = pgTable("chat_messages", {
   id: text("id").primaryKey(),
   threadId: text("thread_id").notNull().references(() => chatThreads.id, { onDelete: "cascade" }),
-  senderUserId: text("sender_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** Пусто у системной записи: её пишет сделка, а не человек. */
+  senderUserId: text("sender_user_id").references(() => users.id, { onDelete: "cascade" }),
+  kind: chatMessageKind("kind").notNull().default("user"),
   // Предел длины держит zod в lib/chat/validation, а не БД: сообщение приходит
   // извне, и отказать надо до похода в базу.
-  body: text("body").notNull(),
+  /** Пусто у системной записи — её текст собирается из kind и meta. */
+  body: text("body"),
+  /** Данные системной записи: id заявки, даты, количество. */
+  metaJson: jsonb("meta_json"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => ({
+  /* Форма строки определена видом: у реплики есть автор и текст, у записи о
+   * сделке нет ни того, ни другого. Констрейнтом, а не договорённостью,
+   * потому что на «реплике без автора» две половины одного правила расходятся:
+   * в JS `null === viewerId` ложно и сообщение считается непрочитанным, в SQL
+   * `sender_user_id <> $1` при NULL даёт NULL и строка выпадает. Пока такое
+   * состояние невозможно, расхождению неоткуда взяться. */
+  kindShape: check("chat_messages_kind_shape", sql`
+    (${t.kind} = 'user' and ${t.senderUserId} is not null and ${t.body} is not null)
+    or (${t.kind} <> 'user' and ${t.senderUserId} is null and ${t.body} is null)`),
   threadIdx: index("chat_messages_thread_idx").on(t.threadId, t.id),
   // Без него каскад при удалении пользователя пойдёт сиквеншл-сканом.
   senderIdx: index("chat_messages_sender_idx").on(t.senderUserId),

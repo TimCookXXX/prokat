@@ -64,6 +64,16 @@ export function formatDayMonthShort(dateStr: string): string {
   return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]}`;
 }
 
+/* «08.09» — для колонок и узких строк, где даже «8 сен» в диапазоне не
+ * помещается: период стоит парой, и словесный месяц удваивается. Ноль ведущий
+ * нарочно — в колонке даты выравниваются, а «8.09 — 14.09» рвёт ряд. */
+export function formatDayMonthNum(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}.${mm}`;
+}
+
 export function formatDayMonth(dateStr: string): string {
   const d = new Date(`${dateStr}T00:00:00Z`);
   return `${d.getUTCDate()} ${MONTHS_GEN[d.getUTCMonth()]}`;
@@ -80,7 +90,15 @@ export function formatMonthYearGen(date: Date): string {
 
 /* Сколько осталось до срока, словами: «2 ч 40 мин», «6 ч», «завтра».
  * Возвращает null, когда срок уже прошёл — вызывающий решает, что показать. */
-export function formatTimeLeft(until: Date, now: Date = new Date()): string | null {
+export function formatTimeLeft(
+  until: Date,
+  now: Date = new Date(),
+  /* Только старшая единица: «23 ч» вместо «23 ч 51 мин». Для метки, стоящей
+   * вплотную к названию, точность до минуты не нужна и вредна — она отнимает
+   * ширину у самого названия. Решение принимают по порядку величины: сутки
+   * впереди или последний час. */
+  coarse = false,
+): string | null {
   const minutes = Math.floor((until.getTime() - now.getTime()) / 60000);
   if (minutes <= 0) return null;
   if (minutes < 60) return `${minutes} мин`;
@@ -88,7 +106,7 @@ export function formatTimeLeft(until: Date, now: Date = new Date()): string | nu
   const hours = Math.floor(minutes / 60);
   if (hours < 24) {
     const rest = minutes % 60;
-    return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
+    return rest && !coarse ? `${hours} ч ${rest} мин` : `${hours} ч`;
   }
   const days = Math.floor(hours / 24);
   return `${days} ${ruPlural(days, "день", "дня", "дней")}`;

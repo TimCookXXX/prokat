@@ -15,7 +15,6 @@ export const NOTIFICATION_KINDS = [
   "request_confirmed",
   "request_declined",
   "request_completed",
-  "request_no_show",
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -24,28 +23,27 @@ export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 // разные формы: у заявки нет ни threadId, ни messageId.
 export type RequestNotificationKind = Exclude<NotificationKind, "chat_message">;
 
-// Кому адресовано событие. Владелец смотрит входящие заявки, арендатор — свои.
-// Списки нужны и счётчикам, и гашению при заходе в раздел; разъехавшись, они
-// дали бы точку, которая горит по одному правилу, а гаснет по другому.
-export const OWNER_EVENT_KINDS = ["request_created", "request_cancelled"] as const;
-export const CUSTOMER_EVENT_KINDS = [
-  "request_confirmed", "request_declined", "request_completed", "request_no_show",
-] as const;
-
-/* Какой стороной человек оказывается в этом событии. Лента показывает обе роли
- * и умеет фильтроваться по одной, поэтому всплывашку надо гасить не «на ленте
+/* Какой стороной человек оказывается в событии. Лента показывает обе роли и
+ * умеет фильтроваться по одной, поэтому всплывашку надо гасить не «на ленте
  * вообще», а только когда показанная сторона совпадает: иначе событие по своей
- * заявке, пришедшее при фильтре «я сдаю», не покажется нигде. */
-export function sideForKind(kind: RequestNotificationKind): "owner" | "customer" {
-  return (OWNER_EVENT_KINDS as readonly string[]).includes(kind) ? "owner" : "customer";
-}
+ * заявке, пришедшее при фильтре «я сдаю», не покажется нигде.
+ *
+ * Сторону называет точка записи и хранит колонка `notifications.side` —
+ * вывести её из вида нельзя, почему именно см. в drizzle/schema.ts рядом с
+ * колонкой. */
+export type NotificationSide = "owner" | "customer";
 
-// Решения владельца по заявке — подмножество BookingStatus. Сужение не
-// косметика: transitionRequest принимает все семь статусов, а вид уведомления
-// есть только у четырёх, и `request_${to}` на полном union не типизируется.
+/* Решения владельца — подмножество BookingStatus. Сужение не косметика:
+ * transitionRequest принимает все статусы, а вид уведомления есть не у
+ * каждого, и `request_${to}` на полном union не типизируется.
+ *
+ * Состоявшуюся вовремя аренду владелец не отмечает — она закрывается сама,
+ * когда даты прошли. Руками закрывают два случая, которых календарь знать не
+ * может: вещь вернули раньше срока (completed) и сделка расторгнута
+ * (cancelled). Неявки среди решений больше нет — см. ADR 0018. */
 export type OwnerDecision = Extract<
   BookingStatus,
-  "confirmed" | "declined" | "completed" | "no_show"
+  "confirmed" | "declined" | "completed" | "cancelled"
 >;
 
 // Возвращаемый тип сужен до request_*: решение владельца не может дать

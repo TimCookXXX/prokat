@@ -22,7 +22,9 @@ import {
 import { unavailableDates, type DayLoad } from "@/lib/catalog/availability";
 import { field } from "@/components/ui/field";
 import { formatDayMonth } from "@/lib/catalog/dates";
-import { formatHandover, formatPrice } from "@/lib/catalog/format";
+import {
+  depositValue, formatHandover, formatPrice, type DepositType,
+} from "@/lib/catalog/format";
 import { HandoverIcon } from "@/components/catalog/HandoverIcon";
 
 export interface BookingWidgetProps {
@@ -37,10 +39,13 @@ export interface BookingWidgetProps {
   availability: Record<string, DayLoad>;
   quantity: number;
   priceDay: number;
-  depositLabel: string;
-  // Флагами, а не готовой строкой: от них зависит ещё и иконка, а depositLabel
-  // рядом показывает, чем кончается «отдадим строку» — его тут разбирают
-  // регуляркой обратно.
+  /* Залог исходными данными, а не готовой строкой. Строкой он сюда и
+   * приезжал — и разбирался обратно регуляркой, потому что плитке нужно
+   * значение без слова «залог». Форматирование живёт в lib/catalog/format,
+   * и обеим формам залога полагается один вход. */
+  depositType: DepositType;
+  depositAmount: number | null;
+  // Флагами, а не готовой строкой: от них зависит ещё и иконка.
   handoverPickup: boolean;
   handoverDelivery: boolean;
   sellerName: string;
@@ -143,13 +148,9 @@ export function BookingWidget(props: BookingWidgetProps) {
   // Цена и залог — блоками внизу (как у Hygglo). Значения — уже строки.
   // Обе плитки безусловны: цена за сутки у объявления обязательна, а залог
   // «без залога» тоже показывается — это ответ на вопрос, а не его отсутствие.
-  const depositValue =
-    props.depositLabel === "без залога" ? "Нет"
-      : props.depositLabel === "залог: документ" ? "Документ"
-        : props.depositLabel.replace(/^залог\s*/, "");
   const priceBoxes: { value: string; label: string }[] = [
     { value: formatPrice(props.priceDay), label: "сутки" },
-    { value: depositValue, label: "залог" },
+    { value: depositValue(props.depositType, props.depositAmount), label: "залог" },
   ];
 
   return (

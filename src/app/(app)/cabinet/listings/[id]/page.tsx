@@ -12,6 +12,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireAuthState } from "@/lib/auth/guard";
 import { getOwnerListing } from "@/server/owner";
 import { getCabinetRequests } from "@/server/cabinet";
+import { toFeedRow, sortFeedRows } from "@/server/requests-feed";
 import { getListingThreads } from "@/server/chat";
 import {
   getActiveCities, getAllCategories, getAvailabilityRows, listingPhotos,
@@ -20,13 +21,12 @@ import { leafCategories } from "@/lib/owner/categories";
 import { listingPath } from "@/lib/catalog/listing-path";
 import { ListingForm } from "@/components/cabinet/ListingForm";
 import { ListingAvailability } from "@/components/cabinet/ListingAvailability";
-import { RequestActions } from "@/components/cabinet/RequestActions";
+import { RequestsFeed } from "@/components/cabinet/RequestsFeed";
 import { ListingRowActions } from "@/components/cabinet/ListingRowActions";
 import { Avatar } from "@/components/ui/Avatar";
 import { addDaysStr, todayStr, formatDayMonth } from "@/lib/catalog/dates";
 import { ruPlural } from "@/lib/plural";
 import { formatDeposit, formatPrice } from "@/lib/catalog/format";
-import { STATUS_BADGE_CLASSES, STATUS_LABELS } from "@/lib/booking/status-labels";
 import { occupancySummary, type AvailabilityMap } from "@/lib/catalog/availability";
 import { BOOKING_HORIZON_DAYS } from "@/lib/booking/params";
 
@@ -146,6 +146,7 @@ export default async function CabinetListingPage({
   // Окно сводки — месяц: столько владелец и держит в голове, а календарь
   // ниже отвечает на всё остальное.
   const summary = occupancySummary(listing.quantity, map, from, addDaysStr(from, 30));
+  const feedRows = sortFeedRows(requests.map((r) => toFeedRow(r)));
   const photo = listingPhotos(listing)[0];
 
   return (
@@ -236,46 +237,10 @@ export default async function CabinetListingPage({
             {requests.length === 0 ? (
               <p className="text-sm text-muted-foreground">Заявок на эту вещь пока не было.</p>
             ) : (
-              <ul className="flex flex-col gap-2.5">
-                {requests.map((row) => (
-                  <li
-                    key={row.id}
-                    className={`rounded-lg border p-3.5 ${
-                      row.status === "new" ? "border-accent" : "border-border"
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-medium">
-                          {row.dateFrom === row.dateTo
-                            ? formatDayMonth(row.dateFrom)
-                            : `${formatDayMonth(row.dateFrom)} — ${formatDayMonth(row.dateTo)}`}
-                          {row.qty > 1 ? ` · ${row.qty} шт.` : ""}
-                        </p>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                          <Link href={`/u/${row.peer.id}` as never} className="hover:text-foreground">
-                            {row.peer.name ?? "клиент"}
-                          </Link>
-                          {row.peerPhone && (
-                            <>
-                              {" · "}
-                              <a href={`tel:${row.peerPhone.replace(/[^+\d]/g, "")}`} className="hover:text-foreground">
-                                {row.peerPhone}
-                              </a>
-                            </>
-                          )}
-                        </p>
-                      </div>
-                      <span className={`shrink-0 rounded-sm px-2.5 py-1 text-xs font-medium ${STATUS_BADGE_CLASSES[row.status]}`}>
-                        {STATUS_LABELS[row.status]}
-                      </span>
-                    </div>
-                    <div className="mt-3">
-                      <RequestActions requestId={row.id} side={row.side} status={row.status} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              /* Та же лента, что в разделе заявок, компактным видом: панель
+               * узкая, а вещь и роль здесь и так известны. Один вид заявки на
+               * весь кабинет — телефон и кнопки решения в шторке. */
+              <RequestsFeed compact rows={feedRows} />
             )}
           </Panel>
 

@@ -13,6 +13,10 @@ import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/lib/db";
 import { categories, chatMessages, chatThreads, cities, listings, users } from "@db/schema";
 import { canReadThread } from "@/lib/chat/rules";
+import {
+  isSystemKind, systemMessageLine,
+  type ChatMessageKind, type ChatSystemMeta,
+} from "@/lib/chat/system-message";
 
 export const MESSAGES_PAGE_SIZE = 40;
 const THREADS_PAGE_SIZE = 50;
@@ -40,8 +44,12 @@ export type ThreadListItem = {
 
 export type ThreadMessage = {
   id: string;
-  senderUserId: string;
-  body: string;
+  /** Пусто у записи о сделке — её пишет не человек. */
+  senderUserId: string | null;
+  kind: ChatMessageKind;
+  /** Пусто у записи о сделке: её текст собирает lib/chat/system-message. */
+  body: string | null;
+  meta: ChatSystemMeta | null;
   createdAt: Date;
 };
 
@@ -84,11 +92,66 @@ function unreadCursor(userId: string) {
     else ${chatThreads.customerLastReadMessageId} end, '')`;
 }
 
+/* Непрочитанное в SQL — та же формула, что isUnreadFor в lib/chat/unread.
+ * Собрана здесь одним выражением, а не переписана в каждой из трёх выборок:
+ * счётчик в шапке, список переписок и треды объявления обязаны считать
+ * одинаково.
+ *
+ * Про kind: системная запись не бывает непрочитанной, и проверяется это
+ * отдельным условием, а не через отправителя. `sender_user_id <> ?` в SQL при
+ * NULL даёт NULL и строку отбрасывает — то есть сегодня системная запись
+ * выпала бы сама. На этом совпадении правило строить нельзя: оно молча
+ * сломается, как только в отправителе окажется актор. */
+function unreadCondition(userId: string) {
+  return and(
+    eq(chatMessages.kind, "user"),
+    ne(chatMessages.senderUserId, userId),
+    gt(chatMessages.id, unreadCursor(userId)),
+  );
+}
+
+/* Сколько непрочитанного в каждом из тредов — одним сгруппированным запросом.
+ *
+ * Вынесено наружу по той же причине, по какой собрана unreadCondition:
+ * читателей стало трое (список переписок, треды объявления и сводка кабинета),
+ * и третья копия этих восьми строк разъехалась бы с остальными двумя первой же
+ * правкой. Счётчик в шапке считает сумму без группировки и делит с ними только
+ * unreadCondition.
+ *
+ * Пустой список — пустая карта без похода в базу: inArray на пустом массиве
+ * drizzle не принимает. */
+export async function getUnreadByThread(
+  threadIds: readonly string[],
+  userId: string,
+): Promise<Map<string, number>> {
+  if (threadIds.length === 0) return new Map();
+  const rows = await getDb()
+    .select({ threadId: chatMessages.threadId, cnt: sql<number>`count(*)::int` })
+    .from(chatMessages)
+    .innerJoin(chatThreads, eq(chatThreads.id, chatMessages.threadId))
+    .where(and(
+      inArray(chatMessages.threadId, [...threadIds]),
+      unreadCondition(userId),
+    ))
+    .groupBy(chatMessages.threadId);
+  return new Map(rows.map((r) => [r.threadId, r.cnt]));
+}
+
 // Экспортируется ради тестов: функция чистая, а превью — то, что человек видит
 // в списке чаще самого сообщения.
 export function toPreview(body: string): string {
   const flat = body.replace(/\s+/g, " ").trim();
   return flat.length > PREVIEW_LENGTH ? `${flat.slice(0, PREVIEW_LENGTH)}…` : flat;
+}
+
+/* Превью последней строки треда. У записи о сделке текста в базе нет, поэтому
+ * строка собирается из вида и meta — иначе тред, где последней была запись,
+ * всплывал бы наверх списка с пустым превью. */
+export function messagePreview(
+  m: { kind: string; body: string | null; meta: ChatSystemMeta | null },
+): string {
+  if (isSystemKind(m.kind)) return toPreview(systemMessageLine(m.kind, m.meta));
+  return m.body ? toPreview(m.body) : "";
 }
 
 export interface ListingThread {
@@ -132,18 +195,7 @@ export async function getListingThreads(
 
   if (rows.length === 0) return [];
 
-  const unreadRows = await db
-    .select({ threadId: chatMessages.threadId, cnt: sql<number>`count(*)::int` })
-    .from(chatMessages)
-    .innerJoin(chatThreads, eq(chatThreads.id, chatMessages.threadId))
-    .where(and(
-      inArray(chatMessages.threadId, rows.map((r) => r.id)),
-      ne(chatMessages.senderUserId, ownerUserId),
-      gt(chatMessages.id, unreadCursor(ownerUserId)),
-    ))
-    .groupBy(chatMessages.threadId);
-
-  const unreadByThread = new Map(unreadRows.map((u) => [u.threadId, u.cnt]));
+  const unreadByThread = await getUnreadByThread(rows.map((r) => r.id), ownerUserId);
   return rows.map((r) => ({ ...r, unread: unreadByThread.get(r.id) ?? 0 }));
 }
 
@@ -181,30 +233,21 @@ export async function getThreadList(userId: string): Promise<ThreadListItem[]> {
   const counterpartIds = threads.map((t) => (t.ownerUserId === userId ? t.customerUserId : t.ownerUserId));
   const listingIds = threads.map((t) => t.listingId);
 
-  const [lastMessages, unreadRows, listingRows, counterpartRows] = await Promise.all([
+  const [lastMessages, unreadById, listingRows, counterpartRows] = await Promise.all([
     // DISTINCT ON по треду с сортировкой по id DESC — идёт по индексу
     // (thread_id, id) и берёт последнее сообщение каждого треда одним проходом.
     db.selectDistinctOn([chatMessages.threadId], {
       threadId: chatMessages.threadId,
       id: chatMessages.id,
       senderUserId: chatMessages.senderUserId,
+      kind: chatMessages.kind,
       body: chatMessages.body,
+      meta: sql<ChatSystemMeta | null>`${chatMessages.metaJson}`,
     })
       .from(chatMessages)
       .where(inArray(chatMessages.threadId, threadIds))
       .orderBy(chatMessages.threadId, desc(chatMessages.id)),
-    db.select({
-      threadId: chatMessages.threadId,
-      cnt: sql<number>`count(*)::int`,
-    })
-      .from(chatMessages)
-      .innerJoin(chatThreads, eq(chatThreads.id, chatMessages.threadId))
-      .where(and(
-        inArray(chatMessages.threadId, threadIds),
-        ne(chatMessages.senderUserId, userId),
-        gt(chatMessages.id, unreadCursor(userId)),
-      ))
-      .groupBy(chatMessages.threadId),
+    getUnreadByThread(threadIds, userId),
     db.select({
       id: listings.id,
       title: listings.title,
@@ -222,7 +265,6 @@ export async function getThreadList(userId: string): Promise<ThreadListItem[]> {
   ]);
 
   const lastById = new Map(lastMessages.map((m) => [m.threadId, m]));
-  const unreadById = new Map(unreadRows.map((r) => [r.threadId, r.cnt]));
   const listingById = new Map(listingRows.map((l) => [l.id, l]));
   const userById = new Map(counterpartRows.map((u) => [u.id, u]));
 
@@ -235,7 +277,8 @@ export async function getThreadList(userId: string): Promise<ThreadListItem[]> {
     // Курсор той стороны, что напротив: моё сообщение прочитано, если оно не
     // новее его отметки. ULID сравнивается лексикографически.
     const counterpartCursor = iAmOwner ? t.customerLastReadMessageId : t.ownerLastReadMessageId;
-    const lastMessageMine = last?.senderUserId === userId;
+    // Запись о сделке ничья: галочки прочтения к ней не относятся.
+    const lastMessageMine = Boolean(last?.senderUserId) && last?.senderUserId === userId;
     return {
       id: t.id,
       listingId: t.listingId,
@@ -246,7 +289,7 @@ export async function getThreadList(userId: string): Promise<ThreadListItem[]> {
       counterpartName: counterpart?.name ?? null,
       counterpartImage: counterpart?.image ?? null,
       lastMessageAt: t.lastMessageAt,
-      preview: last ? toPreview(last.body) : "",
+      preview: last ? messagePreview(last) : "",
       lastMessageMine,
       iAmOwner,
       lastMessageReadByCounterpart: Boolean(
@@ -338,7 +381,9 @@ export async function getMessages(
   const rows = await db.select({
     id: chatMessages.id,
     senderUserId: chatMessages.senderUserId,
+    kind: chatMessages.kind,
     body: chatMessages.body,
+    meta: sql<ChatSystemMeta | null>`${chatMessages.metaJson}`,
     createdAt: chatMessages.createdAt,
   })
     .from(chatMessages)
@@ -368,7 +413,9 @@ export async function getMessagesAfter(
   const rows = await getDb().select({
     id: chatMessages.id,
     senderUserId: chatMessages.senderUserId,
+    kind: chatMessages.kind,
     body: chatMessages.body,
+    meta: sql<ChatSystemMeta | null>`${chatMessages.metaJson}`,
     createdAt: chatMessages.createdAt,
   })
     .from(chatMessages)
@@ -391,8 +438,7 @@ export async function getUnreadCount(userId: string): Promise<number> {
     .innerJoin(chatThreads, eq(chatThreads.id, chatMessages.threadId))
     .where(and(
       or(eq(chatThreads.ownerUserId, userId), eq(chatThreads.customerUserId, userId)),
-      ne(chatMessages.senderUserId, userId),
-      gt(chatMessages.id, unreadCursor(userId)),
+      unreadCondition(userId),
     ));
   return rows[0]?.cnt ?? 0;
 }

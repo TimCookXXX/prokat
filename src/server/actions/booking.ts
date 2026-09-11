@@ -12,6 +12,7 @@
 
 import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { cache } from "react";
 import { getDb } from "@/lib/db";
 import {
   availability, bookingRequests, events, listings, users,
@@ -27,6 +28,8 @@ import { canTransition, availabilityDelta } from "@/lib/catalog/booking-status";
 import { todayStr } from "@/lib/catalog/dates";
 import { notify } from "@/server/notifications";
 import { publish } from "@/server/realtime";
+import { writeDealNote } from "@/server/deal-note";
+import { queueBookingMail } from "@/server/booking-mail";
 import { requestNotify } from "@/lib/realtime/events";
 
 export type ActionResult<T = void> =
@@ -53,6 +56,12 @@ export async function createBookingRequest(
 
   const limit = checkLimit(session.user.id, "booking");
   if (!limit.ok) return { ok: false, error: `rate_limited:${limit.retryAfterSec}` };
+  // Второй контур — по паре с объявлением. Общий потолок поднят, чтобы не бить
+  // по честному «присматриваю шесть вещей за вечер»; долбёжку в одну вещь
+  // ловит этот ключ. Объявление ещё не прочитано, и это нормально: чужой id
+  // тратит квоту того, кто его прислал.
+  const perListing = checkLimit(`${session.user.id}:${form.listingId}`, "booking_listing");
+  if (!perListing.ok) return { ok: false, error: `rate_limited:${perListing.retryAfterSec}` };
 
   const db = getDb();
   // Владелец читается вместе с объявлением: публичность решает isPubliclyVisible,
@@ -89,10 +98,19 @@ export async function createBookingRequest(
     { from: form.from, to: form.to, qty: String(form.qty) },
     { today: todayStr(), maxQty: listing.quantity },
   );
-  // TODO: qty клампится к quantity по-прежнему молча. Владелец может уменьшить
-  // количество, пока форма открыта, и заявка уйдёт на меньшее число единиц, чем
-  // человек видел в диалоге, — тот же класс, что dates_stale.
   if (isSelectionShifted(form, sel)) return { ok: false, error: "dates_stale" };
+  // Количество клампится к quantity так же молча, как когда-то даты: владелец
+  // мог уменьшить его, пока форма открыта, и заявка ушла бы на меньшее число
+  // единиц, чем человек видел в диалоге. Отдельный код, а не dates_stale:
+  // причина другая, и текст человеку нужен другой.
+  if (sel.qty !== form.qty) return { ok: false, error: "qty_stale" };
+  // И цена: заявка навсегда запоминает условия, на которых её подали, поэтому
+  // подать её на условиях, которых человек не видел, нельзя. Без этой проверки
+  // поднятая за секунду до отправки цена замерзала бы в заявке как «то, на что
+  // вы согласились» — ровно тот обман, от которого снимок и заводился.
+  if (form.priceDay !== undefined && listing.priceDay !== form.priceDay) {
+    return { ok: false, error: "price_stale" };
+  }
 
   const availRows = await db.select().from(availability).where(and(
     eq(availability.listingId, listing.id),
@@ -107,46 +125,96 @@ export async function createBookingRequest(
 
   const requestId = newId();
   const now = new Date();
-  await db.transaction(async (tx) => {
-    await tx.insert(bookingRequests).values({
-      id: requestId,
-      listingId: listing.id,
-      ownerUserId: listing.ownerUserId,
-      customerUserId: session.user.id,
-      dateFrom: sel.from,
-      dateTo: sel.to,
-      qty: sel.qty,
-      status: "new",
-      customerPhone: form.phone,
-      customerComment: form.comment || null,
-      expiresAt: new Date(now.getTime() + EXPIRES_HOURS * 60 * 60 * 1000),
+  try {
+    await db.transaction(async (tx) => {
+      await tx.insert(bookingRequests).values({
+        id: requestId,
+        listingId: listing.id,
+        ownerUserId: listing.ownerUserId,
+        customerUserId: session.user.id,
+        dateFrom: sel.from,
+        dateTo: sel.to,
+        qty: sel.qty,
+        // Условия на момент заявки — снимком, а не ссылкой на вещь: владелец
+        // вправе поменять цену завтра, и стоимость, которую человек видел,
+        // выбирая даты, от этого меняться не должна.
+        priceDay: listing.priceDay,
+        depositType: listing.depositType,
+        depositAmount: listing.depositAmount,
+        status: "new",
+        customerPhone: form.phone,
+        customerComment: form.comment || null,
+        expiresAt: new Date(now.getTime() + EXPIRES_HOURS * 60 * 60 * 1000),
+      });
+      // Телефон из первой заявки запоминаем в профиле для предзаполнения.
+      await tx.update(users)
+        .set({ phone: form.phone })
+        .where(and(eq(users.id, session.user.id), sql`${users.phone} IS NULL`));
+      await tx.insert(events).values({
+        id: newId(),
+        entityType: "listing",
+        entityId: listing.id,
+        event: "submit_request",
+        userId: session.user.id,
+        metaJson: { requestId, from: sel.from, to: sel.to, qty: sel.qty },
+      });
+      // Заявка заводит переписку и открывает журнал сделки. До этого у владельца
+      // канала к клиенту не было вовсе: свой тред он начать не может, а телефон
+      // и комментарий при отклонении — весь его инструмент.
+      await writeDealNote(tx, {
+        listingId: listing.id,
+        ownerUserId: listing.ownerUserId,
+        customerUserId: session.user.id,
+        kind: "request_created",
+        // Комментарий копией: колонку читает шторка в момент решения, эту —
+        // переписка. Копия делается здесь же, одной транзакцией, поэтому
+        // разъехаться им негде.
+        // Тем же снимком, что лёг в заявку: карточка в переписке и шторка
+        // обязаны называть одну сумму.
+        meta: {
+          requestId, from: sel.from, to: sel.to, qty: sel.qty,
+          priceDay: listing.priceDay,
+          depositType: listing.depositType,
+          depositAmount: listing.depositAmount ?? undefined,
+          comment: form.comment || undefined,
+        },
+      });
+      const notified = await notify(tx, {
+        recipientId: listing.ownerUserId,
+        actorId: session.user.id,
+        kind: "request_created",
+        side: "owner",
+        entityId: requestId,
+      });
+      if (notified) {
+        await publish(tx, requestNotify({
+          kind: "request_created", requestId, recipientId: listing.ownerUserId,
+        }));
+      }
     });
-    // Телефон из первой заявки запоминаем в профиле для предзаполнения.
-    await tx.update(users)
-      .set({ phone: form.phone })
-      .where(and(eq(users.id, session.user.id), sql`${users.phone} IS NULL`));
-    await tx.insert(events).values({
-      id: newId(),
-      entityType: "listing",
-      entityId: listing.id,
-      event: "submit_request",
-      userId: session.user.id,
-      metaJson: { requestId, from: sel.from, to: sel.to, qty: sel.qty },
-    });
-    const notified = await notify(tx, {
-      recipientId: listing.ownerUserId,
-      actorId: session.user.id,
-      kind: "request_created",
-      entityId: requestId,
-    });
-    if (notified) {
-      await publish(tx, requestNotify({
-        kind: "request_created", requestId, recipientId: listing.ownerUserId,
-      }));
+  } catch (e) {
+    /* Дубль ловим индексом, а не проверкой перед вставкой: между чтением и
+     * записью помещается вторая вкладка, и от гонки проверка не спасает.
+     * 23505 — нарушение уникальности; свой индекс отличаем по имени, чужое
+     * нарушение пробрасываем. */
+    const code = (e as { code?: string })?.code;
+    const detail = String((e as { constraint?: string })?.constraint ?? "");
+    if (code === "23505" && detail === "booking_requests_live_dup_uq") {
+      return { ok: false, error: "duplicate_request" };
     }
-  });
+    throw e;
+  }
 
+  queueBookingMail({
+    kind: "created",
+    recipientId: listing.ownerUserId,
+    listingTitle: listing.title,
+    dateFrom: sel.from,
+    dateTo: sel.to,
+  });
   revalidatePath("/cabinet/requests");
+  // И сводка: новая заявка встаёт в её панель такой же строкой.
+  revalidatePath("/cabinet");
   return { ok: true, data: { requestId } };
 }
 
@@ -155,8 +223,23 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
   if (!session?.user?.id) return { ok: false, error: "auth_required" };
 
   const db = getDb();
+  let mail: Parameters<typeof queueBookingMail>[0] | null = null;
   try {
     await db.transaction(async (tx) => {
+      /* ПЕРВЫМ лочится объявление — то же правило, что в actions/owner.ts.
+       * Без него отмена брала строку заявки, а подтверждение — объявление, и
+       * два пути вставали во встречном порядке: подтверждение держит
+       * объявление и тянется к заявке, отмена держит заявку и тянется к
+       * занятости, которую подтверждение уже забрало. */
+      const idRows = await tx
+        .select({ listingId: bookingRequests.listingId })
+        .from(bookingRequests)
+        .where(eq(bookingRequests.id, requestId))
+        .limit(1);
+      if (!idRows[0]) throw new Error("not_found");
+      await tx.select({ id: listings.id }).from(listings)
+        .where(eq(listings.id, idRows[0].listingId)).for("update").limit(1);
+
       const rows = await tx.select().from(bookingRequests)
         .where(eq(bookingRequests.id, requestId))
         .for("update")
@@ -188,11 +271,30 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
         userId: session.user.id,
         metaJson: { fromStatus: req.status },
       });
+      await writeDealNote(tx, {
+        listingId: req.listingId,
+        ownerUserId: req.ownerUserId,
+        customerUserId: req.customerUserId,
+        kind: "request_cancelled",
+        meta: { requestId, from: req.dateFrom, to: req.dateTo, qty: req.qty },
+      });
+      const titleRows = await tx.select({ title: listings.title })
+        .from(listings).where(eq(listings.id, req.listingId)).limit(1);
+      mail = {
+        // Отзыв new и отмена confirmed — разные события: во втором случае
+        // рушится существующая договорённость, в первом её ещё не было.
+        kind: req.status === "confirmed" ? "cancelled" : "withdrawn",
+        recipientId: req.ownerUserId,
+        listingTitle: titleRows[0]?.title ?? "",
+        dateFrom: req.dateFrom,
+        dateTo: req.dateTo,
+      };
       // Отменяет арендатор — узнать об этом должен владелец.
       const notified = await notify(tx, {
         recipientId: req.ownerUserId,
         actorId: session.user.id,
         kind: "request_cancelled",
+        side: "owner",
         entityId: requestId,
       });
       if (notified) {
@@ -207,18 +309,49 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
     throw e;
   }
 
+  if (mail) queueBookingMail(mail);
   revalidatePath("/cabinet/requests");
+  // И сводка: отменённая бронь стоит в её панели такой же строкой, как в ленте.
+  revalidatePath("/cabinet");
   return { ok: true, data: undefined };
 }
 
-// Ленивое протухание: new-заявки с истёкшим expires_at помечаются expired.
-// Дешёвый UPDATE по индексу (owner_status_idx покрывает status).
-export async function expireStaleRequests(): Promise<void> {
-  await getDb().update(bookingRequests)
-    .set({ status: "expired", respondedAt: new Date() })
+/* Две ленивые уборки, обе перед чтением списков: крона в проде нет.
+ *
+ * Протухание: new с истёкшим expires_at становится expired.
+ * Закрытие: confirmed с прошедшим date_to становится completed — итог аренды
+ * следует из календаря, а не из нажатия владельца. Отмечать состоявшуюся
+ * аренду его больше не просят; единственное, чего календарь не знает, —
+ * «сдавать передумали», и для этого есть отмена.
+ *
+ * Ни та, ни другая не уведомляют и не пишут в журнал сделки: это массовые
+ * UPDATE внутри чужого рендера, и запись по строке превратила бы их в N+1.
+ * Исключение названо в ADR 0017 и расширено на закрытие в ADR 0018.
+ *
+ * Обёрнуто в cache(): за один рендер кабинета уборку зовут до трёх раз —
+ * счётчик в layout, сводка, список объявлений, — а работа у неё одна.
+ *
+ * День берём деловой (Europe/Moscow), а не current_date базы: у контейнера db
+ * зона не задана, и с полуночи до трёх ночи по Москве он отдавал бы вчерашний
+ * день — закрытие опаздывало бы на три часа.
+ *
+ * Даты закрытая бронь не освобождает, и это верно: диапазон уже прожит,
+ * история занятости честная. Прошлые дни всё равно никем не читаются —
+ * все выборки занятости начинаются с сегодня. */
+export const expireStaleRequests = cache(async (): Promise<void> => {
+  const db = getDb();
+  const now = new Date();
+  await db.update(bookingRequests)
+    .set({ status: "expired", respondedAt: now })
     .where(and(
       eq(bookingRequests.status, "new"),
-      lt(bookingRequests.expiresAt, new Date()),
+      lt(bookingRequests.expiresAt, now),
     ));
-}
+  await db.update(bookingRequests)
+    .set({ status: "completed", respondedAt: now })
+    .where(and(
+      eq(bookingRequests.status, "confirmed"),
+      lt(bookingRequests.dateTo, todayStr()),
+    ));
+});
 

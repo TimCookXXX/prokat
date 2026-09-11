@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatDeposit, formatHandover, formatHandoverShort } from "@/lib/catalog/format";
+import { depositValue, formatDeposit, formatHandover, formatHandoverShort } from "@/lib/catalog/format";
 
 describe("formatHandover()", () => {
   it("оба способа — выбор остаётся за людьми", () => {
@@ -60,5 +60,33 @@ describe("formatDeposit: деньги без суммы", () => {
     // Разряды formatPrice разделяет неразрывным пробелом — в ожидании он
     // приводится к обычному, иначе тест падает на невидимой разнице.
     expect(formatDeposit("money", 3000).replace(/\u00A0/g, " ")).toBe("залог 3 000 ₽");
+  });
+});
+
+/* Тот же залог значением к готовой подписи «Залог». Раньше это жило разбором
+ * строки formatDeposit прямо в виджете брони — сравнением с «без залога» и
+ * срезанием префикса. Правка формулировки ломала его молча: тип совпадал, а
+ * ветка переставала срабатывать. Обе функции обязаны читать ОДИН вход. */
+describe("depositValue()", () => {
+  const flat = (s: string) => s.replace(/ /g, " ");
+
+  it("отвечает на все четыре случая", () => {
+    expect(depositValue("none", null)).toBe("Не нужен");
+    expect(depositValue("document", null)).toBe("Документ");
+    expect(flat(depositValue("money", 3000))).toBe("3 000 ₽");
+    expect(depositValue("money", null)).toBe("Не указан");
+  });
+
+  // Ноль здесь то же «значения нет», что и пустое поле, — как и у formatDeposit.
+  it("ноль трактует как «не указан», а не как «бесплатно»", () => {
+    expect(depositValue("money", 0)).toBe("Не указан");
+  });
+
+  // Слова «залог» в значении быть не должно: подпись рядом уже его сказала.
+  it("слово «залог» в значение не попадает", () => {
+    for (const v of [
+      depositValue("none", null), depositValue("document", null),
+      depositValue("money", 3000), depositValue("money", null),
+    ]) expect(v.toLowerCase()).not.toContain("залог");
   });
 });

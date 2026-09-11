@@ -24,6 +24,15 @@ function humanError(code: string): string {
   if (code.startsWith("dates_taken:")) {
     return "Выбранные даты уже заняты — обновите страницу и выберите другие.";
   }
+  if (code === "duplicate_request") {
+    return "Вы уже отправили заявку на эти даты — она ждёт ответа в «Мои заявки».";
+  }
+  if (code === "qty_stale") {
+    return "Пока форма была открыта, у вещи изменилось количество — обновите страницу.";
+  }
+  if (code === "price_stale") {
+    return "Пока форма была открыта, владелец изменил цену — обновите страницу.";
+  }
   if (code === "dates_stale") {
     return "Пока форма была открыта, начался новый день — обновите страницу и выберите даты заново.";
   }
@@ -32,7 +41,11 @@ function humanError(code: string): string {
   // нужен для прямого вызова экшена: по сети он доступен мимо UI.
   if (code === "own_listing") return "Это ваше объявление — забронировать его нельзя.";
   if (code === "auth_required") return "Войдите, чтобы отправить заявку.";
-  return code.length < 200 ? code : "Не получилось отправить заявку.";
+  /* Наружу выносим только то, что писали для человека. Сообщения зода на
+   * английском («Expected number, received nan») сюда доезжали дословно:
+   * экшен отдаёт текст первой непройденной проверки, и среди них есть как
+   * наши русские, так и служебные. Кириллица — признак «это писали людям». */
+  return /[а-яё]/i.test(code) ? code : "Не получилось отправить заявку — обновите страницу.";
 }
 
 export function BookingFormDialog({
@@ -68,6 +81,7 @@ export function BookingFormDialog({
         from: sel.from,
         to: sel.to,
         qty: String(sel.qty),
+        priceDay: String(priceDay),
         phone,
         comment,
         website,

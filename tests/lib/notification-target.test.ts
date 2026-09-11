@@ -15,7 +15,7 @@ describe("куда ведёт уведомление", () => {
   it("любая заявка ведёт в общую ленту, независимо от стороны", () => {
     const kinds = [
       "request_created", "request_cancelled",
-      "request_confirmed", "request_declined", "request_completed", "request_no_show",
+      "request_confirmed", "request_declined", "request_completed",
     ] as const;
     for (const kind of kinds) {
       expect(notificationTarget(kind, "r1").href).toBe("/cabinet/requests");

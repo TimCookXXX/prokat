@@ -138,7 +138,7 @@ export function AccountShell({
         </ProfileCover>
       )}
 
-      <div className={`mx-auto w-full max-w-6xl px-4 pb-6 ${identity ? "" : "pt-6"} ${identity && !isHub && !isChat ? "max-md:pt-3" : ""} ${isChat ? "max-md:pb-0" : ""}`}>
+      <div className={`mx-auto w-full max-w-[1200px] px-4 pb-6 ${identity ? "" : "pt-6"} ${identity && !isHub && !isChat ? "max-md:pt-3" : ""} ${isChat ? "max-md:pb-0" : ""}`}>
         {/* editable — это своя личная зона, поэтому аватарку здесь можно и
           * открыть, и сменить. Тот же герой в превью выбора обложки рисуется
           * без этого флага. */}

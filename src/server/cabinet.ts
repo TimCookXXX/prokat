@@ -1,9 +1,9 @@
 // Сводка кабинета: одна страница вместо обхода пяти разделов.
 
-import { and, asc, desc, eq, gt, gte, inArray, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/lib/db";
-import { availability, bookingRequests, categories, cities, events, listings, users } from "@db/schema";
+import { availability, bookingRequests, categories, chatThreads, cities, events, listings, users } from "@db/schema";
 import { expireStaleRequests } from "@/server/actions/booking";
 import { todayStr, addDaysStr } from "@/lib/catalog/dates";
 import type { BookingStatus } from "@/lib/catalog/booking-status";
@@ -11,19 +11,10 @@ import {
   disclosedPhone, requestSide, type RequestSide,
 } from "@/lib/booking/request-access";
 import type { LinkableListing } from "@/lib/booking/listing-link";
-
-export interface CabinetDeal {
-  id: string;
-  listingTitle: string;
-  /** Та же тройка полей, что и у строки ленты, и по той же причине: сводка
-   *  показывает подтверждённые сделки, а вещь могли убрать посреди аренды. */
-  listing: LinkableListing;
-  dateFrom: string;
-  dateTo: string;
-  qty: number;
-  expiresAt: Date;
-  peerName: string | null;
-}
+import type { DepositType } from "@/lib/catalog/format";
+import { getUnreadByThread } from "@/server/chat";
+import { summaryRows, toFeedRow } from "@/server/requests-feed";
+import type { FeedRow } from "@/components/cabinet/RequestsFeed";
 
 /* Строка ленты заявок — одна на обе роли. Полей ownerPhone и customerPhone
  * здесь нет намеренно: наружу уходит только peerPhone, уже прошедший через
@@ -38,11 +29,20 @@ export interface CabinetRequestRow {
   qty: number;
   createdAt: Date;
   expiresAt: Date;
-  ownerComment: string | null;
   customerComment: string | null;
+  /* Условия сделки на момент заявки, а не сегодняшние условия вещи. Владелец
+   * вправе поменять цену в любой день, и без снимка стоимость старой заявки
+   * ползла бы вслед за ней — человек видел бы не ту сумму, на которую
+   * соглашался. Снимок лежит колонками самой заявки, см. drizzle/schema.ts. */
+  priceDay: number;
+  depositType: DepositType;
+  depositAmount: number | null;
   /** Всё, что нужно ссылке на вещь: публичный контур закрывают и статус, и бан
    *  владельца — см. lib/booking/listing-link. */
-  listing: LinkableListing & { title: string };
+  listing: LinkableListing & { title: string; image: string | null };
+  /** Переписка пары (вещь, арендатор). Пусто у заявок, созданных до журнала
+   *  сделки, по которым ещё не принималось решение. */
+  threadId: string | null;
   peer: { id: string; name: string | null };
   /** Телефон второй стороны или null — см. lib/booking/request-access. */
   peerPhone: string | null;
@@ -107,7 +107,7 @@ export async function getCabinetRequests(
       qty: bookingRequests.qty,
       createdAt: bookingRequests.createdAt,
       expiresAt: bookingRequests.expiresAt,
-      ownerComment: bookingRequests.ownerComment,
+      confirmedAt: bookingRequests.confirmedAt,
       customerComment: bookingRequests.customerComment,
       ownerUserId: bookingRequests.ownerUserId,
       customerUserId: bookingRequests.customerUserId,
@@ -116,7 +116,14 @@ export async function getCabinetRequests(
       listingTitle: listings.title,
       listingSlug: listings.slug,
       listingStatus: listings.status,
+      // Обложка в SQL, как в getThreadList: весь photos_json ради миниатюры
+      // не тянем.
+      listingImage: sql<string | null>`${listings.photosJson}->0->>'url'`,
+      priceDay: bookingRequests.priceDay,
+      depositType: bookingRequests.depositType,
+      depositAmount: bookingRequests.depositAmount,
       listerBannedAt: lister.bannedAt,
+      threadId: chatThreads.id,
       citySlug: cities.slug,
       categorySlug: categories.slug,
       peerId: peer.id,
@@ -128,6 +135,12 @@ export async function getCabinetRequests(
     .innerJoin(cities, eq(cities.id, listings.cityId))
     .innerJoin(categories, eq(categories.id, listings.categoryId))
     .innerJoin(lister, eq(lister.id, listings.ownerUserId))
+    // Тред пары (вещь, арендатор) — leftJoin: у заявок старше журнала сделки
+    // его может не быть, и строка ленты обязана выжить без него.
+    .leftJoin(chatThreads, and(
+      eq(chatThreads.listingId, listings.id),
+      eq(chatThreads.customerUserId, bookingRequests.customerUserId),
+    ))
     // Вторая сторона одним join'ом: кто именно — решает та же колонка, что и
     // права, поэтому условие вычисляется, а не выбирается снаружи.
     .innerJoin(peer, sql`${peer.id} = case
@@ -161,8 +174,10 @@ export async function getCabinetRequests(
       qty: r.qty,
       createdAt: r.createdAt,
       expiresAt: r.expiresAt,
-      ownerComment: r.ownerComment,
       customerComment: r.customerComment,
+      priceDay: r.priceDay,
+      depositType: r.depositType,
+      depositAmount: r.depositAmount,
       listing: {
         id: r.listingId,
         title: r.listingTitle,
@@ -171,7 +186,9 @@ export async function getCabinetRequests(
         categorySlug: r.categorySlug,
         status: r.listingStatus,
         ownerBannedAt: r.listerBannedAt,
+        image: r.listingImage,
       },
+      threadId: r.threadId,
       peer: { id: r.peerId, name: r.peerName },
       // peer.phone — профиль второй стороны, и владельцем она оказывается
       // только когда смотрит арендатор. Подставлять её как ownerPhone в другом
@@ -179,7 +196,7 @@ export async function getCabinetRequests(
       // владельца» под телефоном клиента — заготовленная утечка.
       peerPhone: disclosedPhone({
         ...parties,
-        status,
+        confirmedAt: r.confirmedAt,
         customerPhone: r.customerPhone,
         ownerPhone: side === "customer" ? r.peerPhone : null,
       }, userId),
@@ -188,14 +205,12 @@ export async function getCabinetRequests(
 }
 
 export interface CabinetSummary {
-  /** Заявки, которые ждут решения владельца: у каждой горит свой срок. */
-  pending: CabinetDeal[];
-  /** Сколько их всего — карточек в pending не больше пяти. */
-  pendingTotal: number;
-  /** Подтверждённые аренды: моя вещь уехала к арендатору. */
-  lending: CabinetDeal[];
-  /** Подтверждённые аренды, где арендатор — я. */
-  borrowing: CabinetDeal[];
+  /* Живые заявки обеих ролей одной лентой, уже отсортированные и срезанные.
+   * Три списка (pending/lending/borrowing) разошлись вместе с тремя разделами
+   * экрана: роль теперь подпись в строке, а не место, где строка лежит. */
+  rows: FeedRow[];
+  /** Сколько живых заявок не поместилось. Точное: резали в памяти, не лимитом. */
+  rest: number;
   stats: {
     views7d: number;
     requests30d: number;
@@ -203,6 +218,11 @@ export interface CabinetSummary {
     busyDays30d: number;
   };
 }
+
+/* Сколько строк показывает панель. Потолок обязателен: при двадцати заявках
+ * сводка превратилась бы в ту же ленту, только без фильтров — ровно то, чего
+ * ADR 0015 велел не допускать. Остаток назван числом и ведёт в ленту. */
+const SUMMARY_ROWS = 8;
 
 export async function getCabinetSummary(userId: string): Promise<CabinetSummary> {
   // Читаем после протухания: заявка с истёкшим сроком не должна висеть
@@ -219,21 +239,11 @@ export async function getCabinetSummary(userId: string): Promise<CabinetSummary>
     .from(listings)
     .where(eq(listings.ownerUserId, userId));
 
-  const [pending, pendingTotal, lending, borrowing, views, requests, active, busy] = await Promise.all([
-    deals(userId, "owner", "new"),
-
-    // Сколько их всего: карточек показываем пять, и без числа шестая заявка
-    // была бы не видна и ничем не обозначена.
-    db
-      .select({ cnt: sql<number>`count(*)::int` })
-      .from(bookingRequests)
-      .where(and(
-        eq(bookingRequests.ownerUserId, userId),
-        eq(bookingRequests.status, "new"),
-      )),
-
-    deals(userId, "owner", "confirmed"),
-    deals(userId, "customer", "confirmed"),
+  const [live, views, requests, active, busy] = await Promise.all([
+    /* Тот же запрос, что и у ленты. Второго пути чтения у заявки больше нет:
+     * прежний deals() отдавал семь полей, и «Пульту» их не хватало — телефона,
+     * снимка вещи, залога и суммы в нём не было вовсе. */
+    getCabinetRequests(userId, { statuses: ["new", "confirmed"] }),
 
     db
       .select({ cnt: sql<number>`count(*)::int` })
@@ -269,11 +279,23 @@ export async function getCabinetSummary(userId: string): Promise<CabinetSummary>
       )),
   ]);
 
+  /* Непрочитанное — счётчиком у иконки переписки. Формула одна на весь
+   * проект: список переписок, треды объявления и сводка обязаны считать
+   * одинаково, поэтому берём общую функцию, а не пишем четвёртую копию. */
+  const threadIds = live.map((r) => r.threadId).filter((id): id is string => id !== null);
+  const unread = await getUnreadByThread(threadIds, userId);
+
+  const { shown, rest } = summaryRows(
+    live.map((r) => ({
+      ...toFeedRow(r),
+      unread: r.threadId ? unread.get(r.threadId) ?? 0 : 0,
+    })),
+    SUMMARY_ROWS,
+  );
+
   return {
-    pending,
-    pendingTotal: pendingTotal[0]?.cnt ?? 0,
-    lending,
-    borrowing,
+    rows: shown,
+    rest,
     stats: {
       views7d: views[0]?.cnt ?? 0,
       requests30d: requests[0]?.cnt ?? 0,
@@ -283,62 +305,3 @@ export async function getCabinetSummary(userId: string): Promise<CabinetSummary>
   };
 }
 
-/* Заявки одной стороны сделки вместе с вещью и вторым участником: карточка
- * сводки отвечает «что, когда и с кем» без дополнительных запросов.
- *
- * Ожидающие решения сортируются по сроку — первым то, что сгорит раньше;
- * подтверждённые — по дате начала. */
-async function deals(
-  userId: string,
-  side: "owner" | "customer",
-  status: "new" | "confirmed",
-): Promise<CabinetDeal[]> {
-  const peer = alias(users, "peer");
-  const lister = alias(users, "lister");
-  const mineColumn = side === "owner" ? bookingRequests.ownerUserId : bookingRequests.customerUserId;
-  const peerColumn = side === "owner" ? bookingRequests.customerUserId : bookingRequests.ownerUserId;
-
-  const rows = await getDb()
-    .select({
-      id: bookingRequests.id,
-      listingId: bookingRequests.listingId,
-      listingTitle: listings.title,
-      listingSlug: listings.slug,
-      listingStatus: listings.status,
-      listerBannedAt: lister.bannedAt,
-      citySlug: cities.slug,
-      categorySlug: categories.slug,
-      dateFrom: bookingRequests.dateFrom,
-      dateTo: bookingRequests.dateTo,
-      qty: bookingRequests.qty,
-      expiresAt: bookingRequests.expiresAt,
-      peerName: peer.name,
-    })
-    .from(bookingRequests)
-    .innerJoin(listings, eq(listings.id, bookingRequests.listingId))
-    .innerJoin(cities, eq(cities.id, listings.cityId))
-    .innerJoin(categories, eq(categories.id, listings.categoryId))
-    .innerJoin(lister, eq(lister.id, listings.ownerUserId))
-    .innerJoin(peer, eq(peer.id, peerColumn))
-    .where(and(eq(mineColumn, userId), eq(bookingRequests.status, status)))
-    .orderBy(status === "new" ? asc(bookingRequests.expiresAt) : asc(bookingRequests.dateFrom))
-    .limit(5);
-
-  return rows.map((r) => ({
-    id: r.id,
-    listingTitle: r.listingTitle,
-    listing: {
-      id: r.listingId,
-      slug: r.listingSlug,
-      citySlug: r.citySlug,
-      categorySlug: r.categorySlug,
-      status: r.listingStatus,
-      ownerBannedAt: r.listerBannedAt,
-    },
-    dateFrom: r.dateFrom,
-    dateTo: r.dateTo,
-    qty: r.qty,
-    expiresAt: r.expiresAt,
-    peerName: r.peerName,
-  }));
-}

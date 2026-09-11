@@ -22,7 +22,8 @@ import { useSyncCounters } from "@/components/realtime/useSyncCounters";
 import { fetchNewerMessages } from "@/server/actions/realtime";
 import { buildFeed, unreadAnchor } from "@/lib/chat/grouping";
 import { fetchOlderMessages, postMessage, startThread, markThreadRead } from "@/server/actions/chat";
-import { DateDivider, UnreadDivider } from "@/components/chat/FeedDividers";
+import { DateDivider, SystemNote, UnreadDivider } from "@/components/chat/FeedDividers";
+import { isUnreadFor } from "@/lib/chat/unread";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { content } from "@theme/content";
 import type { ThreadMessage } from "@/server/chat";
@@ -145,7 +146,7 @@ export function ThreadView({
   // человек и так только что отправил, а фоновой вкладке зачитывать нечего.
   const announce = useCallback((incoming: ThreadMessage[]) => {
     if (document.visibilityState !== "visible") return;
-    const foreign = incoming.filter((m) => m.senderUserId !== viewerId);
+    const foreign = incoming.filter((m) => isUnreadFor(m, viewerId, null));
     const last = foreign[foreign.length - 1];
     if (!last) return;
     setAnnouncement((prev) => ({
@@ -241,7 +242,7 @@ export function ThreadView({
     // но считаем, сколько чужих сообщений пришло: об этом скажет кнопка.
     if (!stickToBottom.current) {
       setUnseenBelow(
-        messages.filter((m) => m.id > seenUpTo.current && m.senderUserId !== viewerId).length,
+        messages.filter((m) => isUnreadFor(m, viewerId, seenUpTo.current)).length,
       );
       return;
     }
@@ -446,6 +447,7 @@ export function ThreadView({
         {feed.map((item) => {
           if (item.kind === "date") return <DateDivider key={item.key} label={item.label} />;
           if (item.kind === "unread") return <UnreadDivider key={item.key} count={item.count} />;
+          if (item.kind === "system") return <SystemNote key={item.key} message={item.message} />;
           return (
             <Group
               key={item.key}
@@ -541,7 +543,7 @@ function Group({
           key={m.id}
           mine={mine}
           last={i === messages.length - 1}
-          body={m.body}
+          body={m.body ?? ""}
           createdAt={m.createdAt}
           read={mine && Boolean(counterpartCursor && m.id <= counterpartCursor)}
         />
