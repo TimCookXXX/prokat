@@ -18,7 +18,6 @@ vi.mock("@/server/actions/booking", () => ({ cancelBookingRequest: vi.fn() }));
 const { SummaryPanel } = await import("@/components/cabinet/SummaryPanel");
 type Row = Parameters<typeof SummaryPanel>[0]["rows"][number];
 
-const TODAY = "2026-09-11";
 const flat = (s: string) => s.replace(/[\s\u00A0\u202F]+/g, " ");
 const text = () => flat(document.body.textContent ?? "");
 
@@ -51,7 +50,7 @@ const row = (over: Partial<Row> = {}): Row => ({
 
 describe("строка, ждущая ответа", () => {
   it("несёт всё для решения: сумму, залог, слова клиента и кнопки", () => {
-    render(<SummaryPanel rows={[row({ customerComment: "Заберу вечером" })]} rest={0} today={TODAY} />);
+    render(<SummaryPanel rows={[row({ customerComment: "Заберу вечером" })]} rest={0} />);
     const t = text();
     expect(t).toContain("≈ 2 800 ₽");
     // Сутки считает сам компонент, и границы диапазона включительные:
@@ -66,13 +65,13 @@ describe("строка, ждущая ответа", () => {
   /* Телефон обязателен именно здесь. Правило сервиса: решение по заявке
    * принимается созвоном, значит номер — вход в решение, а не соседний экран. */
   it("показывает телефон клиента ссылкой для звонка", () => {
-    render(<SummaryPanel rows={[row()]} rest={0} today={TODAY} />);
+    render(<SummaryPanel rows={[row()]} rest={0} />);
     const tel = screen.getByRole("link", { name: /\+7918/ });
     expect(tel.getAttribute("href")).toBe("tel:+79180000001");
   });
 
   it("роль названа словом, а не разделом", () => {
-    render(<SummaryPanel rows={[row()]} rest={0} today={TODAY} />);
+    render(<SummaryPanel rows={[row()]} rest={0} />);
     expect(text()).toContain("вы сдаёте");
   });
 });
@@ -80,33 +79,22 @@ describe("строка, ждущая ответа", () => {
 describe("идущая аренда", () => {
   const going = row({
     status: "confirmed", hot: false,
-    dateFrom: "2026-09-09", dateTo: TODAY,
+    dateFrom: "2026-09-09", dateTo: "2026-09-11",
   });
 
   it("решать не предлагает", () => {
-    render(<SummaryPanel rows={[going]} rest={0} today={TODAY} />);
+    render(<SummaryPanel rows={[going]} rest={0} />);
     expect(screen.queryByRole("button", { name: "Подтвердить" })).toBeNull();
-  });
-
-  // Что происходит СЕГОДНЯ — главное, ради чего строка вообще на экране.
-  it("называет сегодняшнее событие словом", () => {
-    render(<SummaryPanel rows={[going]} rest={0} today={TODAY} />);
-    expect(text()).toContain("сегодня возврат");
-  });
-
-  it("арендатору то же событие называется его словами", () => {
-    render(<SummaryPanel rows={[{ ...going, side: "customer" }]} rest={0} today={TODAY} />);
-    expect(text()).toContain("сегодня вернуть");
   });
 
   // Непрочитанное — числом в самой кнопке переписки, а не рядом с ней.
   it("непрочитанное видно на кнопке переписки", () => {
-    render(<SummaryPanel rows={[{ ...going, unread: 3 }]} rest={0} today={TODAY} />);
+    render(<SummaryPanel rows={[{ ...going, unread: 3 }]} rest={0} />);
     expect(screen.getByRole("link", { name: /Переписка, 3/ })).toBeTruthy();
   });
 
   it("без треда кнопки переписки нет", () => {
-    render(<SummaryPanel rows={[{ ...going, threadId: null }]} rest={0} today={TODAY} />);
+    render(<SummaryPanel rows={[{ ...going, threadId: null }]} rest={0} />);
     expect(screen.queryByRole("link", { name: /Переписка/ })).toBeNull();
   });
 });
@@ -121,7 +109,7 @@ describe("моя заявка на чужую вещь", () => {
    * отдало. Номер в фикстуре стоит НЕПУСТОЙ намеренно: с null проверку прошла
    * бы любая панель, в том числе печатающая всё подряд. */
   it("не печатает телефон, если правило его не отдало", () => {
-    render(<SummaryPanel rows={[{ ...mine, peerPhone: null }]} rest={0} today={TODAY} />);
+    render(<SummaryPanel rows={[{ ...mine, peerPhone: null }]} rest={0} />);
     expect(text()).not.toContain("+7");
     expect(screen.queryByRole("link", { name: /\+7/ })).toBeNull();
   });
@@ -130,19 +118,19 @@ describe("моя заявка на чужую вещь", () => {
   it("печатает телефон, когда правило его отдало", () => {
     render(<SummaryPanel
       rows={[{ ...mine, status: "confirmed", peerPhone: "+79180000009" }]}
-      rest={0} today={TODAY}
+      rest={0}
     />);
     expect(screen.getByRole("link", { name: /\+79180000009/ })).toBeTruthy();
   });
 
   it("показывается и говорит, что ответа ещё нет", () => {
-    render(<SummaryPanel rows={[mine]} rest={0} today={TODAY} />);
+    render(<SummaryPanel rows={[mine]} rest={0} />);
     expect(text()).toContain("вы арендуете");
     expect(text()).toContain("Ждёт подтверждения");
   });
 
   it("чужих кнопок решения не даёт", () => {
-    render(<SummaryPanel rows={[mine]} rest={0} today={TODAY} />);
+    render(<SummaryPanel rows={[mine]} rest={0} />);
     expect(screen.queryByRole("button", { name: "Подтвердить" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Отклонить" })).toBeNull();
   });
@@ -150,25 +138,25 @@ describe("моя заявка на чужую вещь", () => {
 
 describe("хвост и пустота", () => {
   it("непоместившееся названо числом и ведёт в ленту", () => {
-    render(<SummaryPanel rows={[row()]} rest={6} today={TODAY} />);
+    render(<SummaryPanel rows={[row()]} rest={6} />);
     const more = screen.getByRole("link", { name: /Ещё 6 заявок/ });
     expect(more.getAttribute("href")).toBe("/cabinet/requests");
   });
 
   it("одна лишняя заявка склоняется правильно", () => {
-    render(<SummaryPanel rows={[row()]} rest={1} today={TODAY} />);
+    render(<SummaryPanel rows={[row()]} rest={1} />);
     expect(screen.getByRole("link", { name: /Ещё 1 заявка/ })).toBeTruthy();
   });
 
   it("хвоста нет, когда всё поместилось", () => {
-    render(<SummaryPanel rows={[row()]} rest={0} today={TODAY} />);
+    render(<SummaryPanel rows={[row()]} rest={0} />);
     expect(screen.queryByRole("link", { name: /Ещё/ })).toBeNull();
   });
 
   // Пустая сводка даёт по двери на каждую роль: человек мог прийти и сдавать,
   // и брать.
   it("пустая панель зовёт в обе стороны", () => {
-    render(<SummaryPanel rows={[]} rest={0} today={TODAY} />);
+    render(<SummaryPanel rows={[]} rest={0} />);
     expect(screen.getByRole("link", { name: "Разместить вещь" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Что сдают рядом" })).toBeTruthy();
   });

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireAuthState } from "@/lib/auth/guard";
 import { getCabinetSummary } from "@/server/cabinet";
-import { todayStr } from "@/lib/catalog/dates";
 import { Stats } from "@/components/cabinet/StatTile";
 import { SummaryPanel } from "@/components/cabinet/SummaryPanel";
 import { CountersSync } from "@/components/realtime/CountersSync";
@@ -45,9 +44,7 @@ export default async function CabinetIndex() {
         ]}
       />
 
-      {/* Сегодняшний день считает сервер и передаёт строкой: на полуночной
-        * границе он у сервера и у браузера разный, а панель попадает в SSR. */}
-      <SummaryPanel rows={rows} rest={rest} today={todayStr()} />
+      <SummaryPanel rows={rows} rest={rest} />
     </div>
   );
 }

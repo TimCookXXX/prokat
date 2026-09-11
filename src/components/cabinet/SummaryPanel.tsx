@@ -11,7 +11,8 @@
 // Строка молчит, пока от человека ничего не нужно, и раскрывается ровно
 // настолько, насколько нужно: ждущая ответа несёт сумму, залог, слова клиента,
 // телефон и две кнопки; идущая — телефон и переписку; своя отправленная —
-// только то, что ответа ещё нет.
+// только то, что ответа ещё нет. Что происходит с бронью сегодня, панель не
+// пересказывает: даты стоят в строке, и подпись над ними была шумом.
 //
 // Раскладку переключает ширина САМОЙ панели, а не окна: рядом стоит сайдбар,
 // и на 900px окна панели достаётся заметно меньше. Правила — в globals.css,
@@ -28,23 +29,6 @@ import { depositValue, formatPrice } from "@/lib/catalog/format";
 import { rentalDaysCount } from "@/lib/booking/params";
 import { ruPlural } from "@/lib/plural";
 import { Button } from "@/components/ui/button";
-
-/* Что сегодня происходит с этой бронью. Считается от дня, посчитанного НА
- * СЕРВЕРЕ и переданного строкой: «сегодня» на полуночной границе у сервера и
- * у браузера разное, а панель попадает в SSR — вычисляй мы его здесь, React
- * ругался бы на расхождение разметки. */
-function todayNote(row: FeedRow, today: string): string | null {
-  if (row.status !== "confirmed") return null;
-  const owner = row.side === "owner";
-  // Аренда на одни сутки: сегодня и отдать, и забрать обратно. Два события в
-  // один день — это и есть ответ, а не повод назвать одно из них.
-  if (row.dateFrom === today && row.dateTo === today) {
-    return owner ? "сегодня отдать и принять" : "сегодня забрать и вернуть";
-  }
-  if (row.dateFrom === today) return owner ? "сегодня отдать" : "сегодня забрать";
-  if (row.dateTo === today) return owner ? "сегодня возврат" : "сегодня вернуть";
-  return null;
-}
 
 function PhoneButton({ phone }: { phone: string }) {
   return (
@@ -83,12 +67,11 @@ function ChatButton({ row }: { row: FeedRow }) {
   );
 }
 
-function Row({ row, today }: { row: FeedRow; today: string }) {
+function Row({ row }: { row: FeedRow }) {
   const owner = row.side === "owner";
   const decide = owner && row.status === "new";
   const href = requestListingHref(row.listing, row.side);
   const days = rentalDaysCount({ from: row.dateFrom, to: row.dateTo, qty: row.qty });
-  const note = todayNote(row, today);
 
   return (
     <li className={`summary-row${row.hot ? " summary-row--hot" : ""}`}>
@@ -154,11 +137,6 @@ function Row({ row, today }: { row: FeedRow; today: string }) {
 
       <p className="summary-sig">
         {decide && <TimeLeft row={row} />}
-        {note && (
-          <span className="whitespace-nowrap rounded-sm bg-selected px-2 py-0.5 text-2xs font-semibold text-selected-foreground">
-            {note}
-          </span>
-        )}
         {!owner && row.status === "new" && <StatusBadge row={row} />}
       </p>
 
@@ -180,13 +158,11 @@ function Row({ row, today }: { row: FeedRow; today: string }) {
 }
 
 export function SummaryPanel({
-  rows, rest, today,
+  rows, rest,
 }: {
   rows: FeedRow[];
   /** Сколько живых заявок не поместилось. Число точное — резали в памяти. */
   rest: number;
-  /** Деловой день, посчитанный на сервере: см. todayNote. */
-  today: string;
 }) {
   if (rows.length === 0) {
     return (
@@ -211,7 +187,7 @@ export function SummaryPanel({
 
   return (
     <ol className="summary-panel" role="list" aria-label="Живые заявки">
-      {rows.map((r) => <Row key={r.id} row={r} today={today} />)}
+      {rows.map((r) => <Row key={r.id} row={r} />)}
       {rest > 0 && (
         <li>
           <Link href={"/cabinet/requests" as never} className="summary-more">
