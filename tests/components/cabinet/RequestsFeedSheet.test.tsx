@@ -1,12 +1,19 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
 /* Шторка заявки — единственное место, где владелец решает, и единственное, где
  * человек видит условия сделки целиком. Проверяем то, что легко потерять
  * молча: залог показывается ВСЕГДА (в том числе когда его нет — это ответ, а не
  * его отсутствие), количество только когда его больше одного, а сумма считается
  * по цене из самой заявки, а не по сегодняшней цене вещи. */
+
+/* Адрес — единственный источник правды о том, какая заявка открыта. Мок
+ * useSearchParams подставляет его же: это ровно тот контракт, который был
+ * нарушен, когда компонент держал свою копию в useState и читал
+ * window.location в момент рендера. */
+const params = new URLSearchParams();
+vi.mock("next/navigation", () => ({ useSearchParams: () => params }));
 
 // Кнопки решения зовут server action — тот тянет next-auth, которого в jsdom нет.
 vi.mock("@/server/actions/owner", () => ({
@@ -47,11 +54,14 @@ const row = (over: Partial<Row> = {}): Row => ({
 
 /* Шторка монтируется только по клику — на сервере она не рисуется вовсе. Текст
  * читаем из всего документа, а не из container: шторка уезжает в портал, и
- * поддерева, которое вернул render, в ней нет. */
+ * поддерева, которое вернул render, в ней нет.
+ *
+ * Клик здесь не имитируется: pushState в jsdom роутер не обновит, а открытость
+ * компонент берёт из адреса. Ставим адрес и монтируем — это и есть путь
+ * «пришёл по ссылке из переписки». */
 function openSheet(r: Row) {
-  const view = render(<RequestsFeed rows={[r]} />);
-  fireEvent.click(screen.getAllByText("Мангал")[0]);
-  return view;
+  params.set("request", r.id);
+  return render(<RequestsFeed rows={[r]} />);
 }
 
 const sheetText = () => flat(document.body.textContent ?? "");
@@ -103,5 +113,32 @@ describe("шторка заявки", () => {
   it("предупреждает, что оплата и залог мимо сервиса", () => {
     openSheet(row());
     expect(sheetText()).toContain("сервис их не проводит");
+  });
+});
+
+/* Гонка, которая стоила заказчику сломанной шторки: компонент держал свою
+ * копию открытой заявки в useState и читал window.location в момент рендера, а
+ * Next коммитит адрес ПОСЛЕ него. Переход по ссылке из переписки открывал
+ * шторку один раз из десяти. Тест держит контракт: открытость берётся из
+ * адреса, а не из собственного состояния. */
+describe("какая заявка открыта — решает адрес", () => {
+  it("заявка из адреса открывается без единого клика", () => {
+    params.set("request", "01REQ");
+    render(<RequestsFeed rows={[row()]} />);
+    expect(screen.getByText("Залог")).toBeTruthy();
+  });
+
+  it("адрес без заявки шторку не открывает", () => {
+    params.delete("request");
+    render(<RequestsFeed rows={[row()]} />);
+    expect(screen.queryByText("Залог")).toBeNull();
+  });
+
+  // Ссылка на заявку, которой в ленте нет (удалена, отфильтрована), не должна
+  // ни открывать пустую шторку, ни ронять страницу.
+  it("ссылка на чужую или исчезнувшую заявку страницу не роняет", () => {
+    params.set("request", "01НЕТ-ТАКОЙ");
+    expect(() => render(<RequestsFeed rows={[row()]} />)).not.toThrow();
+    expect(screen.queryByText("Залог")).toBeNull();
   });
 });

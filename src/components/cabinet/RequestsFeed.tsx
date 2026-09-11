@@ -11,7 +11,8 @@
 // pushState/popstate — документированный приём Next, тот же, что у фильтра
 // объявлений.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Clock, ImageOff, MessageCircle } from "lucide-react";
@@ -241,10 +242,16 @@ export function RequestsFeed({
    *  узкая — таблица в неё не встаёт. Всегда строки, первой идёт период. */
   compact?: boolean;
 }) {
-  const [openId, setOpenId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return new URLSearchParams(window.location.search).get("request");
-  });
+  /* Какая заявка открыта — знает АДРЕС, а не состояние компонента. Читаем его
+   * useSearchParams'ом, и это не стилистика: своя копия в useState читала
+   * `window.location` в момент рендера, а Next обновляет адрес ПОСЛЕ него.
+   * Переход по ссылке из переписки выпадал в гонку — шторка то открывалась, то
+   * нет, — а заявка всплывала позже, когда человек закрывал соседнюю и
+   * history.back() возвращал её же запись.
+   *
+   * Ручные pushState и replaceState хук видит: Next их перехватывает и сводит
+   * с состоянием роутера. Значит источник правды остаётся один. */
+  const openId = useSearchParams().get("request");
   // Закрывать через history.back() можно только запись, которую сами положили:
   // по прямой ссылке на заявку «назад» увёл бы со страницы.
   const pushed = useRef(false);
@@ -254,28 +261,26 @@ export function RequestsFeed({
     url.searchParams.set("request", id);
     window.history.pushState(null, "", url);
     pushed.current = true;
-    setOpenId(id);
   }, []);
 
   const close = useCallback(() => {
     if (pushed.current) {
       pushed.current = false;
       window.history.back();
-    } else {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("request");
-      window.history.replaceState(null, "", url);
+      return;
     }
-    setOpenId(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("request");
+    window.history.replaceState(null, "", url);
   }, []);
 
+  // Кнопка «назад» уносит нашу запись, и права закрывать ею следующую шторку у
+  // нас больше нет. Сам адрес после popstate перечитывать не надо — им занят
+  // роутер.
   useEffect(() => {
-    const sync = () => {
-      pushed.current = false;
-      setOpenId(new URLSearchParams(window.location.search).get("request"));
-    };
-    window.addEventListener("popstate", sync);
-    return () => window.removeEventListener("popstate", sync);
+    const forget = () => { pushed.current = false; };
+    window.addEventListener("popstate", forget);
+    return () => window.removeEventListener("popstate", forget);
   }, []);
 
   const current = rows.find((r) => r.id === openId) ?? null;
