@@ -210,22 +210,15 @@ export function SummaryPanel({
   }
 
   return (
-    <>
-      <ol className="summary-panel" role="list" aria-label="Живые заявки">
-        {rows.map((r) => <Row key={r.id} row={r} today={today} />)}
-        {rest > 0 && (
-          <li>
-            <Link href={"/cabinet/requests" as never} className="summary-more">
-              Ещё {rest} {ruPlural(rest, "заявка", "заявки", "заявок")} →
-            </Link>
-          </li>
-        )}
-      </ol>
-      {/* Ключевое ограничение сервиса, и место ему под суммами: человек,
-        * увидевший «≈ 3 600 ₽» и «залог», вправе решить, что платит здесь. */}
-      <p className="mt-2 px-0.5 text-xs text-muted-foreground">
-        Оплата и залог — между вами, сервис их не проводит.
-      </p>
-    </>
+    <ol className="summary-panel" role="list" aria-label="Живые заявки">
+      {rows.map((r) => <Row key={r.id} row={r} today={today} />)}
+      {rest > 0 && (
+        <li>
+          <Link href={"/cabinet/requests" as never} className="summary-more">
+            Ещё {rest} {ruPlural(rest, "заявка", "заявки", "заявок")} →
+          </Link>
+        </li>
+      )}
+    </ol>
   );
 }

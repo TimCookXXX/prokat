@@ -173,11 +173,3 @@ describe("хвост и пустота", () => {
     expect(screen.getByRole("link", { name: "Что сдают рядом" })).toBeTruthy();
   });
 });
-
-// Сервис денег не проводит — рядом с суммами это обязано быть сказано.
-describe("оговорка про деньги", () => {
-  it("стоит под панелью", () => {
-    render(<SummaryPanel rows={[row()]} rest={0} today={TODAY} />);
-    expect(text()).toContain("сервис их не проводит");
-  });
-});

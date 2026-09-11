@@ -595,9 +595,13 @@
   .summary-panel .summary-chat {
     flex: none;
     gap: 5px;
-    width: auto;
-    min-width: 2.75rem;
-    padding: 0 0.5rem;
+    /* Ширина фиксирована и с запасом под счётчик. Сжимать её по содержимому
+       нельзя: колонка управления прижата к правому краю, и строка со счётчиком
+       уезжала бы левее соседней — телефоны вставали по разным линиям. Место под
+       число резервируется всегда, даже когда числа нет. */
+    width: 3.5rem;
+    min-width: 0;
+    padding: 0;
   }
 
   .summary-more {
@@ -644,7 +648,7 @@
     }
     .summary-ctl > div > :is(button, a) { flex: 0 0 auto; }
     .summary-panel .summary-phone { flex: 0 1 auto; }
-    .summary-panel .summary-chat { padding: 0 0.5rem; }
+    .summary-panel .summary-chat { width: 3.25rem; padding: 0; }
   }
 }
 
