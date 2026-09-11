@@ -31,10 +31,14 @@ describe("высота панели переписки", () => {
     expect(derived.length).toBeGreaterThan(0);
   });
 
+  /* Пол обязан быть ВНЕШНЕЙ функцией, а не любым max() внутри выражения:
+   * `h-[min(calc(100svh-max(20rem,var(--x))),40rem)]` содержит max(), но пола
+   * у высоты не даёт — там ограничено вычитаемое, а не результат. */
   it("у каждой есть пол: без него телефон на боку схлопывает панель", () => {
     for (const value of derived) {
-      expect(value, `${value} — разность без max(): на низком экране уйдёт в ноль`)
-        .toContain("max(");
+      const inner = value.slice(value.indexOf("[") + 1, value.lastIndexOf("]"));
+      expect(inner, `${inner} — пол не снаружи: max() ограничивает не результат`)
+        .toMatch(/^max\(/);
     }
   });
 

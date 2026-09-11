@@ -80,13 +80,26 @@ function Row({ row }: { row: FeedRow }) {
       </span>
 
       <div className="summary-body">
-        <p className="summary-title">
-          {href ? (
-            <Link href={href as never} className="transition-colors hover:text-accent">
-              {row.listing.title}
-            </Link>
-          ) : row.listing.title}
-        </p>
+        {/* Название и чип — одной строкой, в потоке. Абсолютный чип поверх
+          * строки требовал резерва под себя, и резерв этот платили ВСЕ строки:
+          * у идущей аренды чипа нет, а 82px у названия всё равно отнимались, и
+          * оно ломалось надвое. А бейджу «Ждёт подтверждения» тех 82px не
+          * хватало вдвое — он ложился на текст и перехватывал по нему клик. */}
+        <div className="summary-head">
+          <p className="summary-title">
+            {href ? (
+              <Link href={href as never} className="transition-colors hover:text-accent">
+                {row.listing.title}
+              </Link>
+            ) : row.listing.title}
+          </p>
+          {/* Срок и статус читаются первыми, поэтому стоят у названия, а не
+            * отдельной полосой внизу. */}
+          <p className="summary-flag">
+            {decide && <TimeLeft row={row} compact />}
+            {!owner && row.status === "new" && <StatusBadge row={row} />}
+          </p>
+        </div>
         <p className="summary-meta">
           <span className="font-mono text-2xs uppercase tracking-mono">{roleWord(row)}</span>
           {" · "}
@@ -133,15 +146,6 @@ function Row({ row }: { row: FeedRow }) {
       <p className="summary-when tabular-nums">
         {period(row)}
         {days > 0 && <span className="summary-days">{days} {ruPlural(days, "день", "дня", "дней")}</span>}
-      </p>
-
-      {/* Срок и статус — вплотную к названию, справа. Своей полосой внизу они
-        * добавляли строке седьмую линию: все разной длины и все прижаты влево,
-        * отчего край строки выглядел рваным. Здесь же они дают верху вторую
-        * точку опоры — и читаются первыми, а это про них и верно. */}
-      <p className="summary-flag">
-        {decide && <TimeLeft row={row} compact />}
-        {!owner && row.status === "new" && <StatusBadge row={row} />}
       </p>
 
       <div className="summary-ctl">
