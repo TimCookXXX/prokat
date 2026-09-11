@@ -56,8 +56,13 @@ export type ChatSystemMeta = {
   depositAmount?: number;
 };
 
+/* Дата из meta годится, только если она и правда дата: тип обещаний не даёт,
+ * а `formatDayMonthNum("12.09.2026")` молча вернул бы «NaN.NaN». */
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const isDate = (v: unknown): v is string => typeof v === "string" && DATE_RE.test(v);
+
 function period(meta: ChatSystemMeta): string | null {
-  if (!meta.from || !meta.to) return null;
+  if (!isDate(meta.from) || !isDate(meta.to)) return null;
   return meta.from === meta.to
     ? formatDayMonth(meta.from)
     : `${formatDayMonth(meta.from)} — ${formatDayMonth(meta.to)}`;
@@ -91,6 +96,8 @@ export function systemMessageLine(
   return detail ? `${title}: ${detail}` : title;
 }
 
+const DEPOSIT_TYPES: readonly DepositType[] = ["money", "document", "none"];
+
 export type NoteRow = { term: string; value: string };
 
 /* Строки карточки заявки: что просили и на каких условиях. Только у
@@ -105,13 +112,15 @@ export function requestNoteRows(meta: ChatSystemMeta | null): NoteRow[] {
   const labels = content.chatRequestNote;
   const rows: NoteRow[] = [];
   // Сутки считаются один раз: их спрашивают и строка дат, и стоимость.
-  const days = m.from && m.to ? rentalDaysCount({ from: m.from, to: m.to, qty: 1 }) : 0;
+  const days = isDate(m.from) && isDate(m.to)
+    ? rentalDaysCount({ from: m.from, to: m.to, qty: 1 })
+    : 0;
 
   /* Даты цифрами, а не словами: строка стоит в колонке рядом с подписью, и
    * «20 сентября — 22 сентября · 3 дня» переносится, оставляя висячий
    * разделитель. Плашка решений остаётся на словах — там строка одна, во всю
    * ширину и по центру. Та же причина и тот же формат, что в ленте заявок. */
-  if (m.from && m.to) {
+  if (isDate(m.from) && isDate(m.to)) {
     const p = m.from === m.to
       ? formatDayMonthNum(m.from)
       : `${formatDayMonthNum(m.from)} — ${formatDayMonthNum(m.to)}`;
@@ -130,10 +139,14 @@ export function requestNoteRows(meta: ChatSystemMeta | null): NoteRow[] {
     rows.push({ term: labels.price, value: `≈ ${formatPrice(m.priceDay * days * qty)}` });
   }
 
-  if (m.depositType) {
+  /* Тип залога — из закрытого списка, а не «любая непустая строка»: чужое
+   * значение попало бы в денежную ветку depositValue и выдало бы неизвестный
+   * вид залога за сумму в рублях. */
+  if (DEPOSIT_TYPES.includes(m.depositType as DepositType)) {
+    const amount = typeof m.depositAmount === "number" ? m.depositAmount : null;
     rows.push({
       term: labels.deposit,
-      value: depositValue(m.depositType, m.depositAmount ?? null),
+      value: depositValue(m.depositType as DepositType, amount),
     });
   }
 

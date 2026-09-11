@@ -30,6 +30,9 @@ function humanError(code: string): string {
   if (code === "qty_stale") {
     return "Пока форма была открыта, у вещи изменилось количество — обновите страницу.";
   }
+  if (code === "price_stale") {
+    return "Пока форма была открыта, владелец изменил цену — обновите страницу.";
+  }
   if (code === "dates_stale") {
     return "Пока форма была открыта, начался новый день — обновите страницу и выберите даты заново.";
   }
@@ -74,6 +77,7 @@ export function BookingFormDialog({
         from: sel.from,
         to: sel.to,
         qty: String(sel.qty),
+        priceDay: String(priceDay),
         phone,
         comment,
         website,

@@ -127,7 +127,10 @@ function RequestNote({
         {requestId ? (
           <Link
             href={`/cabinet/requests?request=${requestId}` as never}
-            className="block rounded-sm transition-opacity hover:opacity-80"
+            // Иначе доступным именем стала бы вся карточка целиком — от
+            // заголовка до комментария, — и куда она ведёт, из него не следует.
+            aria-label={`${title}: открыть заявку`}
+            className="block rounded-sm transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             {card}
           </Link>

@@ -19,6 +19,11 @@ export const bookingFormSchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   qty: z.coerce.number().int().min(1).max(1000),
+  /* Цена за сутки, показанная в момент выбора. Ездит с формой не ради расчёта —
+   * сервер считает сам, — а чтобы поймать её сдвиг: заявка замораживает условия
+   * у себя, и заморозить их полагается теми, на которые человек соглашался.
+   * Та же роль, что у qty, и та же проверка (см. price_stale). */
+  priceDay: z.coerce.number().int().positive(),
   phone: z.string().transform(normalizePhone).refine((p) => p.length > 0, {
     message: "Укажите телефон в формате +7 900 000-00-00",
   }),

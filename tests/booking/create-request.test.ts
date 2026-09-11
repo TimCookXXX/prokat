@@ -41,8 +41,10 @@ import { todayStr } from "@/lib/catalog/dates";
 
 const TODAY = todayStr();
 
+const PRICE = 500;
+
 const form = (from: string, to: string) => ({
-  listingId: "l1", from, to, qty: 1, phone: "+79000000000",
+  listingId: "l1", from, to, qty: 1, phone: "+79000000000", priceDay: PRICE,
 });
 
 beforeEach(() => {
@@ -52,7 +54,7 @@ beforeEach(() => {
     {
       listing: {
         id: "l1", ownerUserId: "u2", status: "active", quantity: 1,
-        priceDay: 500, depositType: "money", depositAmount: 2000,
+        priceDay: PRICE, depositType: "money", depositAmount: 2000,
       },
       ownerBannedAt: null,
     },
@@ -86,12 +88,34 @@ describe("createBookingRequest: устаревший выбор дат", () => {
   });
 });
 
+/* Цена — такой же устаревающий параметр формы, как даты и количество. Заявка
+ * навсегда запоминает условия, на которых её подали, поэтому подать её на
+ * условиях, которых человек не видел, нельзя: поднятая за секунду до отправки
+ * цена замёрзла бы в заявке как «то, на что вы согласились». */
+describe("createBookingRequest: устаревшая цена", () => {
+  it("сдвиг цены — отказ, а не молчаливое согласие на новую", async () => {
+    const r = await createBookingRequest({ ...form(TODAY, TODAY), priceDay: PRICE - 100 });
+    expect(r).toEqual({ ok: false, error: "price_stale" });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  // Подделать цену снизу тоже нельзя: экшен доступен по сети мимо интерфейса,
+  // и без сверки с объявлением заявка ушла бы по цене, назначенной клиентом.
+  it("цену из запроса не берёт на веру", async () => {
+    const r = await createBookingRequest({ ...form(TODAY, TODAY), priceDay: 1 });
+    expect(r).toEqual({ ok: false, error: "price_stale" });
+  });
+});
+
 describe("createBookingRequest: своё объявление", () => {
   // Подтвердив такую заявку, владелец занял бы собственные даты в обход
   // календаря занятости, а уведомлений за весь её цикл не пришло бы никому.
   it("владельцу отказ, а не заявка самому себе", async () => {
     listingLimit.mockResolvedValue([
-      { listing: { id: "l1", ownerUserId: "u1", status: "active", quantity: 1 }, ownerBannedAt: null },
+      { listing: {
+        id: "l1", ownerUserId: "u1", status: "active", quantity: 1,
+        priceDay: PRICE, depositType: "money", depositAmount: 2000,
+      }, ownerBannedAt: null },
     ]);
     const res = await createBookingRequest(form(TODAY, TODAY));
     expect(res).toEqual({ ok: false, error: "own_listing" });
@@ -102,7 +126,10 @@ describe("createBookingRequest: своё объявление", () => {
   // своим, даже когда оно снято с публикации.
   it("скрытое своё объявление тоже own_listing, а не listing_not_found", async () => {
     listingLimit.mockResolvedValue([
-      { listing: { id: "l1", ownerUserId: "u1", status: "hidden", quantity: 1 }, ownerBannedAt: null },
+      { listing: {
+        id: "l1", ownerUserId: "u1", status: "hidden", quantity: 1,
+        priceDay: PRICE, depositType: "money", depositAmount: 2000,
+      }, ownerBannedAt: null },
     ]);
     const res = await createBookingRequest(form(TODAY, TODAY));
     expect(res).toEqual({ ok: false, error: "own_listing" });
@@ -122,7 +149,7 @@ describe("createBookingRequest: количество", () => {
     listingLimit.mockResolvedValue([{
       listing: {
         id: "l1", ownerUserId: "owner", status: "active", quantity: 1,
-        priceDay: 500, depositType: "money", depositAmount: 2000,
+        priceDay: PRICE, depositType: "money", depositAmount: 2000,
       },
       ownerBannedAt: null,
     }]);
@@ -134,7 +161,10 @@ describe("createBookingRequest: количество", () => {
 
   it("количество в пределах остатка пропускает", async () => {
     listingLimit.mockResolvedValue([{
-      listing: { id: "l1", ownerUserId: "owner", status: "active", quantity: 5 },
+      listing: {
+        id: "l1", ownerUserId: "owner", status: "active", quantity: 5,
+        priceDay: PRICE, depositType: "money", depositAmount: 2000,
+      },
       ownerBannedAt: null,
     }]);
     transaction.mockResolvedValue(undefined);
@@ -153,7 +183,7 @@ describe("createBookingRequest: журнал сделки", () => {
     listingLimit.mockResolvedValue([{
       listing: {
         id: "l1", ownerUserId: "owner", status: "active", quantity: 1,
-        priceDay: 500, depositType: "money", depositAmount: 2000,
+        priceDay: PRICE, depositType: "money", depositAmount: 2000,
       },
       ownerBannedAt: null,
     }]);
@@ -187,7 +217,7 @@ describe("createBookingRequest: журнал сделки", () => {
   it("кладёт в запись условия на момент заявки", async () => {
     await createBookingRequest(form(TODAY, TODAY));
     expect(dealNoteMock.mock.calls[0][1].meta).toMatchObject({
-      priceDay: 500, depositType: "money", depositAmount: 2000,
+      priceDay: PRICE, depositType: "money", depositAmount: 2000,
     });
   });
 
@@ -220,7 +250,7 @@ describe("createBookingRequest: дубль", () => {
     listingLimit.mockResolvedValue([{
       listing: {
         id: "l1", ownerUserId: "owner", status: "active", quantity: 1,
-        priceDay: 500, depositType: "money", depositAmount: 2000,
+        priceDay: PRICE, depositType: "money", depositAmount: 2000,
       },
       ownerBannedAt: null,
     }]);

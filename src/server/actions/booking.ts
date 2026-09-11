@@ -104,6 +104,11 @@ export async function createBookingRequest(
   // единиц, чем человек видел в диалоге. Отдельный код, а не dates_stale:
   // причина другая, и текст человеку нужен другой.
   if (sel.qty !== form.qty) return { ok: false, error: "qty_stale" };
+  // И цена: заявка навсегда запоминает условия, на которых её подали, поэтому
+  // подать её на условиях, которых человек не видел, нельзя. Без этой проверки
+  // поднятая за секунду до отправки цена замерзала бы в заявке как «то, на что
+  // вы согласились» — ровно тот обман, от которого снимок и заводился.
+  if (listing.priceDay !== form.priceDay) return { ok: false, error: "price_stale" };
 
   const availRows = await db.select().from(availability).where(and(
     eq(availability.listingId, listing.id),
@@ -163,8 +168,7 @@ export async function createBookingRequest(
         // переписка. Копия делается здесь же, одной транзакцией, поэтому
         // разъехаться им негде.
         // Тем же снимком, что лёг в заявку: карточка в переписке и шторка
-        // обязаны называть одну сумму. Копия делается здесь же, одной
-        // транзакцией, поэтому разъехаться им негде.
+        // обязаны называть одну сумму.
         meta: {
           requestId, from: sel.from, to: sel.to, qty: sel.qty,
           priceDay: listing.priceDay,

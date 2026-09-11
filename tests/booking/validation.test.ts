@@ -25,6 +25,7 @@ describe("bookingFormSchema", () => {
     from: "2026-07-20",
     to: "2026-07-22",
     qty: "2",
+    priceDay: "500",
     phone: "8 900 111-22-33",
     comment: "  Привезите к подъезду  ",
   };
@@ -40,6 +41,17 @@ describe("bookingFormSchema", () => {
   it("отклоняет пустой/мусорный телефон", () => {
     expect(bookingFormSchema.safeParse({ ...valid, phone: "" }).success).toBe(false);
     expect(bookingFormSchema.safeParse({ ...valid, phone: "позвоните" }).success).toBe(false);
+  });
+
+  /* Цена ездит с формой, чтобы поймать её сдвиг, — значит она обязательна и
+   * такая же целая положительная, как количество. Мусор в ней не должен
+   * проезжать: сверка с объявлением сравнивает числа. */
+  it("отклоняет форму без цены и с мусорной ценой", () => {
+    const { priceDay: _drop, ...without } = valid;
+    expect(bookingFormSchema.safeParse(without).success).toBe(false);
+    expect(bookingFormSchema.safeParse({ ...valid, priceDay: "0" }).success).toBe(false);
+    expect(bookingFormSchema.safeParse({ ...valid, priceDay: "-100" }).success).toBe(false);
+    expect(bookingFormSchema.safeParse({ ...valid, priceDay: "дорого" }).success).toBe(false);
   });
 
   it("отклоняет кривые даты и qty", () => {
