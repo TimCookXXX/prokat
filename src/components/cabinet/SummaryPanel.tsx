@@ -30,21 +30,14 @@ import { rentalDaysCount } from "@/lib/booking/params";
 import { ruPlural } from "@/lib/plural";
 import { Button } from "@/components/ui/button";
 
-/* Телефон ссылкой, а не кнопкой. Он не действие рядом с «Подтвердить», а то,
- * ЧЕМ решение принимается: по правилам сервиса оно принимается созвоном. Кнопка
- * во всю ширину отнимала у строки целую полосу — на телефоне это половина её
- * высоты, — и уравнивала справку с решением. */
-function PhoneLink({ phone }: { phone: string }) {
+function PhoneButton({ phone }: { phone: string }) {
   return (
-    <p className="summary-phone">
-      <a
-        href={`tel:${phone.replace(/[^+\d]/g, "")}`}
-        className="inline-flex items-center gap-1.5 tabular-nums hover:text-accent"
-      >
-        <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        {phone}
+    <Button asChild size="default" variant="outline" className="summary-phone">
+      <a href={`tel:${phone.replace(/[^+\d]/g, "")}`}>
+        <Phone className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="truncate tabular-nums">{phone}</span>
       </a>
-    </p>
+    </Button>
   );
 }
 
@@ -52,7 +45,7 @@ function ChatButton({ row }: { row: FeedRow }) {
   if (!row.threadId) return null;
   const n = row.unread ?? 0;
   return (
-    <Button asChild size="icon" variant="ghost" className="summary-chat">
+    <Button asChild size="icon" variant="outline" className="summary-chat">
       <Link href={`/chat/${row.threadId}` as never} aria-label={
         n > 0 ? `Переписка, ${n} ${ruPlural(n, "новое", "новых", "новых")}` : "Переписка"
       }>
@@ -115,21 +108,26 @@ function Row({ row }: { row: FeedRow }) {
                 {" · залог "}{depositValue(row.depositType, row.depositAmount).toLowerCase()}
               </span>
             </p>
+            {row.peerPhone && (
+              /* Телефон здесь, а не среди кнопок: правило сервиса — решение по
+               * заявке принимается созвоном, значит номер это ВХОД в решение, а
+               * не третье действие рядом с ним. В колонке управления он вдобавок
+               * вытеснял «Подтвердить» и «Отклонить» за её край. */
+              <p className="summary-money">
+                <a
+                  href={`tel:${row.peerPhone.replace(/[^+\d]/g, "")}`}
+                  className="inline-flex items-center gap-1.5 font-normal tabular-nums text-foreground hover:text-accent"
+                >
+                  <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {row.peerPhone}
+                </a>
+              </p>
+            )}
             {row.customerComment && (
               <p className="summary-quote">{row.customerComment}</p>
             )}
           </>
         )}
-
-      </div>
-
-      {/* Подвал строки: телефон и переписка. На узкой панели они стоят одной
-        * строкой, на широкой контейнер растворяется (display: contents) и оба
-        * встают в сетку сами — так один и тот же узел разметки живёт в двух
-        * раскладках без копии. */}
-      <div className="summary-foot">
-        {row.peerPhone && <PhoneLink phone={row.peerPhone} />}
-        <ChatButton row={row} />
       </div>
 
       <p className="summary-when tabular-nums">
@@ -142,17 +140,19 @@ function Row({ row }: { row: FeedRow }) {
         {!owner && row.status === "new" && <StatusBadge row={row} />}
       </p>
 
-      {/* В колонке управления теперь только решения. Справка (телефон,
-        * переписка) переехала в тело и в угол строки: уравнивать её с
-        * «Подтвердить» размером кнопки было неверно. */}
-      {decide && (
-        <div className="summary-ctl">
+      <div className="summary-ctl">
+        {decide ? (
           <RequestActions
             requestId={row.id} side={row.side} status={row.status}
             dateFrom={row.dateFrom} place="panel"
           />
-        </div>
-      )}
+        ) : (
+          <>
+            {row.peerPhone && <PhoneButton phone={row.peerPhone} />}
+            <ChatButton row={row} />
+          </>
+        )}
+      </div>
     </li>
   );
 }
