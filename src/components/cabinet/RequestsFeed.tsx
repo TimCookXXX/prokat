@@ -13,78 +13,21 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
-import { Clock, ImageOff, MessageCircle } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { Sheet, SheetBody, SheetFooter, SheetHeader } from "@/components/ui/Sheet";
 import { RequestActions } from "@/components/cabinet/RequestActions";
-import { STATUS_BADGE_CLASSES, STATUS_LABELS } from "@/lib/booking/status-labels";
 import { requestListingHref } from "@/lib/booking/listing-link";
-import { formatDayMonthNum, formatTimeLeft } from "@/lib/catalog/dates";
 import { depositValue, formatPrice } from "@/lib/catalog/format";
 import { rentalDaysCount } from "@/lib/booking/params";
 import { ruPlural } from "@/lib/plural";
-import type { CabinetRequestRow } from "@/server/cabinet";
+import {
+  isClosed, period, roleWord, StatusBadge, Thumb, TimeLeft, type FeedRow,
+} from "@/components/cabinet/request-row-bits";
 
-export type FeedRow = Omit<CabinetRequestRow, "createdAt" | "expiresAt"> & {
-  createdAt: string;
-  expiresAt: string;
-  /** Ждёт решения владельца-меня: карточке — охряная полоса и таймер. */
-  hot: boolean;
-  /** ≈ стоимость: сутки и цену сервер уже свёл. Цена — снимок из самой заявки,
-   *  а не сегодняшняя цена вещи (ADR 0019). */
-  estimate: number | null;
-};
-
-// Цифрами, не словами: период стоит парой, и «8 сентября — 14 сентября» не
-// влезал ни в колонку таблицы, ни в строку на телефоне.
-const period = (r: FeedRow) =>
-  r.dateFrom === r.dateTo
-    ? formatDayMonthNum(r.dateFrom)
-    : `${formatDayMonthNum(r.dateFrom)} — ${formatDayMonthNum(r.dateTo)}`;
-
-const roleWord = (r: FeedRow) => (r.side === "owner" ? "вы сдаёте" : "вы арендуете");
-
-const isClosed = (r: FeedRow) =>
-  r.status !== "new" && r.status !== "confirmed";
-
-function Thumb({ row, size }: { row: FeedRow; size: number }) {
-  return (
-    <span
-      className="relative shrink-0 overflow-hidden rounded-lg bg-muted"
-      style={{ width: size, height: size }}
-    >
-      {row.listing.image ? (
-        <Image src={row.listing.image} alt="" fill sizes={`${size}px`} className="object-cover" />
-      ) : (
-        <span className="flex h-full items-center justify-center text-muted-foreground">
-          <ImageOff className="h-4 w-4" aria-hidden="true" />
-        </span>
-      )}
-    </span>
-  );
-}
-
-function TimeLeft({ row }: { row: FeedRow }) {
-  const left = formatTimeLeft(new Date(row.expiresAt));
-  if (!left) return null;
-  return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-sm bg-selected px-2 py-0.5 text-2xs font-semibold text-selected-foreground">
-      <Clock className="h-3 w-3" aria-hidden="true" />
-      {/* SSR и гидрация считают от разных моментов: на минутной границе текст
-        * расходится, и React шумел бы. */}
-      <span suppressHydrationWarning>осталось {left}</span>
-    </span>
-  );
-}
-
-function StatusBadge({ row }: { row: FeedRow }) {
-  return (
-    <span className={`whitespace-nowrap rounded-sm px-2 py-0.5 text-2xs font-medium ${STATUS_BADGE_CLASSES[row.status]}`}>
-      {STATUS_LABELS[row.status]}
-    </span>
-  );
-}
+// Тип строки переехал в общий модуль — переэкспортируем: на него ссылаются
+// server/requests-feed.ts и страницы, и менять там путь незачем.
+export type { FeedRow };
 
 /* Содержимое шторки. Кнопки решения — существующий RequestActions: у него уже
  * есть обе роли, комментарий и тексты ошибок, а два набора кнопок на одну

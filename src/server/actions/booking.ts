@@ -309,6 +309,8 @@ export async function cancelBookingRequest(requestId: string): Promise<ActionRes
 
   if (mail) queueBookingMail(mail);
   revalidatePath("/cabinet/requests");
+  // И сводка: отменённая бронь стоит в её панели такой же строкой, как в ленте.
+  revalidatePath("/cabinet");
   return { ok: true, data: undefined };
 }
 

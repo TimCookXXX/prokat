@@ -38,3 +38,30 @@ export function sortFeedRows(rows: FeedRow[]): FeedRow[] {
     (a, b) => weight(a) - weight(b) || (a.createdAt < b.createdAt ? 1 : -1),
   );
 }
+
+/* Порядок строк СВОДКИ — другое правило, чем у ленты, и подменять им
+ * sortFeedRows нельзя: лента сортирует по свежести намеренно.
+ *
+ * Здесь наверху то, что сгорит раньше всех, потом идущее по дате начала.
+ * Сортировка по сроку, а не по свежести, — не вкусовщина: expiresAt ставится
+ * как «создано + 24 часа» одной константой, поэтому «свежие сверху» — это
+ * ровно ОБРАТНЫЙ порядок к «горит раньше». Со срезом до N это означало бы, что
+ * из панели вылетают именно те заявки, ради которых она и сделана.
+ *
+ * По той же причине резать полагается здесь, а не лимитом в SQL: тот
+ * применяется до сортировки. Заодно остаток считается бесплатно и честно. */
+export function summaryRows(rows: FeedRow[], limit: number): {
+  shown: FeedRow[];
+  rest: number;
+} {
+  const weight = (r: FeedRow) => (r.status === "new" ? 0 : 1);
+  const sorted = [...rows].sort((a, b) => {
+    const w = weight(a) - weight(b);
+    if (w !== 0) return w;
+    // Ждущие ответа — по сроку: первым то, что закроется само раньше всех.
+    if (a.status === "new") return a.expiresAt < b.expiresAt ? -1 : 1;
+    // Идущие — по дате начала: ближайшая передача или возврат впереди.
+    return a.dateFrom < b.dateFrom ? -1 : a.dateFrom > b.dateFrom ? 1 : 0;
+  });
+  return { shown: sorted.slice(0, limit), rest: Math.max(0, sorted.length - limit) };
+}

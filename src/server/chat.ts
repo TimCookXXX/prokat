@@ -110,6 +110,32 @@ function unreadCondition(userId: string) {
   );
 }
 
+/* Сколько непрочитанного в каждом из тредов — одним сгруппированным запросом.
+ *
+ * Вынесено наружу по той же причине, по какой собрана unreadCondition:
+ * читателей стало четверо (список переписок, треды объявления, счётчик в шапке
+ * и сводка кабинета), и четвёртая копия этих восьми строк разъехалась бы с
+ * остальными тремя первой же правкой.
+ *
+ * Пустой список — пустая карта без похода в базу: inArray на пустом массиве
+ * drizzle не принимает. */
+export async function getUnreadByThread(
+  threadIds: readonly string[],
+  userId: string,
+): Promise<Map<string, number>> {
+  if (threadIds.length === 0) return new Map();
+  const rows = await getDb()
+    .select({ threadId: chatMessages.threadId, cnt: sql<number>`count(*)::int` })
+    .from(chatMessages)
+    .innerJoin(chatThreads, eq(chatThreads.id, chatMessages.threadId))
+    .where(and(
+      inArray(chatMessages.threadId, [...threadIds]),
+      unreadCondition(userId),
+    ))
+    .groupBy(chatMessages.threadId);
+  return new Map(rows.map((r) => [r.threadId, r.cnt]));
+}
+
 // Экспортируется ради тестов: функция чистая, а превью — то, что человек видит
 // в списке чаще самого сообщения.
 export function toPreview(body: string): string {
@@ -168,17 +194,7 @@ export async function getListingThreads(
 
   if (rows.length === 0) return [];
 
-  const unreadRows = await db
-    .select({ threadId: chatMessages.threadId, cnt: sql<number>`count(*)::int` })
-    .from(chatMessages)
-    .innerJoin(chatThreads, eq(chatThreads.id, chatMessages.threadId))
-    .where(and(
-      inArray(chatMessages.threadId, rows.map((r) => r.id)),
-      unreadCondition(ownerUserId),
-    ))
-    .groupBy(chatMessages.threadId);
-
-  const unreadByThread = new Map(unreadRows.map((u) => [u.threadId, u.cnt]));
+  const unreadByThread = await getUnreadByThread(rows.map((r) => r.id), ownerUserId);
   return rows.map((r) => ({ ...r, unread: unreadByThread.get(r.id) ?? 0 }));
 }
 
@@ -216,7 +232,7 @@ export async function getThreadList(userId: string): Promise<ThreadListItem[]> {
   const counterpartIds = threads.map((t) => (t.ownerUserId === userId ? t.customerUserId : t.ownerUserId));
   const listingIds = threads.map((t) => t.listingId);
 
-  const [lastMessages, unreadRows, listingRows, counterpartRows] = await Promise.all([
+  const [lastMessages, unreadById, listingRows, counterpartRows] = await Promise.all([
     // DISTINCT ON по треду с сортировкой по id DESC — идёт по индексу
     // (thread_id, id) и берёт последнее сообщение каждого треда одним проходом.
     db.selectDistinctOn([chatMessages.threadId], {
@@ -230,17 +246,7 @@ export async function getThreadList(userId: string): Promise<ThreadListItem[]> {
       .from(chatMessages)
       .where(inArray(chatMessages.threadId, threadIds))
       .orderBy(chatMessages.threadId, desc(chatMessages.id)),
-    db.select({
-      threadId: chatMessages.threadId,
-      cnt: sql<number>`count(*)::int`,
-    })
-      .from(chatMessages)
-      .innerJoin(chatThreads, eq(chatThreads.id, chatMessages.threadId))
-      .where(and(
-        inArray(chatMessages.threadId, threadIds),
-        unreadCondition(userId),
-      ))
-      .groupBy(chatMessages.threadId),
+    getUnreadByThread(threadIds, userId),
     db.select({
       id: listings.id,
       title: listings.title,
@@ -258,7 +264,6 @@ export async function getThreadList(userId: string): Promise<ThreadListItem[]> {
   ]);
 
   const lastById = new Map(lastMessages.map((m) => [m.threadId, m]));
-  const unreadById = new Map(unreadRows.map((r) => [r.threadId, r.cnt]));
   const listingById = new Map(listingRows.map((l) => [l.id, l]));
   const userById = new Map(counterpartRows.map((u) => [u.id, u]));
 

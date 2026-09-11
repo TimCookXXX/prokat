@@ -31,13 +31,18 @@ function humanError(code: string): string {
   return "Не получилось — обновите страницу.";
 }
 
-export function RequestActions({ requestId, side, status, dateFrom }: {
+export function RequestActions({ requestId, side, status, dateFrom, place = "sheet" }: {
   requestId: string;
   /** Обязателен: без стороны компонент нарисовал бы арендатору кнопки владельца. */
   side: RequestSide;
   status: BookingStatus;
   /** Первый день брони — по нему видно, началась ли аренда. */
   dateFrom: string;
+  /* Где стоят кнопки. В шторке под них отдана вся ширина, в строке сводки —
+   * колонка: там они на телефоне делят ширину пополам, а на широкой панели
+   * ужимаются до высоты строки. Размеры задаёт CSS панели по её собственной
+   * ширине, поэтому здесь только раскладка. */
+  place?: "sheet" | "panel";
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -81,14 +86,25 @@ export function RequestActions({ requestId, side, status, dateFrom }: {
   }
 
   if (status === "new") {
+    const panel = place === "panel";
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" pending={pending} onClick={() => run(() => confirmRequest(requestId))}>
+      <div className={panel ? "contents" : "flex flex-col gap-2"}>
+        <div className={panel ? "flex w-full gap-2" : "flex flex-wrap gap-2"}>
+          <Button
+            size={panel ? "default" : "sm"}
+            className={panel ? "grow basis-0" : undefined}
+            pending={pending}
+            onClick={() => run(() => confirmRequest(requestId))}
+          >
             Подтвердить
           </Button>
-          <Button size="sm" variant="outline" pending={pending}
-            onClick={() => run(() => declineRequest(requestId))}>
+          <Button
+            size={panel ? "default" : "sm"}
+            variant="outline"
+            className={panel ? "grow basis-0" : undefined}
+            pending={pending}
+            onClick={() => run(() => declineRequest(requestId))}
+          >
             Отклонить
           </Button>
         </div>
