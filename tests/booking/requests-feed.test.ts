@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { toFeedRow, sortFeedRows } from "@/server/requests-feed";
 import type { CabinetRequestRow } from "@/server/cabinet";
 
-const row =(over: Partial<CabinetRequestRow> = {}): CabinetRequestRow => ({
+const row = (over: Partial<CabinetRequestRow> = {}): CabinetRequestRow => ({
   id: "01REQ",
   side: "owner",
   status: "new",

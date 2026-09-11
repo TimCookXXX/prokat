@@ -170,6 +170,15 @@ export async function setListingStatus(
 
 // ============================== Заявки ==============================
 
+/* Отказы, о которых человеку есть что сказать: внутри транзакции они летят
+ * исключением, наружу уходят кодом. Всё остальное — настоящая поломка, и её
+ * нужно ронять, а не показывать как отказ.
+ *
+ * Списком, а не цепочкой сравнений: новый код отказа иначе молча превращается
+ * в 500 — ровно это и случилось с not_started, пока его сюда не добавили.
+ * `dates_taken:` проверяется отдельно — он несёт в себе список дат. */
+const KNOWN_REFUSALS = new Set(["not_found", "bad_status", "not_started"]);
+
 /* Сколько соседних заявок закрывает одно подтверждение. Потолок нужен: набор
  * лочится целиком внутри транзакции подтверждения, и на популярной вещи он
  * может быть большим. Что сверху — протухнет само, через сутки. */
@@ -277,6 +286,12 @@ async function transitionRequest(
       if (to === "completed") {
         if (req.status !== "confirmed") throw new Error("bad_status");
         const from = todayStr();
+        /* Нижняя граница обязательна. Без неё «вернули раньше» закрывало бы и
+         * бронь, которая ещё не начиналась: освобождался бы ВЕСЬ диапазон, а
+         * аренда, которой не было, попадала в публичный счётчик сделок — ровно
+         * тот дефект, за который сняли «неявку». Не начавшаяся бронь
+         * расторгается, а не завершается: для этого есть «Отменить бронь». */
+        if (req.dateFrom > from) throw new Error("not_started");
         if (req.dateTo > from) {
           await tx.update(availability)
             .set({ bookedQty: sql`greatest(0, ${availability.bookedQty} - ${req.qty})` })
@@ -414,7 +429,7 @@ async function transitionRequest(
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
-    if (msg === "not_found" || msg === "bad_status" || msg.startsWith("dates_taken:")) {
+    if (KNOWN_REFUSALS.has(msg) || msg.startsWith("dates_taken:")) {
       return { ok: false, error: msg };
     }
     throw e;

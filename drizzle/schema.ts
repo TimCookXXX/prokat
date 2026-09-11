@@ -230,9 +230,14 @@ export const bookingRequests = pgTable("booking_requests", {
   ownerStatusIdx: index("booking_requests_owner_status_idx").on(t.ownerUserId, t.status, t.createdAt),
   customerIdx: index("booking_requests_customer_idx").on(t.customerUserId, t.createdAt),
   listingIdx: index("booking_requests_listing_idx").on(t.listingId),
-  // Под ленивое протухание: expireStaleRequests фильтрует по (status,
-  // expires_at) и без этого индекса идёт сиквеншл-сканом с записью — а
-  // дёргается он теперь и при каждом обновлении счётчиков по событию сокета.
+  /* Под ленивую уборку: без него expireStaleRequests идёт сиквеншл-сканом с
+   * записью — а дёргается она теперь и при каждом обновлении счётчиков по
+   * событию сокета.
+   *
+   * Уборок в ней две, и вторая, закрытие аренды по прошедшим датам, ходит по
+   * (status, date_to) — этим индексом она пользуется только префиксом
+   * `status`. Своего ей пока не заводим: подтверждённых броней на порядки
+   * меньше, чем заявок, и префикс отсекает почти всё. */
   staleIdx: index("booking_requests_stale_idx").on(t.status, t.expiresAt),
   /* Двойное нажатие «Забронировать» давало владельцу две одинаковые заявки:
    * подтвердит одну, вторая сутки висит и протухает. Индексом, а не проверкой
@@ -360,10 +365,10 @@ export const notifications = pgTable("notifications", {
 // он собирается из вида и meta при выводе — иначе правка формулировки
 // потребовала бы переписывать историю.
 //
-// Протухания в списке нет намеренно: `expireStaleRequests` — массовый UPDATE,
-// который зовут перед чтением списков, и запись в треды превратила бы его в
-// N+1 внутри чужого рендера. Самый частый терминальный исход остаётся вне
-// журнала; цена названа в ADR.
+// Ленивой уборки в списке нет намеренно: `expireStaleRequests` — массовый
+// UPDATE, который зовут перед чтением списков, и запись в треды превратила бы
+// его в N+1 внутри чужого рендера. Оба её исхода — протухание и закрытие
+// аренды по прошедшим датам — остаются вне журнала; цена названа в ADR 0017.
 export const chatMessageKind = pgEnum("chat_message_kind", [
   "user",
   "request_created",

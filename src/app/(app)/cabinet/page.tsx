@@ -156,7 +156,9 @@ function PendingCard({ deal }: { deal: CabinetDeal }) {
 
       {/* Сводка показывает только ждущие решения владельца, поэтому сторона и
         * статус здесь известны заранее. */}
-      <RequestActions requestId={deal.id} side="owner" status="new" />
+      <RequestActions
+        requestId={deal.id} side="owner" status="new" dateFrom={deal.dateFrom}
+      />
     </article>
   );
 }

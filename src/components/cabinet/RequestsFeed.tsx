@@ -30,7 +30,6 @@ export type FeedRow = Omit<CabinetRequestRow, "createdAt" | "expiresAt"> & {
   hot: boolean;
   /** ≈ стоимость: сутки уже посчитаны сервером — там знает цену вещь. */
   estimate: number | null;
-
 };
 
 // Цифрами, не словами: период стоит парой, и «8 сентября — 14 сентября» не
@@ -180,7 +179,9 @@ function SheetContent({ row }: { row: FeedRow }) {
       </SheetBody>
 
       <SheetFooter>
-        <RequestActions requestId={row.id} side={row.side} status={row.status} />
+        <RequestActions
+          requestId={row.id} side={row.side} status={row.status} dateFrom={row.dateFrom}
+        />
       </SheetFooter>
     </>
   );

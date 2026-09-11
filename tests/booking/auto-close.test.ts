@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 /* Аренда закрывается сама, когда даты прошли. Итог следует из календаря, а не
  * из нажатия владельца: отмечать состоявшуюся аренду его больше не просят, и
- * кнопок «Завершена» и «Неявка» нет вовсе.
+ * кнопки «Завершена» нет вовсе (ADR 0018).
  *
  * Проверяем две вещи, которые легко потерять: границу дня и то, что закрытие
  * идёт по ДЕЛОВОМУ дню, а не по часам процесса. */
@@ -30,6 +30,7 @@ vi.mock("react", async (orig) => ({
 
 const { expireStaleRequests } = await import("@/server/actions/booking");
 const { todayStr } = await import("@/lib/catalog/dates");
+const { renderSql } = await import("../fixtures/render-sql");
 
 describe("ленивая уборка", () => {
   beforeEach(() => { set.mockClear(); where.mockClear(); update.mockClear(); });
@@ -40,20 +41,24 @@ describe("ленивая уборка", () => {
     expect(statuses).toEqual(["expired", "completed"]);
   });
 
-  /* Деловой день, а не current_date базы: у контейнера db зона не задана, и
-   * с полуночи до трёх ночи по Москве он отдавал бы вчерашний день —
-   * закрытие опаздывало бы на три часа. */
-  it("закрывает по деловому дню", async () => {
+  /* Граница закрытия — настоящим SQL, а не поиском даты в дереве условия:
+   * подмена `<` на `<=` закрывала бы аренду в её ПОСЛЕДНИЙ день, когда вещь
+   * ещё у арендатора, а дата в условии осталась бы та же.
+   *
+   * Деловой день, а не current_date базы: у контейнера db зона не задана, и с
+   * полуночи до трёх ночи по Москве он отдавал бы вчерашний день — закрытие
+   * опаздывало бы на три часа. */
+  it("закрывает только те, у кого последний день уже прошёл", async () => {
     await expireStaleRequests();
-    // Условие drizzle — циклический объект, поэтому ищем значение обходом,
-    // а не сериализацией.
-    const found = new Set<unknown>();
-    const has = (node: unknown, needle: string): boolean => {
-      if (node === needle) return true;
-      if (typeof node !== "object" || node === null || found.has(node)) return false;
-      found.add(node);
-      return Object.values(node).some((v) => has(v, needle));
-    };
-    expect(has(where.mock.calls[1], todayStr())).toBe(true);
+    const sql = renderSql(where.mock.calls[1][0]);
+    expect(sql).toContain(`"booking_requests"."date_to" < '${todayStr()}'`);
+    expect(sql).toContain(`"booking_requests"."status" = 'confirmed'`);
+  });
+
+  // Протухание закрывает только ждущие ответа: подтверждённую бронь срок
+  // ответа уже не касается.
+  it("протухание трогает только новые заявки", async () => {
+    await expireStaleRequests();
+    expect(renderSql(where.mock.calls[0][0])).toContain(`"booking_requests"."status" = 'new'`);
   });
 });

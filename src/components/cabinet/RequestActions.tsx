@@ -16,6 +16,7 @@ import {
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { cancelBookingRequest } from "@/server/actions/booking";
 import { canTransition, type BookingStatus } from "@/lib/catalog/booking-status";
+import { todayStr } from "@/lib/catalog/dates";
 import type { RequestSide } from "@/lib/booking/request-access";
 
 function humanError(code: string): string {
@@ -23,14 +24,20 @@ function humanError(code: string): string {
     return "Эти даты уже заняты (другая бронь или закрытие) — отклоните заявку или освободите календарь.";
   }
   if (code === "bad_status") return "Статус уже изменился — обновите страницу.";
+  // Кнопки в этом случае нет, но экшен доступен по сети мимо интерфейса.
+  if (code === "not_started") {
+    return "Аренда ещё не началась — возвращать нечего. Если она сорвалась, отмените бронь.";
+  }
   return "Не получилось — обновите страницу.";
 }
 
-export function RequestActions({ requestId, side, status }: {
+export function RequestActions({ requestId, side, status, dateFrom }: {
   requestId: string;
   /** Обязателен: без стороны компонент нарисовал бы арендатору кнопки владельца. */
   side: RequestSide;
   status: BookingStatus;
+  /** Первый день брони — по нему видно, началась ли аренда. */
+  dateFrom: string;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -90,17 +97,18 @@ export function RequestActions({ requestId, side, status }: {
     );
   }
 
-  /* Подтверждённая бронь. Итог аренды здесь не отмечают: он следует из
-   * календаря, и заявка закрывается сама, когда даты прошли. Осталось одно
-   * действие — отмена, и она же закрывает случай «клиент не пришёл»:
-   * освобождает даты, чтобы вещь можно было сдать другому. */
+  /* Подтверждённая бронь. Состоявшуюся вовремя аренду здесь не отмечают: она
+   * закрывается сама, когда даты прошли. Руками закрывают два случая, которых
+   * календарь знать не может, — и это ровно две кнопки ниже. */
   if (status === "confirmed") {
+    // Пока аренда не началась, «вернули раньше» бессмысленно: возвращать
+    // нечего. Мутация это же и не пропустит (not_started) — здесь мы просто не
+    // предлагаем действие, которое обязано отказать. Сегодняшний день сходится
+    // с серверным: шторка монтируется только после клика, SSR её не рисует.
+    const started = dateFrom <= todayStr();
     return (
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Вовремя завершённую бронь отмечать не нужно — она закроется сама,
-            * когда даты пройдут. Эта кнопка про то, чего календарь знать не
-            * может: вещь вернули раньше срока. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {started && (
           <ConfirmDialog
             trigger={<Button size="sm">Вернули раньше</Button>}
             title="Закрыть бронь досрочно?"
@@ -115,6 +123,7 @@ export function RequestActions({ requestId, side, status }: {
               if (!r.ok) throw new Error(humanError(r.error ?? ""));
             }}
           />
+        )}
         <ConfirmDialog
           trigger={
             <Button size="sm" variant="outline" className="text-destructive">
@@ -134,8 +143,6 @@ export function RequestActions({ requestId, side, status }: {
             if (!r.ok) throw new Error(humanError(r.error ?? ""));
           }}
         />
-        </div>
-        {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
       </div>
     );
   }
