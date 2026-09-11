@@ -213,6 +213,8 @@ export async function createBookingRequest(
     dateTo: sel.to,
   });
   revalidatePath("/cabinet/requests");
+  // И сводка: новая заявка встаёт в её панель такой же строкой.
+  revalidatePath("/cabinet");
   return { ok: true, data: { requestId } };
 }
 

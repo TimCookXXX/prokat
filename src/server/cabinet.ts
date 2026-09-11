@@ -1,6 +1,6 @@
 // Сводка кабинета: одна страница вместо обхода пяти разделов.
 
-import { and, asc, desc, eq, gt, gte, inArray, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "@/lib/db";
 import { availability, bookingRequests, categories, chatThreads, cities, events, listings, users } from "@db/schema";

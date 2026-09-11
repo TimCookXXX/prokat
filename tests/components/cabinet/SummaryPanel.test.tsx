@@ -54,6 +54,9 @@ describe("строка, ждущая ответа", () => {
     render(<SummaryPanel rows={[row({ customerComment: "Заберу вечером" })]} rest={0} today={TODAY} />);
     const t = text();
     expect(t).toContain("≈ 2 800 ₽");
+    // Сутки считает сам компонент, и границы диапазона включительные:
+    // 14–17 сентября — четверо суток, а не трое.
+    expect(t).toContain("за 4 дня");
     expect(t).toContain("залог 4 000 ₽");
     expect(t).toContain("Заберу вечером");
     expect(screen.getByRole("button", { name: "Подтвердить" })).toBeTruthy();
@@ -112,6 +115,25 @@ describe("идущая аренда", () => {
  * только что забронировавший чужую вещь, видел «Всё разобрано». */
 describe("моя заявка на чужую вещь", () => {
   const mine = row({ side: "customer", hot: false, peerPhone: null });
+
+  /* Телефон владельца до подтверждения не раскрыт — это решает правило в
+   * lib/booking/request-access, и панель обязана печатать только то, что оно
+   * отдало. Номер в фикстуре стоит НЕПУСТОЙ намеренно: с null проверку прошла
+   * бы любая панель, в том числе печатающая всё подряд. */
+  it("не печатает телефон, если правило его не отдало", () => {
+    render(<SummaryPanel rows={[{ ...mine, peerPhone: null }]} rest={0} today={TODAY} />);
+    expect(text()).not.toContain("+7");
+    expect(screen.queryByRole("link", { name: /\+7/ })).toBeNull();
+  });
+
+  // А когда отдало — печатает: обратная половина того же правила.
+  it("печатает телефон, когда правило его отдало", () => {
+    render(<SummaryPanel
+      rows={[{ ...mine, status: "confirmed", peerPhone: "+79180000009" }]}
+      rest={0} today={TODAY}
+    />);
+    expect(screen.getByRole("link", { name: /\+79180000009/ })).toBeTruthy();
+  });
 
   it("показывается и говорит, что ответа ещё нет", () => {
     render(<SummaryPanel rows={[mine]} rest={0} today={TODAY} />);

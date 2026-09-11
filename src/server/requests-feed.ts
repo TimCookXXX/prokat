@@ -54,14 +54,20 @@ export function summaryRows(rows: FeedRow[], limit: number): {
   shown: FeedRow[];
   rest: number;
 } {
-  const weight = (r: FeedRow) => (r.status === "new" ? 0 : 1);
+  /* Вес по ТРЕБУЕМОМУ ОТ ЧЕЛОВЕКА, а не по статусу. Статус `new` носят две
+   * разные вещи: заявка ко мне, где решаю я, и моя собственная, где я не могу
+   * ничего. Сложи их в одну группу — и восемь моих заявок, отправленных за час,
+   * вытеснят в хвост единственную, у которой есть кнопки. Лента считает вес по
+   * тому же признаку (`hot`), и расходиться с ней здесь не за чем. */
+  const weight = (r: FeedRow) => (r.hot ? 0 : r.status === "confirmed" ? 1 : 2);
+  const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
   const sorted = [...rows].sort((a, b) => {
     const w = weight(a) - weight(b);
     if (w !== 0) return w;
-    // Ждущие ответа — по сроку: первым то, что закроется само раньше всех.
-    if (a.status === "new") return a.expiresAt < b.expiresAt ? -1 : 1;
     // Идущие — по дате начала: ближайшая передача или возврат впереди.
-    return a.dateFrom < b.dateFrom ? -1 : a.dateFrom > b.dateFrom ? 1 : 0;
+    if (a.status === "confirmed") return cmp(a.dateFrom, b.dateFrom);
+    // Ждущие ответа — по сроку: первым то, что закроется само раньше всех.
+    return cmp(a.expiresAt, b.expiresAt);
   });
   return { shown: sorted.slice(0, limit), rest: Math.max(0, sorted.length - limit) };
 }

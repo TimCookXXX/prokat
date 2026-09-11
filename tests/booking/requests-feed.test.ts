@@ -66,14 +66,37 @@ describe("summaryRows", () => {
   const req = (id: string, over: Partial<FeedRow> = {}): FeedRow =>
     ({ ...toFeedRow(row()), id, ...over }) as FeedRow;
 
-  it("ждущие ответа идут первыми, и первым — то, что сгорит раньше", () => {
+  it("ждущие МОЕГО ответа идут первыми, и первым — то, что сгорит раньше", () => {
     const rows = [
-      req("поздняя", { status: "new", expiresAt: at(20) }),
-      req("идёт", { status: "confirmed", dateFrom: "2026-09-01" }),
-      req("срочная", { status: "new", expiresAt: at(2) }),
+      req("поздняя", { status: "new", hot: true, expiresAt: at(20) }),
+      req("идёт", { status: "confirmed", hot: false, dateFrom: "2026-09-01" }),
+      req("срочная", { status: "new", hot: true, expiresAt: at(2) }),
     ];
     expect(summaryRows(rows, 8).shown.map((r) => r.id))
       .toEqual(["срочная", "поздняя", "идёт"]);
+  });
+
+  /* Статус `new` носят две разные вещи: заявка КО МНЕ, где решаю я, и МОЯ
+   * собственная, где я не могу ничего. Сортируй по статусу — и восемь моих
+   * заявок, отправленных за час, вытеснят единственную с кнопками: у них
+   * expiresAt раньше просто потому, что созданы раньше. */
+  it("моя отправленная заявка не вытесняет ту, где решаю я", () => {
+    const rows = [
+      req("моя-1", { side: "customer", status: "new", hot: false, expiresAt: at(1) }),
+      req("моя-2", { side: "customer", status: "new", hot: false, expiresAt: at(2) }),
+      req("решаю-я", { status: "new", hot: true, expiresAt: at(20) }),
+    ];
+    expect(summaryRows(rows, 1).shown.map((r) => r.id)).toEqual(["решаю-я"]);
+  });
+
+  // Идущая аренда важнее моей заявки, по которой ещё не ответили: по ней
+  // сегодня может быть передача или возврат, а по той — делать нечего.
+  it("идущая аренда стоит выше моей неотвеченной заявки", () => {
+    const rows = [
+      req("моя", { side: "customer", status: "new", hot: false, expiresAt: at(1) }),
+      req("идёт", { status: "confirmed", hot: false, dateFrom: "2026-09-30" }),
+    ];
+    expect(summaryRows(rows, 8).shown.map((r) => r.id)).toEqual(["идёт", "моя"]);
   });
 
   it("идущие — по дате начала: ближайшая передача впереди", () => {
@@ -88,9 +111,9 @@ describe("summaryRows", () => {
    * до неё, и из панели вылетели бы ровно те заявки, ради которых она есть. */
   it("срез оставляет самое срочное, а не самое свежее", () => {
     const rows = [
-      req("a", { status: "new", expiresAt: at(20) }),
-      req("b", { status: "new", expiresAt: at(1) }),
-      req("c", { status: "new", expiresAt: at(10) }),
+      req("a", { status: "new", hot: true, expiresAt: at(20) }),
+      req("b", { status: "new", hot: true, expiresAt: at(1) }),
+      req("c", { status: "new", hot: true, expiresAt: at(10) }),
     ];
     const { shown, rest } = summaryRows(rows, 2);
     expect(shown.map((r) => r.id)).toEqual(["b", "c"]);

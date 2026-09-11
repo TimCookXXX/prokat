@@ -587,8 +587,18 @@
   .summary-ctl:empty { display: none; }
   /* Телефон растягивается, иконка переписки — нет: номер длинный, а мишень у
      иконки и так 44px. */
-  .summary-phone { flex: 1 1 auto; min-width: 0; gap: 6px; }
-  .summary-chat { flex: none; gap: 5px; width: auto; min-width: 2.75rem; padding: 0 0.5rem; }
+  /* Через .summary-panel, а не в один класс: h-11/w-11/min-w-11 приезжают
+     утилитами, у которых та же специфичность, а в собранном листе слой utilities
+     идёт ПОСЛЕ components — одиночный класс им проигрывал, и счётчик
+     непрочитанного вылезал за скруглённый край кнопки. */
+  .summary-panel .summary-phone { flex: 1 1 auto; min-width: 0; gap: 6px; }
+  .summary-panel .summary-chat {
+    flex: none;
+    gap: 5px;
+    width: auto;
+    min-width: 2.75rem;
+    padding: 0 0.5rem;
+  }
 
   .summary-more {
     display: flex;
@@ -633,8 +643,8 @@
       padding-right: 0.75rem;
     }
     .summary-ctl > div > :is(button, a) { flex: 0 0 auto; }
-    .summary-phone { flex: 0 1 auto; }
-    .summary-chat { padding: 0 0.5rem; }
+    .summary-panel .summary-phone { flex: 0 1 auto; }
+    .summary-panel .summary-chat { padding: 0 0.5rem; }
   }
 }
 

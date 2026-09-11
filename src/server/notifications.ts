@@ -5,7 +5,7 @@
 // или booking_requests, только потом notifications. Встречный порядок даёт живой
 // дедлок на треде с активной перепиской — это проверено, а не предположено.
 
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, type Tx } from "@/lib/db";
 import { notifications } from "@db/schema";
 import { newId } from "@/lib/id";
@@ -127,6 +127,27 @@ export async function markRequestNotificationsSeen(
     .where(and(
       eq(notifications.userId, userId),
       eq(notifications.side, side),
+      isNull(notifications.readAt),
+    ));
+}
+
+/* Гашение по КОНКРЕТНЫМ заявкам. Нужно там, где экран показывает не всё:
+ * сводка держит только живое и только восемь строк, а «увидел» обязано
+ * означать «увидел именно это». Гасить по стороне она не вправе — под нож
+ * попали бы отказ, отмена и завершение, строк по которым в панели нет
+ * никогда, и человек не узнал бы о них вовсе.
+ *
+ * Пустой список — ничего не делаем: inArray пустого массива не принимает. */
+export async function markRequestsSeen(
+  userId: string,
+  requestIds: readonly string[],
+): Promise<void> {
+  if (requestIds.length === 0) return;
+  await getDb().update(notifications)
+    .set({ readAt: sql`now()` })
+    .where(and(
+      eq(notifications.userId, userId),
+      inArray(notifications.entityId, [...requestIds]),
       isNull(notifications.readAt),
     ));
 }

@@ -35,8 +35,14 @@ import { Button } from "@/components/ui/button";
  * ругался бы на расхождение разметки. */
 function todayNote(row: FeedRow, today: string): string | null {
   if (row.status !== "confirmed") return null;
-  if (row.dateFrom === today) return row.side === "owner" ? "сегодня отдать" : "сегодня забрать";
-  if (row.dateTo === today) return row.side === "owner" ? "сегодня возврат" : "сегодня вернуть";
+  const owner = row.side === "owner";
+  // Аренда на одни сутки: сегодня и отдать, и забрать обратно. Два события в
+  // один день — это и есть ответ, а не повод назвать одно из них.
+  if (row.dateFrom === today && row.dateTo === today) {
+    return owner ? "сегодня отдать и принять" : "сегодня забрать и вернуть";
+  }
+  if (row.dateFrom === today) return owner ? "сегодня отдать" : "сегодня забрать";
+  if (row.dateTo === today) return owner ? "сегодня возврат" : "сегодня вернуть";
   return null;
 }
 
@@ -91,20 +97,20 @@ function Row({ row, today }: { row: FeedRow; today: string }) {
       </span>
 
       <div className="summary-body">
-        <h3 className="summary-title">
+        <p className="summary-title">
           {href ? (
             <Link href={href as never} className="transition-colors hover:text-accent">
               {row.listing.title}
             </Link>
           ) : row.listing.title}
-        </h3>
+        </p>
         <p className="summary-meta">
           <span className="font-mono text-2xs uppercase tracking-mono">{roleWord(row)}</span>
           {" · "}
           {/* Период в строке только на узкой панели: на широкой он стоит
             * отдельной колонкой, и повторять его здесь незачем. */}
           <span className="summary-narrow tabular-nums">{period(row)} · </span>
-          {row.peer.name ?? (owner ? "клиент" : "владелец")}
+          {row.peer.name ?? (owner ? "клиент" : "продавец")}
         </p>
 
         {/* Деньги и слова человека — только там, где решение за вами: на
@@ -188,7 +194,7 @@ export function SummaryPanel({
         <div className="summary-empty">
           <h2 className="font-display text-lg font-bold">Ничего не ждёт ответа</h2>
           <p className="mt-1.5 max-w-[48ch] text-sm text-muted-foreground">
-            Заявки появятся здесь, как только кто-то выберет даты на вашу вещь.
+            Здесь будет всё живое: и заявки на ваши вещи, и те, что отправили вы.
           </p>
           <div className="mt-3.5 flex flex-wrap gap-2">
             <Button asChild>
@@ -205,7 +211,7 @@ export function SummaryPanel({
 
   return (
     <>
-      <ol className="summary-panel" aria-label="Живые заявки">
+      <ol className="summary-panel" role="list" aria-label="Живые заявки">
         {rows.map((r) => <Row key={r.id} row={r} today={today} />)}
         {rest > 0 && (
           <li>

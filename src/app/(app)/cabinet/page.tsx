@@ -6,9 +6,7 @@ import { Stats } from "@/components/cabinet/StatTile";
 import { SummaryPanel } from "@/components/cabinet/SummaryPanel";
 import { CountersSync } from "@/components/realtime/CountersSync";
 import { ScrollReset } from "@/components/account/ScrollReset";
-import {
-  markRequestNotificationsSeen, purgeReadNotifications,
-} from "@/server/notifications";
+import { markRequestsSeen, purgeReadNotifications } from "@/server/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +21,15 @@ export default async function CabinetIndex() {
 
   const { rows, rest, stats } = await getCabinetSummary(session.user.id);
 
-  /* Гасим события по заявкам обеих сторон: решения теперь принимаются здесь, и
-   * кружок, продолжающий гореть над разобранной панелью, врал бы. Обе стороны
-   * безусловно — в отличие от ленты, где фильтр по роли может показать только
-   * половину: панель показывает всё живое сразу. */
-  await markRequestNotificationsSeen(session.user.id, "owner");
-  await markRequestNotificationsSeen(session.user.id, "customer");
+  /* Гасим ровно те заявки, что человек увидел, — по их идентификаторам, а не
+   * по стороне. Гашение по стороне здесь было бы обманом: панель держит только
+   * живое и только первые восемь строк, а отказ, отмена и завершение рождаются
+   * в момент, когда заявка СТАЛА закрытой, и в панель не попадают никогда. Под
+   * нож ушло бы именно то, о чём человеку и хотели сказать.
+   *
+   * Лента гасит по стороне по обратной причине: она показывает все статусы, и
+   * сузить её может только фильтр роли. */
+  await markRequestsSeen(session.user.id, rows.map((r) => r.id));
   await purgeReadNotifications();
 
   return (
