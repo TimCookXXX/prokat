@@ -105,6 +105,24 @@ describe("createBookingRequest: устаревшая цена", () => {
     const r = await createBookingRequest({ ...form(TODAY, TODAY), priceDay: 1 });
     expect(r).toEqual({ ok: false, error: "price_stale" });
   });
+
+  /* Форма без цены проходит: так шлёт страница, открытая до выкладки поля.
+   * Снимок всё равно берётся из объявления — клиент на него не влияет, —
+   * теряется только предупреждение о сдвиге. */
+  it("без цены заявка проходит, а снимок всё равно берётся у вещи", async () => {
+    availWhere.mockResolvedValue([]);
+    const inserted: Record<string, unknown>[] = [];
+    transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
+      await fn({
+        insert: () => ({ values: async (v: Record<string, unknown>) => { inserted.push(v); } }),
+        update: () => ({ set: () => ({ where: async () => undefined }) }),
+      });
+    });
+    const { priceDay: _drop, ...without } = form(TODAY, TODAY);
+    const r = await createBookingRequest(without);
+    expect(r.ok).toBe(true);
+    expect(inserted.find((v) => "customerPhone" in v)).toMatchObject({ priceDay: PRICE });
+  });
 });
 
 describe("createBookingRequest: своё объявление", () => {

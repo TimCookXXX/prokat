@@ -108,7 +108,9 @@ export async function createBookingRequest(
   // подать её на условиях, которых человек не видел, нельзя. Без этой проверки
   // поднятая за секунду до отправки цена замерзала бы в заявке как «то, на что
   // вы согласились» — ровно тот обман, от которого снимок и заводился.
-  if (listing.priceDay !== form.priceDay) return { ok: false, error: "price_stale" };
+  if (form.priceDay !== undefined && listing.priceDay !== form.priceDay) {
+    return { ok: false, error: "price_stale" };
+  }
 
   const availRows = await db.select().from(availability).where(and(
     eq(availability.listingId, listing.id),

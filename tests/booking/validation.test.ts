@@ -43,12 +43,19 @@ describe("bookingFormSchema", () => {
     expect(bookingFormSchema.safeParse({ ...valid, phone: "позвоните" }).success).toBe(false);
   });
 
-  /* Цена ездит с формой, чтобы поймать её сдвиг, — значит она обязательна и
-   * такая же целая положительная, как количество. Мусор в ней не должен
-   * проезжать: сверка с объявлением сравнивает числа. */
-  it("отклоняет форму без цены и с мусорной ценой", () => {
+  /* Цена ездит с формой, чтобы поймать её сдвиг. Но НЕобязательна: страница,
+   * открытая до выкладки этого поля, шлёт форму без него, и обязательное поле
+   * рвало бы бронь всем, кто не перезагрузился. Это не гипотеза — ровно так и
+   * сломалось на первой же живой заявке. */
+  it("форма без цены остаётся валидной — старая вкладка не должна ломаться", () => {
     const { priceDay: _drop, ...without } = valid;
-    expect(bookingFormSchema.safeParse(without).success).toBe(false);
+    const r = bookingFormSchema.safeParse(without);
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.priceDay).toBeUndefined();
+  });
+
+  // А присланный мусор проезжать не должен: сверка сравнивает числа.
+  it("отклоняет мусорную цену", () => {
     expect(bookingFormSchema.safeParse({ ...valid, priceDay: "0" }).success).toBe(false);
     expect(bookingFormSchema.safeParse({ ...valid, priceDay: "-100" }).success).toBe(false);
     expect(bookingFormSchema.safeParse({ ...valid, priceDay: "дорого" }).success).toBe(false);
