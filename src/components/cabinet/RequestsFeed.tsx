@@ -98,8 +98,11 @@ function StatusBadge({ row }: { row: FeedRow }) {
 function SheetContent({ row }: { row: FeedRow }) {
   const owner = row.side === "owner";
   const publicHref = requestListingHref(row.listing, row.side);
-  const peerComment = owner ? row.customerComment : row.ownerComment;
-  const myComment = owner ? row.ownerComment : row.customerComment;
+  /* Комментарий один — тот, что клиент оставил при заявке. Владельцу это
+   * чужие слова в момент решения, арендатору — свои. Комментария владельца
+   * больше нет: причину он пишет в переписке, где на неё можно ответить. */
+  const peerComment = owner ? row.customerComment : null;
+  const myComment = owner ? null : row.customerComment;
 
   return (
     <>

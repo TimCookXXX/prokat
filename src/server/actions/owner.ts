@@ -177,7 +177,6 @@ const RIVALS_LIMIT = 50;
 async function transitionRequest(
   requestId: string,
   to: OwnerDecision,
-  ownerComment?: string,
 ): Promise<ActionResult> {
   const owner = await requireUser();
   if (!owner) return { ok: false, error: "auth_required" };
@@ -288,7 +287,6 @@ async function transitionRequest(
         .set({
           status: to,
           respondedAt: new Date(),
-          ...(ownerComment !== undefined ? { ownerComment: ownerComment || null } : {}),
         })
         .where(eq(bookingRequests.id, requestId));
 
@@ -401,29 +399,26 @@ async function transitionRequest(
   return { ok: true, data: undefined };
 }
 
-export async function confirmRequest(requestId: string, comment?: string): Promise<ActionResult> {
-  return transitionRequest(requestId, "confirmed", comment);
+export async function confirmRequest(requestId: string): Promise<ActionResult> {
+  return transitionRequest(requestId, "confirmed");
 }
-export async function declineRequest(requestId: string, comment?: string): Promise<ActionResult> {
-  return transitionRequest(requestId, "declined", comment);
+export async function declineRequest(requestId: string): Promise<ActionResult> {
+  return transitionRequest(requestId, "declined");
 }
 export async function completeRequest(requestId: string): Promise<ActionResult> {
   return transitionRequest(requestId, "completed");
 }
-// Комментарий принимается, как у отказа: «Неявка» — терминальный ярлык на
-// человека, и возразить ему он не может. Пусть хотя бы знает причину.
-export async function noShowRequest(requestId: string, comment?: string): Promise<ActionResult> {
-  return transitionRequest(requestId, "no_show", comment);
+// Причину неявки, как и причину отказа, владелец пишет в переписке: поля для
+// неё больше нет — см. ADR 0017.
+export async function noShowRequest(requestId: string): Promise<ActionResult> {
+  return transitionRequest(requestId, "no_show");
 }
 
 /* Владелец отменяет подтверждённую бронь. Раньше отменить её мог только
  * арендатор, и владельцу, у которого вещь сломалась или он заболел, оставалась
  * «Неявка» — то есть обвинить клиента в том, чего тот не делал. */
-export async function cancelConfirmedByOwner(
-  requestId: string,
-  comment?: string,
-): Promise<ActionResult> {
-  return transitionRequest(requestId, "cancelled", comment);
+export async function cancelConfirmedByOwner(requestId: string): Promise<ActionResult> {
+  return transitionRequest(requestId, "cancelled");
 }
 
 // ============================== Календарь ==============================

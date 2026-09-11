@@ -207,8 +207,16 @@ export const bookingRequests = pgTable("booking_requests", {
   qty: integer("qty").notNull().default(1),
   status: bookingStatus("status").notNull().default("new"),
   customerPhone: varchar("customer_phone", { length: 20 }).notNull(),
+  /* Комментарий клиента к заявке. Живёт колонкой, потому что читается в
+   * момент решения — в шторке прямо над кнопками, — и тянуть его туда из
+   * переписки значило бы джойнить чат ради одной строки. В журнал сделки он
+   * попадает копией, в meta системной записи: у читателей разные экраны.
+   *
+   * Комментария владельца здесь больше нет. Он появился, когда у владельца не
+   * было канала к клиенту вовсе, и снят вместе с этой причиной: решения
+   * объясняются в переписке. Цена снятия названа в ADR 0017 — у владельца
+   * скрытой вещи канала снова нет, отказ приходит без причины. */
   customerComment: text("customer_comment"),
-  ownerComment: text("owner_comment"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   respondedAt: timestamp("responded_at"),
   expiresAt: timestamp("expires_at").notNull(),

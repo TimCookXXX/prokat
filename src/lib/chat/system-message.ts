@@ -37,6 +37,10 @@ export type ChatSystemMeta = {
   from?: string;
   to?: string;
   qty?: number;
+  /** Что человек написал, отправляя заявку. Копия колонки заявки: колонку
+   *  читает шторка в момент решения, эту — переписка. Разные экраны, и
+   *  джойнить чат ради одной строки дороже, чем скопировать её при записи. */
+  comment?: string;
 };
 
 function period(meta: ChatSystemMeta): string | null {
@@ -52,12 +56,17 @@ function period(meta: ChatSystemMeta): string | null {
 export function systemMessageText(
   kind: ChatSystemKind,
   meta: ChatSystemMeta | null,
-): { title: string; detail: string | null } {
+): { title: string; detail: string | null; comment: string | null } {
   const title = content.chatSystem[kind];
   const m = meta ?? {};
+  const comment = m.comment?.trim() || null;
   const p = period(m);
-  if (!p) return { title, detail: null };
-  return { title, detail: m.qty && m.qty > 1 ? `${p} · ${m.qty} шт.` : p };
+  if (!p) return { title, detail: null, comment };
+  return {
+    title,
+    detail: m.qty && m.qty > 1 ? `${p} · ${m.qty} шт.` : p,
+    comment,
+  };
 }
 
 /** Одной строкой — для превью в списке переписок и для скринридера. */

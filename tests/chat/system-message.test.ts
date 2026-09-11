@@ -44,7 +44,7 @@ describe("systemMessageText", () => {
    * лента обязана дочитаться, а не упасть. */
   it("без meta остаётся один заголовок", () => {
     expect(systemMessageText("request_declined", null)).toEqual({
-      title: "Заявка отклонена", detail: null,
+      title: "Заявка отклонена", detail: null, comment: null,
     });
     expect(systemMessageText("request_declined", { requestId: "01REQ" }).detail).toBeNull();
   });
@@ -64,5 +64,39 @@ describe("systemMessageLine", () => {
 
   it("без периода — только заголовок, без двоеточия в пустоту", () => {
     expect(systemMessageLine("request_cancelled", null)).toBe("Бронь отменена");
+  });
+});
+
+/* Комментарий клиента живёт в meta записи и показывается в переписке. В базе
+ * он копия колонки заявки: колонку читает шторка в момент решения, эту —
+ * тред. Записан один раз, одной транзакцией — разъехаться им негде. */
+describe("systemMessageText: комментарий", () => {
+  const meta = { requestId: "01REQ", from: "2026-09-12", to: "2026-09-14" };
+
+  it("отдаётся отдельно от заголовка и периода", () => {
+    const r = systemMessageText("request_created", { ...meta, comment: "Нужен к 9 утра" });
+    expect(r.title).toBe("Заявка на бронь");
+    expect(r.comment).toBe("Нужен к 9 утра");
+  });
+
+  it("пустой и пробельный комментарий — это его отсутствие", () => {
+    expect(systemMessageText("request_created", { ...meta, comment: "" }).comment).toBeNull();
+    expect(systemMessageText("request_created", { ...meta, comment: "   " }).comment).toBeNull();
+    expect(systemMessageText("request_created", meta).comment).toBeNull();
+  });
+
+  // Записи старше этого изменения комментария не имеют — лента обязана их
+  // дочитывать, а не падать.
+  it("запись без комментария читается как раньше", () => {
+    const r = systemMessageText("request_confirmed", meta);
+    expect(r.comment).toBeNull();
+    expect(flat(r.detail ?? "")).toBe("12 сентября — 14 сентября");
+  });
+
+  // Превью в списке переписок остаётся стабильным: комментарий бывает длинным,
+  // и строка списка прыгала бы от заявки к заявке.
+  it("в превью комментарий не попадает", () => {
+    expect(systemMessageLine("request_created", { ...meta, comment: "Нужен к 9 утра" }))
+      .not.toContain("9 утра");
   });
 });

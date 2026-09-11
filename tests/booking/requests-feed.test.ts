@@ -14,7 +14,6 @@ const row = (over: Partial<CabinetRequestRow> = {}): CabinetRequestRow => ({
   qty: 1,
   createdAt: new Date("2026-09-09T10:00:00Z"),
   expiresAt: new Date("2026-09-10T10:00:00Z"),
-  ownerComment: null,
   customerComment: null,
   listing: {
     id: "01L", title: "Мангал", slug: "mangal", citySlug: "krasnodar",

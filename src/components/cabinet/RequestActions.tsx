@@ -4,8 +4,9 @@
 // вперемешку, и решать, чьи кнопки рисовать, обязан он сам: снаружи это
 // решалось бы в каждом месте заново, а промах даёт арендатору «Подтвердить».
 //
-// Критический путь владельца «подтвердить» — один тап; комментарий (например,
-// предложить другие даты) — опционально, раскрывается.
+// Критический путь владельца «подтвердить» — один тап. Поля для причины здесь
+// нет: объяснение пишется в переписке по вещи, где клиент может ответить.
+// Цена этого решения названа в ADR 0017.
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,6 @@ import {
 } from "@/server/actions/owner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { cancelBookingRequest } from "@/server/actions/booking";
-import { field } from "@/components/ui/field";
 import { canTransition, type BookingStatus } from "@/lib/catalog/booking-status";
 import type { RequestSide } from "@/lib/booking/request-access";
 
@@ -32,8 +32,6 @@ export function RequestActions({ requestId, side, status }: {
   side: RequestSide;
   status: BookingStatus;
 }) {
-  const [comment, setComment] = useState("");
-  const [showComment, setShowComment] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -79,25 +77,14 @@ export function RequestActions({ requestId, side, status }: {
     return (
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" pending={pending} onClick={() => run(() => confirmRequest(requestId, comment))}>
+          <Button size="sm" pending={pending} onClick={() => run(() => confirmRequest(requestId))}>
             Подтвердить
           </Button>
           <Button size="sm" variant="outline" pending={pending}
-            onClick={() => run(() => declineRequest(requestId, comment))}>
+            onClick={() => run(() => declineRequest(requestId))}>
             Отклонить
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setShowComment((s) => !s)}>
-            {showComment ? "Скрыть комментарий" : "+ Комментарий"}
-          </Button>
         </div>
-        {showComment && (
-          <textarea
-            value={comment} maxLength={500} rows={2}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Клиент увидит этот комментарий — например, предложите другие даты"
-            className={`${field} px-3 py-2 text-sm`}
-          />
-        )}
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
       </div>
     );
@@ -112,13 +99,8 @@ export function RequestActions({ requestId, side, status }: {
           <Button size="sm" pending={pending} onClick={() => run(() => completeRequest(requestId))}>
             Завершена
           </Button>
-          {/* Комментарий у неявки — как у отказа: это терминальный ярлык на
-            * человека, и возразить ему нечем. Пусть хотя бы знает причину. */}
-          <Button size="sm" variant="outline" pending={pending} onClick={() => run(() => noShowRequest(requestId, comment || undefined))}>
+          <Button size="sm" variant="outline" pending={pending} onClick={() => run(() => noShowRequest(requestId))}>
             Неявка
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setShowComment((s) => !s)}>
-            {showComment ? "Скрыть комментарий" : "+ Комментарий"}
           </Button>
           {/* Отмена — владелец тоже имеет выход из подтверждённой брони: вещь
             * сломалась, планы изменились. Даты освобождаются, клиент узнаёт.
@@ -138,21 +120,11 @@ export function RequestActions({ requestId, side, status }: {
             confirmLabel="Отменить бронь"
             destructive
             onConfirm={async () => {
-              // Пустая строка стёрла бы комментарий, оставленный при
-              // подтверждении: undefined значит «не трогать».
-              const r = await cancelConfirmedByOwner(requestId, comment || undefined);
+              const r = await cancelConfirmedByOwner(requestId);
               if (!r.ok) throw new Error(humanError(r.error ?? ""));
             }}
           />
         </div>
-        {showComment && (
-          <textarea
-            value={comment} maxLength={500} rows={2}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Клиент увидит этот комментарий"
-            className={`${field} px-3 py-2 text-sm`}
-          />
-        )}
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
       </div>
     );

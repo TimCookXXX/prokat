@@ -152,7 +152,13 @@ export async function createBookingRequest(
         ownerUserId: listing.ownerUserId,
         customerUserId: session.user.id,
         kind: "request_created",
-        meta: { requestId, from: sel.from, to: sel.to, qty: sel.qty },
+        // Комментарий копией: колонку читает шторка в момент решения, эту —
+        // переписка. Копия делается здесь же, одной транзакцией, поэтому
+        // разъехаться им негде.
+        meta: {
+          requestId, from: sel.from, to: sel.to, qty: sel.qty,
+          comment: form.comment || undefined,
+        },
       });
       const notified = await notify(tx, {
         recipientId: listing.ownerUserId,

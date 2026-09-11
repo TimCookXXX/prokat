@@ -21,7 +21,7 @@ describe("C2C schema shape", () => {
 
   it("bookingRequests references owner user, not provider", () => {
     const cols = Object.keys(bookingRequests);
-    expect(cols).toEqual(expect.arrayContaining(["ownerUserId", "ownerComment"]));
+    expect(cols).toEqual(expect.arrayContaining(["ownerUserId"]));
     expect(cols).not.toContain("providerId");
     expect(cols).not.toContain("providerComment");
   });

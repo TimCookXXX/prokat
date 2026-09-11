@@ -38,7 +38,6 @@ export interface CabinetRequestRow {
   qty: number;
   createdAt: Date;
   expiresAt: Date;
-  ownerComment: string | null;
   customerComment: string | null;
   /** Всё, что нужно ссылке на вещь: публичный контур закрывают и статус, и бан
    *  владельца — см. lib/booking/listing-link. */
@@ -110,7 +109,6 @@ export async function getCabinetRequests(
       qty: bookingRequests.qty,
       createdAt: bookingRequests.createdAt,
       expiresAt: bookingRequests.expiresAt,
-      ownerComment: bookingRequests.ownerComment,
       customerComment: bookingRequests.customerComment,
       ownerUserId: bookingRequests.ownerUserId,
       customerUserId: bookingRequests.customerUserId,
@@ -175,7 +173,6 @@ export async function getCabinetRequests(
       qty: r.qty,
       createdAt: r.createdAt,
       expiresAt: r.expiresAt,
-      ownerComment: r.ownerComment,
       customerComment: r.customerComment,
       listing: {
         id: r.listingId,

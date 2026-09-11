@@ -30,10 +30,10 @@ export async function POST(req: NextRequest) {
   }
   // Действия владельца (нужна сессия владельца вещи).
   if (typeof body.requestId === "string") {
-    if (body.action === "confirm") return NextResponse.json(await confirmRequest(body.requestId, body.comment));
-    if (body.action === "decline") return NextResponse.json(await declineRequest(body.requestId, body.comment));
+    if (body.action === "confirm") return NextResponse.json(await confirmRequest(body.requestId));
+    if (body.action === "decline") return NextResponse.json(await declineRequest(body.requestId));
     if (body.action === "complete") return NextResponse.json(await completeRequest(body.requestId));
-    if (body.action === "no_show") return NextResponse.json(await noShowRequest(body.requestId, body.comment));
+    if (body.action === "no_show") return NextResponse.json(await noShowRequest(body.requestId));
   }
   if (body.action === "block" && typeof body.listingId === "string") {
     return NextResponse.json(await setBlockedDates(body.listingId, body.from, body.to, body.qty));

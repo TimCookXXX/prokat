@@ -43,12 +43,24 @@ export function SystemNote({
 }: {
   message: { kind: string; meta: ChatSystemMeta | null };
 }) {
-  const { title, detail } = systemMessageText(message.kind as ChatSystemKind, message.meta);
+  const { title, detail, comment } = systemMessageText(
+    message.kind as ChatSystemKind, message.meta,
+  );
   return (
     <li className="my-1.5 flex justify-center">
-      <span className="max-w-[80%] rounded-sm bg-muted px-3 py-1.5 text-center text-xs text-muted-foreground">
-        {title}
-        {detail && <span className="ml-1.5 whitespace-nowrap tabular-nums">{detail}</span>}
+      <span className="flex max-w-[80%] flex-col items-center gap-1 rounded-sm bg-muted px-3 py-1.5 text-center text-xs text-muted-foreground">
+        {/* Перенос разрешён только МЕЖДУ названием события и его датами:
+          * «Заявка на / бронь» рвёт фразу, а неразрывная строка целиком
+          * распирает плашку до краёв экрана. Каждая часть неразрывна, шов
+          * между ними — свободен. */}
+        <span className="flex flex-wrap justify-center gap-x-1.5">
+          <span className="whitespace-nowrap">{title}</span>
+          {detail && <span className="whitespace-nowrap tabular-nums">{detail}</span>}
+        </span>
+        {/* Комментарий — своей строкой и в кавычках: это чужие слова внутри
+          * служебной записи, и слипаться с ней они не должны. Переносится
+          * свободно, в отличие от дат. */}
+        {comment && <span className="text-foreground">«{comment}»</span>}
       </span>
     </li>
   );
