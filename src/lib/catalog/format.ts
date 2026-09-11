@@ -6,13 +6,31 @@ export function formatPrice(rub: number): string {
   return `${grouped} ₽`;
 }
 
-export function formatDeposit(type: "money" | "document" | "none", amount: number | null): string {
+export type DepositType = "money" | "document" | "none";
+
+/* Залог самостоятельной фразой — там, где рядом нет подписи: чип вещи в шапке
+ * переписки, строка условий в выдаче. Слово «залог» входит в саму фразу. */
+export function formatDeposit(type: DepositType, amount: number | null): string {
   if (type === "none") return "без залога";
   if (type === "document") return "залог: документ";
   // Тип «деньги» без суммы: владелец выбрал залог, но не сказал какой. Голое
   // «залог» ничего не сообщало — ноль здесь то же «значения нет», что и пустое
   // поле, и оба честнее назвать вслух.
   return amount ? `залог ${formatPrice(amount)}` : "залог не указан";
+}
+
+/* Тот же залог, но значением к готовой подписи «Залог»: в строке списка
+ * определений слово из фразы удвоилось бы.
+ *
+ * Отдельная функция, а не разбор строки formatDeposit. Именно разбором это и
+ * жило в виджете брони — сравнением с «без залога» и срезанием префикса
+ * «залог », — и любая правка формулировки ломала его молча, потому что тип
+ * совпадал, а ветка переставала срабатывать. Теперь обе функции читают ОДИН
+ * вход и врозь не разъедутся. */
+export function depositValue(type: DepositType, amount: number | null): string {
+  if (type === "none") return "Не нужен";
+  if (type === "document") return "Документ";
+  return amount ? formatPrice(amount) : "Не указан";
 }
 
 // Значение к подписи «Получение» в блоке брони — короткое, как «залог 3 000 ₽»

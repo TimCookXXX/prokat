@@ -205,6 +205,20 @@ export const bookingRequests = pgTable("booking_requests", {
   dateFrom: date("date_from").notNull(),
   dateTo: date("date_to").notNull(),
   qty: integer("qty").notNull().default(1),
+  /* Условия сделки НА МОМЕНТ ЗАЯВКИ. Денормализованы из объявления по той же
+   * причине, что owner_user_id, но с обратным знаком: владелец не меняется, а
+   * цена и залог меняются в любой момент.
+   *
+   * Без снимка «стоимость» пересчитывалась из текущей цены вещи, и заявка
+   * недельной давности дорожала задним числом — человек видел не ту сумму, на
+   * которую соглашался. Считать нужно по тому, что показали в момент выбора
+   * дат; смотреть на вещь вправе только чип «вот эта вещь стоит столько».
+   *
+   * Сервис денег не проводит, так что это не договор, а честная запись о том,
+   * из чего человек исходил. Она же уезжает копией в журнал сделки. */
+  priceDay: integer("price_day").notNull(),
+  depositType: depositType("deposit_type").notNull().default("none"),
+  depositAmount: integer("deposit_amount"),
   status: bookingStatus("status").notNull().default("new"),
   customerPhone: varchar("customer_phone", { length: 20 }).notNull(),
   /* Комментарий клиента к заявке. Живёт колонкой, потому что читается в

@@ -128,6 +128,12 @@ export async function createBookingRequest(
         dateFrom: sel.from,
         dateTo: sel.to,
         qty: sel.qty,
+        // Условия на момент заявки — снимком, а не ссылкой на вещь: владелец
+        // вправе поменять цену завтра, и стоимость, которую человек видел,
+        // выбирая даты, от этого меняться не должна.
+        priceDay: listing.priceDay,
+        depositType: listing.depositType,
+        depositAmount: listing.depositAmount,
         status: "new",
         customerPhone: form.phone,
         customerComment: form.comment || null,
@@ -156,8 +162,14 @@ export async function createBookingRequest(
         // Комментарий копией: колонку читает шторка в момент решения, эту —
         // переписка. Копия делается здесь же, одной транзакцией, поэтому
         // разъехаться им негде.
+        // Тем же снимком, что лёг в заявку: карточка в переписке и шторка
+        // обязаны называть одну сумму. Копия делается здесь же, одной
+        // транзакцией, поэтому разъехаться им негде.
         meta: {
           requestId, from: sel.from, to: sel.to, qty: sel.qty,
+          priceDay: listing.priceDay,
+          depositType: listing.depositType,
+          depositAmount: listing.depositAmount ?? undefined,
           comment: form.comment || undefined,
         },
       });

@@ -13,7 +13,7 @@ import {
   type Category, type City, type Listing, type Seller,
 } from "@/server/catalog";
 import { extractListingId, listingPath } from "@/lib/catalog/listing-path";
-import { formatDeposit, formatPrice } from "@/lib/catalog/format";
+import { formatPrice } from "@/lib/catalog/format";
 import { addDaysStr, todayStr } from "@/lib/catalog/dates";
 import type { AvailabilityMap } from "@/lib/catalog/availability";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
@@ -337,7 +337,8 @@ async function ListingPage({
             availability={availabilityRecord}
             quantity={listing.quantity}
             priceDay={listing.priceDay}
-            depositLabel={formatDeposit(listing.depositType, listing.depositAmount)}
+            depositType={listing.depositType}
+            depositAmount={listing.depositAmount}
             handoverPickup={listing.handoverPickup}
             handoverDelivery={listing.handoverDelivery}
             sellerName={sellerName}

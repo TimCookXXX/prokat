@@ -195,6 +195,15 @@ export const content = {
     request_cancelled: "Бронь отменена",
     request_completed: "Аренда завершена",
   },
+  /* Подписи строк в карточке заявки. Здесь, а не в компоненте: текст записи о
+   * сделке не хранится в базе и собирается при выводе — значит и жить ему
+   * там же, где остальные её слова (ADR 0017). */
+  chatRequestNote: {
+    dates: "Даты",
+    qty: "Сколько",
+    price: "Стоимость",
+    deposit: "Залог",
+  },
   loading: {
     title: "Ищем рядом…",
     words: HANDOFF_WORDS as string[],

@@ -11,6 +11,7 @@ import {
   disclosedPhone, requestSide, type RequestSide,
 } from "@/lib/booking/request-access";
 import type { LinkableListing } from "@/lib/booking/listing-link";
+import type { DepositType } from "@/lib/catalog/format";
 
 export interface CabinetDeal {
   id: string;
@@ -39,9 +40,16 @@ export interface CabinetRequestRow {
   createdAt: Date;
   expiresAt: Date;
   customerComment: string | null;
+  /* Условия сделки на момент заявки, а не сегодняшние условия вещи. Владелец
+   * вправе поменять цену в любой день, и без снимка стоимость старой заявки
+   * ползла бы вслед за ней — человек видел бы не ту сумму, на которую
+   * соглашался. Снимок лежит колонками самой заявки, см. drizzle/schema.ts. */
+  priceDay: number;
+  depositType: DepositType;
+  depositAmount: number | null;
   /** Всё, что нужно ссылке на вещь: публичный контур закрывают и статус, и бан
    *  владельца — см. lib/booking/listing-link. */
-  listing: LinkableListing & { title: string; image: string | null; priceDay: number };
+  listing: LinkableListing & { title: string; image: string | null };
   /** Переписка пары (вещь, арендатор). Пусто у заявок, созданных до журнала
    *  сделки, по которым ещё не принималось решение. */
   threadId: string | null;
@@ -121,7 +129,9 @@ export async function getCabinetRequests(
       // Обложка в SQL, как в getThreadList: весь photos_json ради миниатюры
       // не тянем.
       listingImage: sql<string | null>`${listings.photosJson}->0->>'url'`,
-      listingPriceDay: listings.priceDay,
+      priceDay: bookingRequests.priceDay,
+      depositType: bookingRequests.depositType,
+      depositAmount: bookingRequests.depositAmount,
       listerBannedAt: lister.bannedAt,
       threadId: chatThreads.id,
       citySlug: cities.slug,
@@ -175,6 +185,9 @@ export async function getCabinetRequests(
       createdAt: r.createdAt,
       expiresAt: r.expiresAt,
       customerComment: r.customerComment,
+      priceDay: r.priceDay,
+      depositType: r.depositType,
+      depositAmount: r.depositAmount,
       listing: {
         id: r.listingId,
         title: r.listingTitle,
@@ -184,7 +197,6 @@ export async function getCabinetRequests(
         status: r.listingStatus,
         ownerBannedAt: r.listerBannedAt,
         image: r.listingImage,
-        priceDay: r.listingPriceDay,
       },
       threadId: r.threadId,
       peer: { id: r.peerId, name: r.peerName },

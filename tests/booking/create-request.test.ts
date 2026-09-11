@@ -49,7 +49,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   authMock.mockResolvedValue({ user: { id: "u1", bannedAt: null } });
   listingLimit.mockResolvedValue([
-    { listing: { id: "l1", ownerUserId: "u2", status: "active", quantity: 1 }, ownerBannedAt: null },
+    {
+      listing: {
+        id: "l1", ownerUserId: "u2", status: "active", quantity: 1,
+        priceDay: 500, depositType: "money", depositAmount: 2000,
+      },
+      ownerBannedAt: null,
+    },
   ]);
 });
 
@@ -114,7 +120,10 @@ describe("createBookingRequest: количество", () => {
 
   it("отказывает, если количество урезалось клампом", async () => {
     listingLimit.mockResolvedValue([{
-      listing: { id: "l1", ownerUserId: "owner", status: "active", quantity: 1 },
+      listing: {
+        id: "l1", ownerUserId: "owner", status: "active", quantity: 1,
+        priceDay: 500, depositType: "money", depositAmount: 2000,
+      },
       ownerBannedAt: null,
     }]);
     const r = await createBookingRequest({
@@ -142,7 +151,10 @@ describe("createBookingRequest: журнал сделки", () => {
     authMock.mockResolvedValue({ user: { id: "u1", bannedAt: null } });
     availWhere.mockResolvedValue([]);
     listingLimit.mockResolvedValue([{
-      listing: { id: "l1", ownerUserId: "owner", status: "active", quantity: 1 },
+      listing: {
+        id: "l1", ownerUserId: "owner", status: "active", quantity: 1,
+        priceDay: 500, depositType: "money", depositAmount: 2000,
+      },
       ownerBannedAt: null,
     }]);
     dealNoteMock.mockClear();
@@ -167,6 +179,34 @@ describe("createBookingRequest: журнал сделки", () => {
     });
     expect(note.meta).toMatchObject({ from: TODAY, to: TODAY, qty: 1 });
   });
+
+  /* Условия сделки уезжают в журнал копией с тех же значений, что легли
+   * колонками в саму заявку. Копия, а не ссылка на вещь: владелец поменяет
+   * цену завтра, и журнал переписался бы задним числом — а он на то и журнал,
+   * чтобы этого не делать. */
+  it("кладёт в запись условия на момент заявки", async () => {
+    await createBookingRequest(form(TODAY, TODAY));
+    expect(dealNoteMock.mock.calls[0][1].meta).toMatchObject({
+      priceDay: 500, depositType: "money", depositAmount: 2000,
+    });
+  });
+
+  /* И теми же значениями — в саму заявку. Расхождение этих двух записей
+   * означало бы, что шторка и переписка называют разные суммы за одну сделку;
+   * обе делаются одной транзакцией, поэтому разъехаться им негде. */
+  it("кладёт те же условия колонками в заявку", async () => {
+    const inserted: Record<string, unknown>[] = [];
+    transaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
+      const tx = {
+        insert: () => ({ values: async (v: Record<string, unknown>) => { inserted.push(v); } }),
+        update: () => ({ set: () => ({ where: async () => undefined }) }),
+      };
+      await fn(tx);
+    });
+    await createBookingRequest(form(TODAY, TODAY));
+    const request = inserted.find((v) => "customerPhone" in v);
+    expect(request).toMatchObject({ priceDay: 500, depositType: "money", depositAmount: 2000 });
+  });
 });
 
 /* Дубль ловится индексом, а не проверкой перед вставкой, и наружу выходит
@@ -178,7 +218,10 @@ describe("createBookingRequest: дубль", () => {
     authMock.mockResolvedValue({ user: { id: "u1", bannedAt: null } });
     availWhere.mockResolvedValue([]);
     listingLimit.mockResolvedValue([{
-      listing: { id: "l1", ownerUserId: "owner", status: "active", quantity: 1 },
+      listing: {
+        id: "l1", ownerUserId: "owner", status: "active", quantity: 1,
+        priceDay: 500, depositType: "money", depositAmount: 2000,
+      },
       ownerBannedAt: null,
     }]);
   });

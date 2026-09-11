@@ -20,7 +20,9 @@ import { RequestActions } from "@/components/cabinet/RequestActions";
 import { STATUS_BADGE_CLASSES, STATUS_LABELS } from "@/lib/booking/status-labels";
 import { requestListingHref } from "@/lib/booking/listing-link";
 import { formatDayMonthNum, formatTimeLeft } from "@/lib/catalog/dates";
-import { formatPrice } from "@/lib/catalog/format";
+import { depositValue, formatPrice } from "@/lib/catalog/format";
+import { rentalDaysCount } from "@/lib/booking/params";
+import { ruPlural } from "@/lib/plural";
 import type { CabinetRequestRow } from "@/server/cabinet";
 
 export type FeedRow = Omit<CabinetRequestRow, "createdAt" | "expiresAt"> & {
@@ -87,6 +89,8 @@ function StatusBadge({ row }: { row: FeedRow }) {
  * заявку неизбежно разъехались бы. */
 function SheetContent({ row }: { row: FeedRow }) {
   const owner = row.side === "owner";
+  // Диапазон включает обе границы, поэтому счёт суток — не разность дат.
+  const days = rentalDaysCount({ from: row.dateFrom, to: row.dateTo, qty: row.qty });
   const publicHref = requestListingHref(row.listing, row.side);
   /* Комментарий один — тот, что клиент оставил при заявке. Владельцу это
    * чужие слова в момент решения, арендатору — свои. Комментария владельца
@@ -115,13 +119,47 @@ function SheetContent({ row }: { row: FeedRow }) {
       <SheetBody>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
           <dt className="text-muted-foreground">Период</dt>
-          <dd>{period(row)}{row.qty > 1 ? ` · ${row.qty} шт.` : ""}</dd>
+          <dd className="tabular-nums">
+            {period(row)}
+            {days > 0 && ` · ${days} ${ruPlural(days, "день", "дня", "дней")}`}
+          </dd>
+          {/* Количество своей строкой, а не хвостом к периоду: слипшись, эти
+            * два ответа читались одним. Единица — не ответ, а умолчание. */}
+          {row.qty > 1 && (
+            <>
+              <dt className="text-muted-foreground">Сколько</dt>
+              <dd className="tabular-nums">{row.qty} шт.</dd>
+            </>
+          )}
           {row.estimate !== null && (
             <>
               <dt className="text-muted-foreground">Стоимость</dt>
-              <dd>≈ {formatPrice(row.estimate)}</dd>
+              <dd className="tabular-nums">
+                ≈ {formatPrice(row.estimate)}
+                {/* Из чего сложилось — тут же: «≈ 1 500 ₽» без раскладки человек
+                  * сверяет в уме, а сутки у нас включают обе границы, и счёт в
+                  * уме обычно расходится на день.
+                  *
+                  * Каждый множитель неразрывен, переносится только по швам
+                  * между ними: на 360px строка целиком не влезает, а рвать её
+                  * посреди «3 дня» нельзя. */}
+                {days > 0 && (
+                  <span className="ml-1.5 inline-flex flex-wrap gap-x-1 text-muted-foreground">
+                    <span className="whitespace-nowrap">({formatPrice(row.priceDay)}</span>
+                    <span className="whitespace-nowrap">
+                      × {days} {ruPlural(days, "день", "дня", "дней")}
+                      {row.qty > 1 ? "" : ")"}
+                    </span>
+                    {row.qty > 1 && <span className="whitespace-nowrap">× {row.qty} шт.)</span>}
+                  </span>
+                )}
+              </dd>
             </>
           )}
+          {/* Залог — всегда, даже когда его нет: «без залога» это ответ на
+            * вопрос, а не отсутствие ответа. */}
+          <dt className="text-muted-foreground">Залог</dt>
+          <dd className="tabular-nums">{depositValue(row.depositType, row.depositAmount)}</dd>
           <dt className="text-muted-foreground">{owner ? "Клиент" : "Продавец"}</dt>
           <dd>
             <Link href={`/u/${row.peer.id}` as never} className="hover:underline underline-offset-2">
@@ -155,6 +193,12 @@ function SheetContent({ row }: { row: FeedRow }) {
             Ваш комментарий: {myComment}
           </p>
         )}
+
+        {/* Ключевое ограничение продукта, и место ему рядом с суммами: человек,
+          * увидевший «Стоимость» и «Залог», вправе решить, что платит здесь. */}
+        <p className="mt-4 text-xs text-muted-foreground">
+          Оплата и залог — между вами, сервис их не проводит.
+        </p>
 
         {row.hot && (
           <p className="mt-4 text-xs text-muted-foreground">

@@ -21,7 +21,10 @@ export function toFeedRow(r: CabinetRequestRow): FeedRow {
     createdAt: r.createdAt.toISOString(),
     expiresAt: r.expiresAt.toISOString(),
     hot,
-    estimate: days > 0 ? r.listing.priceDay * days * r.qty : null,
+    // По цене из самой заявки, а не по сегодняшней цене вещи: иначе сумма
+    // старой заявки ползла бы вслед за прайсом владельца, и человек видел бы
+    // не то, на что соглашался. Снимок — в drizzle/schema.ts.
+    estimate: days > 0 ? r.priceDay * days * r.qty : null,
   };
 }
 
