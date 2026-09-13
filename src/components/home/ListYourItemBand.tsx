@@ -43,9 +43,9 @@ export function ListYourItemBand({
 
       <div className="relative grid items-center gap-8 p-4 sm:p-6 wide:grid-cols-[minmax(0,1fr)_minmax(280px,420px)] wide:gap-12 wide:p-11">
         <div>
-          {/* 52 пункта — плакатный кегль макета. На телефоне он ломается на три
-            * строки и кричит громче героя, поэтому там ступень заголовка
-            * раздела, как у остальных секций. */}
+          {/* 52 пункта — плакатный кегль макета. На телефоне он ломается на
+            * несколько строк и кричит громче героя, поэтому там ступень
+            * заголовка раздела, как у остальных секций. */}
           <h2 className="max-w-[22ch] font-display text-2xl font-extrabold leading-none tracking-mark sm:text-3xl md:text-band">
             {content.home.bandTitle}
           </h2>
