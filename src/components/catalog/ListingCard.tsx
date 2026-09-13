@@ -138,10 +138,14 @@ export function ListingCard({
           <span className="min-w-0 truncate text-micro font-medium sm:text-xs">
             {ownerName ?? "Без имени"}
           </span>
+          {/* Охра, а не зелень: по закону цвета зелёный — «можно нажать», а
+            * проверка это состояние аккаунта. Плашка кликабельна целиком, но
+            * значок в ней ничего не запускает. Так же он выглядит в визитках
+            * профиля, кабинета и в карточке владельца под фото. */}
           {ownerIsVerified && (
             <BadgeCheck
-              className="h-3 w-3 shrink-0 text-primary sm:h-3.5 sm:w-3.5"
-              aria-label="Проверенный продавец"
+              className="h-3 w-3 shrink-0 text-accent sm:h-3.5 sm:w-3.5"
+              aria-label="Проверен"
             />
           )}
         </Link>

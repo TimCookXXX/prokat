@@ -29,7 +29,7 @@ export const users = pgTable("users", {
   // argon2id. NULL у OAuth-юзеров: пароль есть только у тех, кто регистрировался почтой.
   passwordHash: text("password_hash"),
   role: userRole("role").notNull().default("user"),
-  // «Проверенный продавец» — ставится вручную админом (см. Фаза 6).
+  // «Проверен» — ставится вручную админом (см. Фаза 6).
   isVerified: boolean("is_verified").notNull().default(false),
   verifiedAt: timestamp("verified_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
