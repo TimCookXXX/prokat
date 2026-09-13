@@ -49,6 +49,6 @@ describe("OwnerCard", () => {
   it("hides the write button on your own listing", () => {
     render(<OwnerCard {...base} isOwn />);
     expect(screen.queryByRole("link", { name: "Написать" })).toBeNull();
-    expect(screen.getByRole("link", { name: /Профиль продавца/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Профиль" })).toBeInTheDocument();
   });
 });

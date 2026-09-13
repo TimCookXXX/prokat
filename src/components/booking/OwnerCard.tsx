@@ -5,8 +5,12 @@ import { Button } from "@/components/ui/button";
 import { LoginTrigger } from "@/components/auth/LoginTrigger";
 import { formatMonthYearGen } from "@/lib/catalog/dates";
 
-// Блок продавца под фото: слева — инфо (аватар, имя-ссылка, проверен, локация,
-// на сайте с), справа — карта-заглушка (интеграции карт пока нет).
+// Блок продавца под фото одной строкой: аватар, имя-ссылка с бейджем проверки,
+// под ними справка (локация, на сайте с) мелким кеглем, справа — действия.
+//
+// Карты-заглушки тут больше нет. Она занимала 280×220 ради серой сетки и
+// названия города, которое и так стоит строкой левее; интеграции карт нет, и
+// пустая рамка только отодвигала описание вниз.
 export function OwnerCard({
   name, href, image, isVerified, location, cityName, createdAt,
   chatHref, isAuthed, isOwn, authProps,
@@ -28,70 +32,69 @@ export function OwnerCard({
   authProps: { nextAuthProviders: string[]; vkEnabled: boolean; canRegisterByEmail: boolean };
 }) {
   return (
-    <div className="surface grid gap-4 p-4 sm:p-5 md:grid-cols-[1fr_280px]">
-      <div>
-        <div className="flex items-center gap-3.5">
-          <Avatar src={image} name={name} size={48} />
-          <div className="font-display text-lg font-bold leading-snug sm:text-xl">
-            Владелец{" "}
-            <Link href={href as never} className="text-accent hover:underline">
-              {name}
-            </Link>
-          </div>
+    <div className="surface flex flex-wrap items-center gap-4 p-4 sm:p-5">
+      <Avatar src={image} name={name} size={56} />
+
+      {/* Ломается по ширине КАРТОЧКИ, а не окна: в колонке товара она узкая и на
+        * широком экране (на md левая колонка — около 350px). basis-[220px]
+        * задаёт порог: не влезли аватар, справка и кнопки в одну строку —
+        * кнопки уезжают вниз. grow-[999] против grow у кнопок: свободное место
+        * на общей строке забирает справка, кнопки остаются по содержимому. */}
+      <div className="min-w-0 grow-[999] basis-[220px]">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-display text-lg font-bold leading-snug">
+          {/* Охра — только под курсором: в покое имя читается как заголовок
+            * блока, а не как акцент, спорящий с ценой и кнопкой брони. */}
+          <Link href={href as never} className="hover:text-accent hover:underline">
+            {name}
+          </Link>
+          {/* Бейдж тот же, что у заголовка профиля продавца, на ступень мельче:
+            * рядом с именем в 17px плашка в text-sm была бы выше строки. */}
+          {isVerified && (
+            <span className="inline-flex items-center gap-1 rounded-sm bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent">
+              <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
+              Проверен
+            </span>
+          )}
         </div>
 
-        <ul className="mt-5 flex flex-col gap-3 text-base">
-          {isVerified && (
-            <li className="flex items-center gap-3 text-foreground">
-              <BadgeCheck className="h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
-              Проверенный продавец
-            </li>
-          )}
-          <li className="flex items-center gap-3 text-foreground">
-            <MapPin className="h-5 w-5 shrink-0" aria-hidden="true" />
+        {/* Пункты разделяют иконки, а не точки: при переносе на узкой карточке
+          * точка повисала в конце строки. */}
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             {location ? `${location}, ${cityName}` : cityName}
-          </li>
-          <li className="flex items-center gap-3 text-foreground">
-            <CalendarClock className="h-5 w-5 shrink-0" aria-hidden="true" />
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <CalendarClock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             На сайте с {formatMonthYearGen(createdAt)}
-          </li>
-        </ul>
-
-        <div className="mt-5 flex gap-2">
-          {!isOwn && (isAuthed ? (
-            <Button asChild className="h-11 flex-1">
-              <Link href={chatHref as never}>Написать</Link>
-            </Button>
-          ) : (
-            <LoginTrigger
-              {...authProps}
-              redirectTo={chatHref}
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              Написать
-            </LoginTrigger>
-          ))}
-          <Button
-            asChild
-            variant="outline"
-            className="h-11 flex-1 border-primary bg-transparent text-primary hoverable hover:text-primary"
-          >
-            <Link href={href as never}>Профиль продавца</Link>
-          </Button>
+          </span>
         </div>
       </div>
 
-      {/* Карта-заглушка (нет интеграции карт), на мобиле не показываем */}
-      <div className="relative hidden min-h-[220px] items-center justify-center overflow-hidden rounded-lg bg-muted text-muted-foreground md:flex">
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 opacity-40 [background-image:linear-gradient(var(--color-border)_1px,transparent_1px),linear-gradient(90deg,var(--color-border)_1px,transparent_1px)] [background-size:20px_20px]"
-        />
-        <div className="relative flex flex-col items-center gap-1 text-center">
-          <MapPin className="h-6 w-6 text-accent" aria-hidden="true" />
-          <span className="text-sm font-medium text-foreground">{cityName}</span>
-          {location && <span className="text-xs">{location}</span>}
-        </div>
+      {/* grow работает только когда кнопки остались на строке одни: тогда они
+        * растягивают её на всю ширину и делят пополам. На общей строке со
+        * справкой её grow-[999] не оставляет им свободного места. */}
+      <div className="flex grow gap-2">
+        {!isOwn && (isAuthed ? (
+          <Button asChild className="h-11 flex-1">
+            <Link href={chatHref as never}>Написать</Link>
+          </Button>
+        ) : (
+          <LoginTrigger
+            {...authProps}
+            redirectTo={chatHref}
+            className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Написать
+          </LoginTrigger>
+        ))}
+        <Button
+          asChild
+          variant="outline"
+          className="h-11 flex-1 border-primary bg-transparent text-primary hoverable hover:text-primary"
+        >
+          <Link href={href as never}>Профиль</Link>
+        </Button>
       </div>
     </div>
   );
