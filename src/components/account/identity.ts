@@ -7,7 +7,7 @@
  * (AccountShell) и уменьшенное превью в выборе обложки (CoverPicker) — высоты
  * обязаны совпадать, иначе превью врёт. Ветки превью разделены теми же
  * media-брейкпоинтами, что и страница, поэтому один класс верен в обоих. */
-export const ACCOUNT_COVER_HEIGHT = "h-52 md:h-60";
+export const ACCOUNT_COVER_HEIGHT = "h-40 md:h-52";
 
 export interface AccountIdentity {
   name: string | null;

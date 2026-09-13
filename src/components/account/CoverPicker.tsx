@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ImagePlus } from "lucide-react";
+import { Check } from "lucide-react";
 import { Brackets } from "@/components/brand/Brackets";
 import { Button } from "@/components/ui/button";
-import { Modal, ModalContent, ModalTitle, ModalTrigger } from "@/components/ui/Modal";
 import { ProfileCover } from "@/components/account/ProfileCover";
 import { AccountHero } from "@/components/account/AccountHero";
 import { CabinetHubHeader } from "@/components/account/CabinetHub";
@@ -17,13 +16,12 @@ import { ACCOUNT_COVER_HEIGHT, type AccountIdentity } from "@/components/account
 /* Выбор обложки профиля: стандартные пресеты или своя фотография.
  *
  * Сверху — миниатюра настоящей шапки кабинета с кандидатом: обложка,
- * аватар нахлёстом, имя, почта, метрики и кнопка, всё в уменьшенном
+ * визитка с аватаром нахлёстом, имя, почта и метрики, всё в уменьшенном
  * масштабе. Клик по плитке ничего не применяет, только меняет кандидата;
  * сохраняет отдельная кнопка внизу.
  *
- * Живёт в двух местах: кнопка на самой обложке открывает Modal (на десктопе
- * окно, на мобиле лист снизу — поведение самого Modal), а на экране настроек
- * тот же выбор лежит прямо на странице. */
+ * Вход один — экран настроек профиля (ProfileCoverField): выбор лежит прямо
+ * на странице. Кнопки на самой обложке больше нет. */
 
 export function CoverChoiceGrid({
   me,
@@ -162,9 +160,9 @@ export function CoverChoiceGrid({
 /* Миниатюра шапки кабинета с кандидатом. Это НЕ отдельная вёрстка: внутри
  * рендерятся те же AccountHero и CabinetHubHeader, что и на настоящей
  * странице, на её «дизайнерской» ширине, а ScaledPreview ужимает их
- * transform: scale — превью меняется вместе со страницей само. Нарисован
- * только муляж кнопки «Сменить обложку»: настоящую поверх обложки кладёт
- * AccountShell, а не герой. */
+ * transform: scale — превью меняется вместе со страницей само. Своего здесь
+ * не рисуется ничего: муляж кнопки «Сменить обложку» ушёл вместе с настоящей
+ * кнопкой с обложки, иначе превью показывало бы то, чего на странице нет. */
 function HeroPreview({
   me,
   pendingCount,
@@ -175,12 +173,6 @@ function HeroPreview({
   coverUrl: string;
 }) {
   const candidate = { ...me, coverUrl };
-  const changeButton = (
-    <span className="glass-photo absolute bottom-4 right-4 inline-flex h-9 items-center gap-2 rounded-sm px-4 text-sm font-medium md:bottom-5 md:right-6">
-      <ImagePlus className="h-4 w-4" aria-hidden="true" />
-      Сменить обложку
-    </span>
-  );
 
   return (
     <div
@@ -191,7 +183,7 @@ function HeroPreview({
         * обложки — из той же константы, что у настоящей страницы. */}
       <div className="hidden md:block">
         <ScaledPreview designWidth={1120}>
-          <ProfileCover src={coverUrl} className={ACCOUNT_COVER_HEIGHT}>{changeButton}</ProfileCover>
+          <ProfileCover src={coverUrl} className={ACCOUNT_COVER_HEIGHT} />
           <div className="px-4 pb-4">
             <AccountHero me={candidate} pendingCount={pendingCount} />
           </div>
@@ -201,7 +193,7 @@ function HeroPreview({
       {/* Мобильная страница: обложка + верх хаба. */}
       <div className="md:hidden">
         <ScaledPreview designWidth={390}>
-          <ProfileCover src={coverUrl} className={ACCOUNT_COVER_HEIGHT}>{changeButton}</ProfileCover>
+          <ProfileCover src={coverUrl} className={ACCOUNT_COVER_HEIGHT} />
           <div className="flex flex-col gap-4 px-4 pb-4">
             <CabinetHubHeader me={candidate} />
           </div>
@@ -284,36 +276,5 @@ function Tile({
         </span>
       )}
     </button>
-  );
-}
-
-/** Кнопка на самой обложке: открывает выбор в окне (мобайл — лист снизу). */
-export function CoverPickerButton({
-  me,
-  pendingCount,
-  className,
-}: {
-  me: AccountIdentity;
-  pendingCount: number;
-  className?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Modal open={open} onOpenChange={setOpen}>
-      <ModalTrigger
-        className={cn(
-          "glass-photo inline-flex h-9 items-center gap-2 rounded-sm px-4 text-sm font-medium transition-opacity hover:opacity-90",
-          className,
-        )}
-      >
-        <ImagePlus className="h-4 w-4" aria-hidden="true" />
-        Сменить обложку
-      </ModalTrigger>
-      <ModalContent aria-describedby={undefined} className="md:max-w-2xl">
-        <ModalTitle className="mb-4 font-display text-lg font-bold">Обложка профиля</ModalTitle>
-        {/* Условный рендер: при каждом открытии выбор начинается с сохранённого. */}
-        {open && <CoverChoiceGrid me={me} pendingCount={pendingCount} onDone={() => setOpen(false)} />}
-      </ModalContent>
-    </Modal>
   );
 }

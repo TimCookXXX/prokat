@@ -57,7 +57,7 @@ describe("AccountShell", () => {
     expect(screen.getByText("marina@ya.ru")).toBeInTheDocument();
     expect(screen.getByText("объявления")).toBeInTheDocument();
     expect(screen.getByText("аренд")).toBeInTheDocument();
-    expect(screen.getByText("Проверенный продавец")).toBeInTheDocument();
+    expect(screen.getByText("Проверен")).toBeInTheDocument();
   });
 
   it("falls back to the default preset cover until the person picks one", () => {
@@ -106,7 +106,7 @@ describe("AccountShell", () => {
   it("keeps the plain layout when there is nobody to show", () => {
     nav.pathname = "/requests";
     render(<AccountShell groups={groups}>x</AccountShell>);
-    expect(screen.queryByText("Проверенный продавец")).toBeNull();
+    expect(screen.queryByText("Проверен")).toBeNull();
     expect(screen.queryByRole("button", { name: "Назад" })).toBeNull();
   });
 });

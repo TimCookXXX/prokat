@@ -16,7 +16,6 @@ import {
 import { Brackets } from "@/components/brand/Brackets";
 import { useSignOut } from "@/components/auth/useSignOut";
 import { ProfileCover } from "@/components/account/ProfileCover";
-import { CoverPickerButton } from "@/components/account/CoverPicker";
 import { AccountHero } from "@/components/account/AccountHero";
 import { CabinetHub } from "@/components/account/CabinetHub";
 import type { AccountNavGroup, AccountNavIcon } from "@/components/account/accountNav";
@@ -120,22 +119,15 @@ export function AccountShell({
       {/* Обложка на всю ширину, уезжает под плавающую панель хедера (она sticky
         * и остаётся сверху) — тем же приёмом, что герой главной. На мобайле
         * показывается только на хабе — в подразделах ей делать нечего.
-        * z-10 кнопке: полоса героя наезжает на обложку отрицательным отступом
-        * и иначе перекрывала бы нижнюю половину кнопки. */}
+        *
+        * Кнопки «Сменить обложку» на фото нет: тот же выбор лежит на экране
+        * настроек профиля (ProfileCoverField), и второй вход в него занимал
+        * угол обложки на каждой странице личной зоны. */}
       {identity && (
         <ProfileCover
           src={identity.coverUrl}
           className={`${ACCOUNT_COVER_HEIGHT} -mt-[var(--header-total)] ${isHub ? "" : "max-md:hidden"}`}
-        >
-          <CoverPickerButton
-            me={identity}
-            pendingCount={pendingCount}
-            /* md:bottom-9, а не 5: герой наезжает на обложку на 56px, и при
-             * меньшем отступе кнопка упирается в ряд метрик под ней. На мобайле
-             * героя нет — там прежние bottom-4. */
-            className="absolute bottom-4 right-4 z-10 md:bottom-9 md:right-6"
-          />
-        </ProfileCover>
+        />
       )}
 
       <div className={`mx-auto w-full max-w-[1200px] px-4 pb-6 ${identity ? "" : "pt-6"} ${identity && !isHub && !isChat ? "max-md:pt-3" : ""} ${isChat ? "max-md:pb-0" : ""}`}>

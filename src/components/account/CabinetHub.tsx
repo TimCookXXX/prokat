@@ -113,16 +113,28 @@ export function CabinetHubHeader({
 }) {
   return (
     <>
-      {/* Аватар свисает с обложки; кольцо цвета холста отделяет его от фото.
+      {/* Визитка: шапка на поверхности, которая наезжает на обложку, — как на
+        * десктопе (AccountHero) и на публичном профиле. Плитки с итогами ниже
+        * остаются отдельными карточками.
+        *
+        * relative обязателен: визитка отрицательным margin залезает на обложку,
+        * а та позиционирована и без своего контекста рисовалась бы поверх неё.
+        *
+        * Равнение по верху, а margin аватара подобран так, чтобы его центр
+        * совпал со строкой имени: подвесить аватар и при этом центрировать по
+        * всему блоку нельзя — он повисает над серединой и читается отдельно
+        * от текста. Кольцо цвета КАРТОЧКИ: аватар лежит на визитке и лишь
+        * выступающей частью попадает на фотографию.
+        *
         * Камера — сосед аватарки, а не вложенная в неё кнопка. */}
-      <div className="relative -mt-8 flex items-end gap-3">
+      <div className="surface relative -mt-6 flex items-start gap-4 p-4">
         {editable ? (
-          <div className="relative shrink-0">
+          <div className="relative -mt-7 shrink-0">
             <AvatarViewer
               src={me.image}
               name={me.name}
               size={72}
-              className="shadow-[0_0_0_3px_var(--color-background)]"
+              className="shadow-[0_0_0_4px_var(--color-card)]"
             />
             <AvatarPickerButton
               image={me.image}
@@ -131,23 +143,28 @@ export function CabinetHubHeader({
             />
           </div>
         ) : (
-          <Avatar
-            src={me.image}
-            name={me.name}
-            size={72}
-            className="shadow-[0_0_0_3px_var(--color-background)]"
-          />
+          <div className="-mt-7 shrink-0">
+            <Avatar
+              src={me.image}
+              name={me.name}
+              size={72}
+              className="shadow-[0_0_0_4px_var(--color-card)]"
+            />
+          </div>
         )}
-        <div className="min-w-0 flex-1 pb-1">
+        <div className="min-w-0 flex-1">
           <div className="truncate font-display text-xl font-bold">
             {me.name ?? "Без имени"}
           </div>
           {me.isVerified && (
             <div className="mt-0.5 flex items-center gap-1.5 text-[13px] text-accent">
               <BadgeCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              Проверенный продавец
+              Проверен
             </div>
           )}
+          {/* Почта видна только владельцу кабинета — публично её нигде нет.
+            * На десктопе она стоит в визитке тем же вторым уровнем. */}
+          <div className="mt-0.5 truncate text-[13px] text-muted-foreground">{me.email}</div>
         </div>
         <Link
           href={"/profile" as never}
