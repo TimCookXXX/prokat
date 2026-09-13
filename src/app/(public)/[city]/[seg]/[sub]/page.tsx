@@ -282,38 +282,48 @@ async function ListingPage({
             />
           </div>
 
-          {listing.description && (
-            <section className="mt-8">
-              <h2 className="mb-2 font-mono text-2xs font-medium uppercase tracking-mono text-muted-foreground">Описание</h2>
-              <p className="max-w-2xl whitespace-pre-line text-sm leading-body">{listing.description}</p>
-            </section>
-          )}
+          {/* Описание и условия — на одной плашке, а не карточкой: между карточкой
+            * владельца и заглушкой отзывов третья белая коробка сделала бы колонку
+            * стопкой одинаковых поверхностей. Плашка тише и не спорит с ними за
+            * внимание. Ширину строки держит сама плашка, поэтому max-w тексту не
+            * нужен — обрезанная колонка внутри широкой подложки читалась бы как
+            * ошибка вёрстки. */}
+          <div className="mt-8 rounded-lg bg-muted">
+            {listing.description && (
+              <section className="p-4 sm:p-5">
+                <h2 className="mb-2 font-mono text-2xs font-medium uppercase tracking-mono text-muted-foreground">Описание</h2>
+                <p className="whitespace-pre-line text-sm leading-body">{listing.description}</p>
+              </section>
+            )}
 
-          <section className="mt-8">
-            <h2 className="mb-3 font-mono text-2xs font-medium uppercase tracking-mono text-muted-foreground">Условия аренды</h2>
-            <ul className="flex max-w-2xl flex-col gap-2.5 text-sm">
-              <li className="flex gap-2.5">
-                <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
-                <span>Оплата и залог — напрямую с владельцем. Сервис сводит вас и ведёт заявку, платежей внутри нет.</span>
-              </li>
-              <li className="flex gap-2.5">
-                <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
-                <span>Заявка на бронь ни к чему не обязывает. Даты займутся только после подтверждения владельцем.</span>
-              </li>
-              <li className="flex gap-2.5">
-                <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
-                <span>
-                  {listing.depositType === "none"
-                    ? "Без залога."
-                    : listing.depositType === "document"
-                      ? "Залог — документ, возвращается после аренды."
-                      : listing.depositAmount
-                        ? `Залог ${formatPrice(listing.depositAmount)} — возвращается после возврата вещи в исходном состоянии.`
-                        : "Залог — по договорённости с владельцем."}
-                </span>
-              </li>
-            </ul>
-          </section>
+            {/* Разделитель — только когда сверху есть описание: без него плашка
+              * начиналась бы кантом в никуда. */}
+            <section className={`p-4 sm:p-5 ${listing.description ? "border-t border-border" : ""}`}>
+              <h2 className="mb-3 font-mono text-2xs font-medium uppercase tracking-mono text-muted-foreground">Условия аренды</h2>
+              <ul className="flex flex-col gap-2.5 text-sm">
+                <li className="flex gap-2.5">
+                  <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+                  <span>Оплата и залог — напрямую с владельцем. Сервис сводит вас и ведёт заявку, платежей внутри нет.</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+                  <span>Заявка на бронь ни к чему не обязывает. Даты займутся только после подтверждения владельцем.</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+                  <span>
+                    {listing.depositType === "none"
+                      ? "Без залога."
+                      : listing.depositType === "document"
+                        ? "Залог — документ, возвращается после аренды."
+                        : listing.depositAmount
+                          ? `Залог ${formatPrice(listing.depositAmount)} — возвращается после возврата вещи в исходном состоянии.`
+                          : "Залог — по договорённости с владельцем."}
+                  </span>
+                </li>
+              </ul>
+            </section>
+          </div>
 
           {/* Отзывы — заглушка (данных отзывов пока нет). */}
           <section className="mt-8">
