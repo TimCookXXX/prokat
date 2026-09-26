@@ -43,7 +43,7 @@ export function ProfileForm({
         <input type="tel" value={phone} placeholder="+7 900 000-00-00" autoComplete="tel"
           onChange={(e) => { setPhone(e.target.value); setSaved(false); }} className={INPUT} />
         <span className="text-xs text-muted-foreground">
-          Подставляется в форму заявки и показывается покупателю после подтверждения.
+          Нужен, чтобы с вами можно было связаться.
         </span>
       </label>
       <label className="flex flex-col gap-1 text-sm">

@@ -23,8 +23,14 @@ export interface AccountNavGroup {
 }
 
 export function buildAccountNav(
-  { newRequestsCount }: { newRequestsCount: number },
+  { newRequestsCount, p2p = true }: { newRequestsCount: number; p2p?: boolean },
 ): AccountNavGroup[] {
+  const account: AccountNavGroup = {
+    title: "аккаунт",
+    items: [{ href: "/profile", label: "Профиль", icon: "profile" }],
+  };
+  // Без P2P-контура (FEATURE_P2P) вещей и заявок нет — остаётся только аккаунт.
+  if (!p2p) return [account];
   return [
     {
       title: "сейчас",
@@ -42,9 +48,6 @@ export function buildAccountNav(
       title: "я арендую",
       items: [{ href: "/requests", label: "Мои заявки", icon: "requests" }],
     },
-    {
-      title: "аккаунт",
-      items: [{ href: "/profile", label: "Профиль", icon: "profile" }],
-    },
+    account,
   ];
 }

@@ -8,8 +8,10 @@ import { countNewRequests } from "@/server/owner";
 import { getCabinetIdentity } from "@/server/me";
 import { AccountShell } from "@/components/account/AccountShell";
 import { buildAccountNav } from "@/components/account/accountNav";
+import { requireP2P } from "@/lib/features";
 
 export default async function CabinetLayout({ children }: { children: React.ReactNode }) {
+  requireP2P();
   const session = await requireAuthState();
   if (!session) redirect("/login?from=/cabinet");
 

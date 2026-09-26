@@ -3,17 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LoginTrigger } from "@/components/auth/LoginTrigger";
-import { Search, ClipboardList, Plus, User } from "lucide-react";
-import { Logo } from "@/components/brand/Logo";
+import { Search, ClipboardList, Package, Plus, User } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
 
 /* Мобильная навигация: парящая пилюля внизу экрана — зеркалит стеклянные
  * пилюли шапки. Пять пунктов, как в брендбуке, но «Чаты» заменены на
  * «Заявки»: переписки в продукте ещё нет, а заявки — центральный флоу.
- *
- * Скобки работают пиктограммой только здесь («Мои вещи») — в остальных местах
- * это знак. Прочие иконки нейтральные, чтобы бренд не спорил с навигацией. */
+ * Иконки нейтральные, чтобы бренд не спорил с навигацией. */
 export function TabBar({
   placeHref,
   user,
@@ -62,13 +59,7 @@ export function TabBar({
 
         {tab("/cabinet/listings", itemClass(myItems), (
           <>
-            <span className="flex h-[22px] items-center">
-              <Logo
-                size={20}
-                showWord={false}
-                bracketClassName={myItems ? "border-accent" : "border-muted-foreground"}
-              />
-            </span>
+            <Package className="h-[22px] w-[22px]" aria-hidden="true" />
             Мои вещи
           </>
         ))}

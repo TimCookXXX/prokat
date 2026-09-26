@@ -28,4 +28,18 @@ describe("env validation", () => {
       NODE_ENV: "development",
     })).toThrow(/NEXTAUTH_SECRET/);
   });
+
+  it("keeps the P2P flow off unless FEATURE_P2P=true", () => {
+    const base = {
+      DATABASE_URL: "postgres://x:y@z/db",
+      NEXTAUTH_SECRET: "x".repeat(32),
+      NEXTAUTH_URL: "http://x",
+      NODE_ENV: "development",
+    } as const;
+    expect(parseEnv(base).FEATURE_P2P).toBe(false);
+    expect(parseEnv({ ...base, FEATURE_P2P: "" }).FEATURE_P2P).toBe(false);
+    expect(parseEnv({ ...base, FEATURE_P2P: "false" }).FEATURE_P2P).toBe(false);
+    expect(parseEnv({ ...base, FEATURE_P2P: "true" }).FEATURE_P2P).toBe(true);
+    expect(() => parseEnv({ ...base, FEATURE_P2P: "yes" })).toThrow(/FEATURE_P2P/);
+  });
 });

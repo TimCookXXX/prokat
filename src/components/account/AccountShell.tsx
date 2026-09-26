@@ -50,7 +50,7 @@ function Badge({ n }: { n?: number }) {
   );
 }
 
-function IdentityCard({ me }: { me: AccountIdentity }) {
+function IdentityCard({ me, p2p }: { me: AccountIdentity; p2p: boolean }) {
   return (
     <div className="surface flex flex-col gap-3 p-4">
       <div className="flex items-center gap-3">
@@ -73,12 +73,12 @@ function IdentityCard({ me }: { me: AccountIdentity }) {
 
       {/* Рейтинга и отзывов в модели нет — показываем то, что происходит на
        * самом деле: сколько вещей выставлено и сколько аренд состоялось. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+      {p2p && <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
         <span>
           {me.activeListings} {ruPlural(me.activeListings, "объявление", "объявления", "объявлений")}
         </span>
         <span>{me.deals} {ruPlural(me.deals, "аренда", "аренды", "аренд")}</span>
-      </div>
+      </div>}
 
       {me.isVerified && (
         <div className="flex items-center gap-2 rounded-md bg-accent/10 px-3 py-2 text-xs text-accent">
@@ -91,10 +91,12 @@ function IdentityCard({ me }: { me: AccountIdentity }) {
 }
 
 export function AccountShell({
-  groups, identity, children,
+  groups, identity, p2p = true, children,
 }: {
   groups: AccountNavGroup[];
   identity?: AccountIdentity | null;
+  /** P2P-контур включён (FEATURE_P2P): статистика вещей и «Разместить вещь». */
+  p2p?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname() ?? "";
@@ -151,7 +153,7 @@ export function AccountShell({
 
       <div className="md:grid md:grid-cols-[250px_1fr] md:items-start md:gap-5">
         <aside className="hidden md:sticky md:top-20 md:flex md:flex-col md:gap-3.5">
-          {identity && <IdentityCard me={identity} />}
+          {identity && <IdentityCard me={identity} p2p={p2p} />}
 
           <nav aria-label="Разделы" className="surface flex flex-col gap-0.5 p-2">
             {groups.map((group) => (
@@ -205,7 +207,7 @@ export function AccountShell({
             )}
           </nav>
 
-          {identity && (
+          {identity && p2p && (
             <Button asChild className="w-full">
               <Link href={"/cabinet/listings/new" as never}>
                 <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />

@@ -5,6 +5,7 @@ import { adminSetListingStatus } from "@/server/actions/admin";
 import { ActionButton } from "@/components/admin/ActionButton";
 import { formatPrice } from "@/lib/catalog/format";
 import { listingPath } from "@/lib/catalog/listing-path";
+import { requireP2P } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Объявления — админка", robots: { index: false } };
@@ -16,6 +17,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function AdminListingsPage() {
+  requireP2P();
   const rows = await adminListListings();
 
   return (

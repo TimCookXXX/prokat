@@ -11,6 +11,7 @@ import { canTransition, type BookingStatus } from "@/lib/catalog/booking-status"
 import { STATUS_BADGE_CLASSES, STATUS_LABELS } from "@/lib/booking/status-labels";
 import { formatDayMonth } from "@/lib/catalog/dates";
 import { CancelRequestButton } from "@/components/booking/CancelRequestButton";
+import { requireP2P } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RequestsPage() {
+  requireP2P();
   const session = await requireAuthState();
   if (!session) redirect("/login?from=/requests");
 

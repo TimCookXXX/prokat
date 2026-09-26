@@ -3,6 +3,7 @@ import { getActiveCities, getCityBySlug } from "@/server/catalog";
 import { parseQuery, type CategorySearchParams } from "@/lib/catalog/filters";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
 import { SearchResults } from "@/components/catalog/SearchResults";
+import { requireP2P } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function SearchPage({
 }: {
   searchParams: Promise<CategorySearchParams>;
 }) {
+  requireP2P();
   const sp = await searchParams;
   const q = parseQuery(sp);
 

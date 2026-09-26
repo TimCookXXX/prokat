@@ -1,8 +1,8 @@
-import { ShieldCheck, MapPin, Wallet, Clock, Users, Leaf, type LucideIcon } from "lucide-react";
+import { Calculator, CalendarCheck, Phone, Leaf, type LucideIcon } from "lucide-react";
 import { content } from "@theme/content";
 
-// Иконки к пунктам «Почему это удобно» — в том же порядке, что whyItems.
-const ICONS: LucideIcon[] = [ShieldCheck, MapPin, Wallet, Clock, Users, Leaf];
+// Иконки к пунктам whyItems — в том же порядке.
+const ICONS: LucideIcon[] = [Calculator, CalendarCheck, Phone];
 
 export function WhyChoose() {
   return (

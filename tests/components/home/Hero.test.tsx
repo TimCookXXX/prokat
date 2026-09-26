@@ -23,3 +23,12 @@ describe("Hero", () => {
     expect(screen.queryByRole("link", { name: "Инструмент" })).toBeNull();
   });
 });
+
+describe("Hero without listing search", () => {
+  it("renders the headline only", () => {
+    render(<Hero search={false} />);
+    expect(screen.getByText(content.home.heroTitle)).toBeInTheDocument();
+    expect(screen.queryByRole("search")).toBeNull();
+    expect(screen.queryByRole("heading", { name: content.home.categoriesHeading })).toBeNull();
+  });
+});

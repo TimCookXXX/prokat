@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireAuthState } from "@/lib/auth/guard";
 import { getUserProfile } from "@/server/me";
 import { ProfileForm } from "@/components/me/ProfileForm";
+import { isP2PEnabled } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Профиль", robots: { index: false } };
@@ -31,7 +32,8 @@ export default async function ProfilePage() {
           @{user.username} · {user.email}
         </p>
         <ProfileForm initialName={user.name ?? ""} initialPhone={user.phone ?? ""} initialBio={user.bio ?? ""} />
-        {user.username && (
+        {/* Публичный профиль продавца — часть P2P-контура. */}
+        {user.username && isP2PEnabled() && (
           <p className="mt-3 text-sm">
             <a href={`/u/${user.username}`} className="text-accent hover:underline underline-offset-2">
               Открыть мой публичный профиль →

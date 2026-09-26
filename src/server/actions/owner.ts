@@ -24,6 +24,7 @@ import {
   unavailableDates, eachDate, type AvailabilityMap,
 } from "@/lib/catalog/availability";
 import { canTransition, type BookingStatus } from "@/lib/catalog/booking-status";
+import { isP2PEnabled, P2P_DISABLED } from "@/lib/features";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
@@ -38,6 +39,7 @@ async function requireUser(): Promise<{ userId: string } | null> {
 // ============================== Товары ==============================
 
 export async function createListing(input: unknown): Promise<ActionResult<{ listingId: string }>> {
+  if (!isP2PEnabled()) return { ok: false, error: P2P_DISABLED };
   const owner = await requireUser();
   if (!owner) return { ok: false, error: "auth_required" };
 
@@ -74,6 +76,7 @@ export async function createListing(input: unknown): Promise<ActionResult<{ list
 }
 
 export async function updateListing(listingId: string, input: unknown): Promise<ActionResult> {
+  if (!isP2PEnabled()) return { ok: false, error: P2P_DISABLED };
   const owner = await requireUser();
   if (!owner) return { ok: false, error: "auth_required" };
 
@@ -109,6 +112,7 @@ export async function setListingStatus(
   listingId: string,
   status: "active" | "hidden" | "archived",
 ): Promise<ActionResult> {
+  if (!isP2PEnabled()) return { ok: false, error: P2P_DISABLED };
   const owner = await requireUser();
   if (!owner) return { ok: false, error: "auth_required" };
 
@@ -129,6 +133,7 @@ async function transitionRequest(
   to: BookingStatus,
   ownerComment?: string,
 ): Promise<ActionResult> {
+  if (!isP2PEnabled()) return { ok: false, error: P2P_DISABLED };
   const owner = await requireUser();
   if (!owner) return { ok: false, error: "auth_required" };
   const userId = owner.userId;
@@ -227,6 +232,7 @@ export async function setBlockedDates(
   dateTo: string,
   blockedQty: number,
 ): Promise<ActionResult> {
+  if (!isP2PEnabled()) return { ok: false, error: P2P_DISABLED };
   const owner = await requireUser();
   if (!owner) return { ok: false, error: "auth_required" };
 
