@@ -19,8 +19,10 @@ async function main() {
 
   console.log(
     `Catalog synced: ${r.citiesCreated} cities and ${r.categoriesCreated} categories created, ` +
-    `${r.groupsUpserted} groups and ${r.classesUpserted} classes upserted`,
+    `${r.groupsUpserted} groups and ${r.classesUpserted} classes upserted; ` +
+    `${r.districtsUpserted} places, ${r.modelsUpserted} models, ${r.aliasesAdded} new model spellings`,
   );
+  for (const p of r.modelProblems) console.warn(`Model: ${p}`);
   if (r.orphanGroups.length || r.orphanClasses.length) {
     console.warn(`Not in catalog-data (kept in DB): groups [${r.orphanGroups.join(", ")}], classes [${r.orphanClasses.join(", ")}]`);
   }

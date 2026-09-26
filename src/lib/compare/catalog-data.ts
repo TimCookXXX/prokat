@@ -22,6 +22,10 @@ export interface CatalogClass {
   slug: string;
   name: string;
   shortHint?: string;
+  /** Как ещё ищут именно этот класс: «sds+», «химчистка». */
+  keywords?: string[];
+  /** Слово-уточнение для чипов при неоднозначном запросе: «пылесос» → «Моющий». */
+  chip?: string;
 }
 
 export interface CatalogGroup {
@@ -60,6 +64,9 @@ export const DEFAULT_CITY_SLUG = "krasnodar";
 
 /** Сегмент списка прокатов: /{city}/prokaty и /{city}/prokaty/{shop}. Группой быть не может. */
 export const SHOPS_SEGMENT = "prokaty";
+
+/** Сегмент поиска по тексту: /{city}/poisk?q=… — неоднозначный запрос или «не нашли». */
+export const SEARCH_SEGMENT = "poisk";
 
 export const CATALOG: CatalogCategory[] = [
   {
@@ -161,13 +168,30 @@ export const CATALOG: CatalogCategory[] = [
         ],
       },
       {
+        slug: "prokat-stroitelnogo-pylesosa",
+        name: "Строительный пылесос",
+        nameGenitive: "строительного пылесоса",
+        seoWord: "prokat",
+        keywords: ["пылесос", "строительный", "промышленный", "для стройки", "пылеудаление"],
+        classes: [
+          { slug: "stroitelnyy-pylesos", name: "Строительный пылесос", shortHint: "пыль и мусор после ремонта, работа с инструментом", chip: "Строительный" },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "uborka",
+    name: "Уборка",
+    vertical: "cleaning",
+    groups: [
+      {
         slug: "prokat-moyushchego-pylesosa",
         name: "Моющий пылесос",
         nameGenitive: "моющего пылесоса",
         seoWord: "prokat",
-        keywords: ["пылесос", "моющий", "химчистка", "karcher", "керхер"],
+        keywords: ["пылесос", "моющий", "химчистка", "чистка ковров", "чистка дивана"],
         classes: [
-          { slug: "moyushchiy-pylesos", name: "Моющий пылесос", shortHint: "химчистка мебели, ковров, салона авто" },
+          { slug: "moyushchiy-pylesos", name: "Моющий пылесос", shortHint: "химчистка мебели, ковров, салона авто", chip: "Моющий" },
         ],
       },
       {

@@ -46,7 +46,7 @@ async function main() {
 
   // --- 1. Справочник сравнения ---
   const catalog = await syncCatalog(db);
-  console.log(`Catalog: ${catalog.groupsUpserted} groups, ${catalog.classesUpserted} classes`);
+  console.log(`Catalog: ${catalog.groupsUpserted} groups, ${catalog.classesUpserted} classes, ${catalog.districtsUpserted} places, ${catalog.modelsUpserted} models`);
   const [city] = await db.select({ id: cities.id }).from(cities).where(eq(cities.slug, DEFAULT_CITY_SLUG)).limit(1);
   const cityId = city.id;
 

@@ -29,6 +29,27 @@
       "when": 1790192601933,
       "tag": "0003_worried_madelyne_pryor",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790413779341,
+      "tag": "0004_last_photon",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790413780102,
+      "tag": "0005_blue_veda",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790416068176,
+      "tag": "0006_lame_pyro",
+      "breakpoints": true
     }
   ]
 }

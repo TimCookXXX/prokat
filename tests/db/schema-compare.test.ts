@@ -16,7 +16,7 @@ describe("comparison schema", () => {
   it("enums match the data model", () => {
     expect(verifiedBy.enumValues).toEqual(["call", "site", "listing", "shop"]);
     expect(leadType.enumValues).toEqual([
-      "show_phone", "call", "request", "regular_request", "price_outdated", "claim_click",
+      "show_phone", "call", "request", "regular_request", "price_outdated", "claim_click", "map_open",
     ]);
   });
 });

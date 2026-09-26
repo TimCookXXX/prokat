@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CATALOG, CATALOG_CITIES, DEFAULT_CITY_SLUG, SHOPS_SEGMENT } from "@/lib/compare/catalog-data";
+import { CATALOG, CATALOG_CITIES, DEFAULT_CITY_SLUG, SEARCH_SEGMENT, SHOPS_SEGMENT } from "@/lib/compare/catalog-data";
 
 const groups = CATALOG.flatMap((c) => c.groups);
 const classes = groups.flatMap((g) => g.classes);
@@ -19,7 +19,7 @@ describe("comparison catalog", () => {
 
   // Группы и категории делят сегмент /{city}/{seg}.
   it("does not let a group slug shadow a category or the shops list", () => {
-    const categorySlugs = new Set([...CATALOG.map((c) => c.slug), SHOPS_SEGMENT]);
+    const categorySlugs = new Set([...CATALOG.map((c) => c.slug), SHOPS_SEGMENT, SEARCH_SEGMENT]);
     expect(groups.filter((g) => categorySlugs.has(g.slug))).toEqual([]);
   });
 
@@ -27,7 +27,13 @@ describe("comparison catalog", () => {
     expect(groups.filter((g) => g.classes.length === 0)).toEqual([]);
   });
 
-  it("starts with the ten tool groups of the plan", () => {
-    expect(CATALOG.find((c) => c.slug === "instrumenty")!.groups).toHaveLength(10);
+  it("has the v1 categories: tools, cleaning, e-bikes", () => {
+    expect(CATALOG.map((c) => c.slug)).toEqual(["instrumenty", "uborka", "elektrovelosipedy"]);
+  });
+
+  // «пылесос» — неоднозначное слово: у каждого пылесоса есть чип-уточнение.
+  it("gives every vacuum class a refinement chip", () => {
+    const vacuums = classes.filter((c) => /пылесос/i.test(c.name));
+    expect(vacuums.map((c) => c.chip)).toEqual(["Строительный", "Моющий"]);
   });
 });
