@@ -2,15 +2,18 @@
 
 inrenta — не маркетплейс, а сравнение: собираем цены и условия прокатов города и
 показываем **итоговую сумму за даты пользователя** у каждого проката (аренда с
-минимальным сроком и недельным тарифом + доставка; залог — отдельно). Мы ничего не
-сдаём, не берём оплату и не держим залоги: человек звонит прокату напрямую. Деньги —
-позже, с прокатов за обращения клиентов. Старт — Краснодар и инструмент (плюс модели
-электровелосипедов для курьеров), но категории и классы — **данные, а не код**: модель
-должна принимать любые новые категории.
+минимальным сроком и недельным тарифом; залог — отдельно) и **дорогу до проката** от
+места пользователя. Версия 1 — только самовывоз: доставка хранится и показывается
+справочно, в итог не входит. Мы ничего не сдаём, не берём оплату и не держим залоги:
+человек звонит прокату напрямую. Деньги — позже, с прокатов за обращения клиентов.
+Старт — Краснодар: инструмент, уборка и модели электровелосипедов для курьеров; но
+категории, классы, модели и места — **данные, а не код**: модель должна принимать любые
+новые категории.
 
-Спецификация продукта — `docs/inrenta-pivot/` (`PRODUCT.md`, `MIGRATION.md` — план по
-шагам, `DATA_MODEL.md`, `DESIGN_SYSTEM.md`, макеты `mockups/*B.dc.html`). Файлы `docs/`
-в сборку и `tsc` не входят — это эталон, рабочие копии живут в `src/`.
+**Действующее ТЗ версии 1 — `TZ.md`** (вход «Что · Когда · Где», расчёт, выдача, 25
+критериев приёмки). При расхождении с пакетом `docs/inrenta-pivot/` (`PRODUCT.md`,
+`MIGRATION.md`, `DATA_MODEL.md`, `DESIGN_SYSTEM.md`, макеты `mockups/*B.dc.html`) прав
+`TZ.md`. Файлы `docs/` в сборку и `tsc` не входят — это эталон, рабочие копии в `src/`.
 
 Это самостоятельный проект. Общение и UI — на русском; идентификаторы кода и
 commit-сообщения — на английском.
@@ -37,7 +40,7 @@ commit-сообщения — на английском.
 - **Стили:** Tailwind + CSS-токены `theme/tokens.css` (дизайн-система «вариант Б»), шрифты Unbounded + Onest (`theme/fonts.ts`), светлая тема по умолчанию + тёмная (`next-themes`).
 - **ID:** ULID (`newId()` в `src/lib/id.ts`). **Цены:** целые рубли. **Даты:** строки `YYYY-MM-DD`. **Слаги:** `slugify()`.
 - **Аналитика:** Яндекс Метрика (цели через `reachGoal()` в `src/lib/analytics.ts`) + серверные `lead_events`.
-- **Тесты:** Vitest (432 теста, только в `tests/**`, импорт через `@/`).
+- **Тесты:** Vitest (481 тест, только в `tests/**`, импорт через `@/`).
 - **Деплой:** docker-compose (Caddy + app + Postgres + backup), HTTPS via Let's Encrypt. См. `docs/DEPLOY.md`, `docs/RECOVERY.md`.
 
 ## Команды
@@ -60,75 +63,111 @@ pnpm db:studio      # drizzle studio
 
 ## Модель данных сравнения (`drizzle/schema.ts`, нижний блок)
 
-Цепочка: **`categories → item_groups → item_classes ← offers → rental_shops → cities`**.
+Цепочка: **`categories → item_groups → item_classes ← offers → rental_shops → cities`**,
+плюс **`brands → product_models ← offers`**, **`model_aliases → product_models`** и
+**`districts` (округ → микрорайон) ← `rental_shops`**.
 
 | Таблица | Назначение | Ключевое |
 |---|---|---|
-| **item_groups** | страница сравнения `/{city}/{slug}` (`prokat-perforatora`) | `categoryId`, `slug` (uniq, делит сегмент с категориями), `nameGenitive` (для H1), `seoWord` (`prokat`/`arenda`), `guide`, `searchKeywords` (синонимы для поиска: «болгарка», «отбойник») |
-| **item_classes** | единица сравнения — внутри класса ранжируются предложения | `groupId`, `slug` (uniq глобально, по нему ищет CSV-импорт), `shortHint` |
-| **rental_shops** | прокат; существует без владельца | `cityId`, `slug` (uniq в городе), контакты (телефон — только по клику), `sourceUrls`, `status` (`unclaimed`/`claimed`/`hidden`), `ownerUserId` (после подтверждения) |
-| **offers** | цена и условия проката по классу | uniq (`shopId`,`itemClassId`,`model`) NULLS NOT DISTINCT; `priceDay` (NULL = только понедельно) / `priceWeek` — хотя бы одна (CHECK), `minDays`, `depositRub` (**NULL = «уточняется», 0 = без денежного**), доставка, `verifiedAt` (date) + `verifiedBy` (`call`/`site`/`listing`/`shop`) |
-| **lead_events** | обращения: `show_phone`, `price_outdated`, `regular_request`, `claim_click`… | `offerId`, `shopId`, `itemClassId`, `sessionId` (cookie `inr_sid`), `tab`, `rankPosition`, `scenario`, `utm` (cookie `inr_utm`) |
-| **regular_requests** | заявки «берём регулярно» | `cityId`, `what`, `frequency`, `contact`, `status` (`new`/`sent`/`closed`) |
-| **shop_claims** | заявки «Это мой прокат» | `shopId` (NULL — проката нет в базе, тогда `shopName`), `userId`, `phone`, `status` (`new`/`approved`/`rejected`) |
+| **item_groups** | страница группы `/{city}/{slug}` (`prokat-perforatora`), классы группы показываются вместе | `categoryId`, `slug` (uniq, делит сегмент с категориями), `nameGenitive` (H1), `seoWord` (`prokat`/`arenda`), `guide`, `searchKeywords` («болгарка», «отбойник») |
+| **item_classes** | класс сравнения (SDS-plus / SDS-max) — чип на странице группы | `groupId`, `slug` (uniq, по нему ищет CSV-импорт), `shortHint`, `searchKeywords`; чип уточнения («Моющий») — `chip` в `catalog-data.ts` |
+| **brands**, **product_models** | бренд и модель; семейство (HR2470 / HR2470FT) — одна модель. Страница модели `/{city}/{seoWord}-{slug}` | модель: `brandId`, `itemClassId`, `name` (без бренда), `slug`, `family`, `specs` jsonb, фото с лицензией |
+| **model_aliases** | написание → модель (ключ `modelKey()`) | `alias` PK |
+| **districts** | места для «Где»: `okrug` (4 округа) и `microdistrict` (центр, синонимы «ФМР», «Фестивалка», `parentId` → округ) | uniq (`cityId`,`slug`) |
+| **rental_shops** | прокат; существует без владельца | `address`, `lat`/`lon` (координаты адреса), `microdistrictId`, `okrugId`, `hours` jsonb (`WeekHours`), телефон (только по клику), `telegram`, `status` (`unclaimed`/`claimed`/`hidden`), `ownerUserId` |
+| **offers** | цена и условия проката | uniq (`shopId`,`itemClassId`,`modelKey`); `modelId` (NULL — не указана или не распознана), `model` (как написал прокат), `modelKey` (`m:<id>` / `r:<ключ>` / `''`), `includes`; `priceDay` / `priceWeek` (хотя бы одна), `minDays`, `depositRub` (**NULL = «уточняется», 0 = без денежного**), доставка (справочно), `verifiedAt` + `verifiedBy` |
+| **lead_events** | обращения: `show_phone`, `request`, `regular_request`, `price_outdated`, `claim_click`, `map_open` | `offerId`, `shopId`, `itemClassId`, `modelId`, `sessionId` (cookie `inr_sid`), `tab`, `rankPosition`, `scenario` (`LeadScenario`: сутки, тип места, микрорайон/округ), `utm` |
+| **regular_requests** | заявки `kind`: `regular` («нужен регулярно») и `not_found` («не нашли — найдём за 30 минут») | `what`, `period`, `frequency`, `contact`, `status` |
+| **shop_claims** | заявки «Это мой прокат» | `shopId` (NULL — проката нет в базе, тогда `shopName`), `userId`, `phone`, `status` |
 
-- Справочник групп и классов — **код**: `src/lib/compare/catalog-data.ts`; `syncCatalog()` делает upsert по slug. Города и категории правятся в админке — синхронизация их только создаёт. Новая категория/класс = данные в этом файле. Слаг `prokaty` зарезервирован (список прокатов).
-- Прокаты и цены заводятся CSV-импортом (`src/lib/compare/offers-csv.ts` → `src/server/compare/import-offers.ts`): файл целиком или ничего; строки-примеры шаблона отклоняются; более старая `verifiedAt` не затирает свежую.
+- Справочники — **код**; `syncCatalog()` (`db:sync-catalog`, в проде — при старте контейнера) приводит к ним БД upsert по slug: группы и классы — `src/lib/compare/catalog-data.ts`; места — `geo-data.ts` (OpenStreetMap, ODbL — источник указан в подвале и на `/kak-schitaem-ceny`); бренды и модели — `models-data.ts` (ключи написаний → `model_aliases`, ранее нераспознанные предложения привязываются к моделям). Границы округов — `okrug-bounds.ts`: округ точки без внешних сервисов. Города и категории правятся в админке — синхронизация их только создаёт. Слаги `prokaty` и `poisk` зарезервированы.
+- Прокаты и цены — CSV-импорт (`offers-csv.ts` → `import-offers.ts`, шаблон `docs/inrenta-pivot/data/offers.template.csv`):
+  - файл целиком или ничего; строки-примеры отклоняются;
+  - прокат ищется по (город, название, телефон);
+  - модель — через `modelKey()` и `model_aliases`; не нашлась — предложение класса и отчёт «нераспознанные модели»;
+  - микрорайон — по справочнику мест; адрес без `lat`/`lon` геокодируется (Яндекс, если есть ключ), иначе — отчёт «адреса без координат»;
+  - часы — «пн-пт 9-20; сб 10-16; вс выходной» (`hours.ts`);
+  - более старая `verifiedAt` не затирает свежую.
 - `cities.namePrepositional` — «в Краснодаре» для заголовков.
 
-### Расчёт итога (`src/lib/compare/pricing.ts`)
+### Расчёт и выдача (`pricing.ts`, `ranking.ts`, `view.ts`; параметры — `config.ts`)
 
-- Итог считается **только** здесь и никогда не хранится.
-- Срок пользователь задаёт **датами** («когда») во всех категориях, отдельных селекторов «неделя/месяц» нет. Сутки = `rentalDays(from, to)` (сб 27 → пн 29 = 2), минимум 1. Календарь — свой (`DateRangeField`, сетка и подсветка — `src/lib/compare/calendar.ts`): первый клик подсвечивается сразу, под курсором виден будущий период, второй клик в любую сторону закрывает (`pickRangeDay`); на компьютере два месяца, на телефоне один.
-- Района доставки («куда привезти») нет: доставка у проката одна цена на город. Фильтр «Район проката» (`area`) — по районам самих прокатов из CSV.
-- Оплачиваемый срок = max(сутки, `minDays`); без `priceDay` — округляется вверх до целых недель. Недельный тариф: недели × `priceWeek` + min(остаток × `priceDay`, `priceWeek`). Месячного тарифа нет.
-- Цена старше 30 дней → блок «на перепроверке», никогда не побеждает во вкладке и не даёт цену «от». Нужна доставка, а её нет → блок «только самовывоз».
-- Модель выдачи (вкладки, цены у фильтров, подсказка про неделю, место в сравнении) — `src/lib/compare/view.ts`; параметры URL — `scenario.ts`; «сегодня» — `localToday()` (московское время).
+- Итог считается **только** в `pricing.ts` и не хранится. Оплачиваемые сутки = max(сутки, `minDays`); без `priceDay` — целые недели. Недельный тариф: недели × `priceWeek` + min(остаток × `priceDay`, `priceWeek`). Месячного тарифа нет. **Доставка в итог не входит** (версия 1 — самовывоз).
+- Срок — **датами** (сб 27 → пн 29 = 2 суток, минимум 1). Дат нет — сегодня на 1 сутки и пометка «укажите даты». Календарь — свой (`DateRangeField`, `calendar.ts`): два клика в любом порядке (`pickRangeDay`).
+- Место проката: координаты адреса → центр микрорайона (≈) → неизвестно. Расстояние = по прямой × `ROUTE_FACTOR` (1,3), время = км ÷ `CITY_SPEED_KMH` (25); «≈», если хоть одна точка — центр микрорайона (`geo.ts`).
+- Оценка «Оптимального» = итог + `TRIPS_PER_RENTAL` (4) × минуты × `MINUTE_COST_RUB` (10).
+- Вкладки (`ranking.ts`):
+  - город — «Оптимальный» (он же «Самый дешёвый») и «Самый дешёвый»;
+  - округ — плюс «Сначала в вашем округе», выдача делится на «в вашем округе» и «в других»;
+  - микрорайон и точка — плюс «Ближе всего».
+  По умолчанию «Ближе всего», если разброс итогов меньше `LOW_SPREAD_SHARE` и расстояния известны; иначе «Оптимальный».
+- Порядок:
+  - доминируемое (дороже и не ближе другого) не бывает первым (`undominatedFirst`);
+  - без местоположения — после известных на «Оптимальном» и «Ближе всего»;
+  - при равенстве выше подтверждённый прокат, затем свежая цена.
+  Под первым — пояснение: «На 100 ₽ дороже самого дешёвого, но в 3 раза ближе».
+- Цена старше `STALE_AFTER_DAYS` (30) → блок «Цена на перепроверке», вне вкладок. Фильтры — у каждого итог первой карточки текущей вкладки после его применения (ТЗ, критерий 21; на «Самом дешёвом» это и минимум, там подпись «от»): без денежного залога, подтвердил цены, от 1 суток, работает сегодня (`hours.ts`, время Москвы), модель, округ. Подсказка про неделю — при выгоде от `WEEK_HINT_MIN_SHARE`.
+- Параметры URL — `scenario.ts` (`targetHref` — адрес цели поиска); «сегодня» — `localToday()` (Москва).
 
-### Поиск «Что нужно» (`src/lib/compare/search.ts`)
+### Поиск «Что · Когда · Где»
 
-- Строка с подсказками по мере набора (`WhatField`), без выпадающего списка всего каталога. Индекс строится на сервере из каталога города (`getCompareCatalog` + `getSearchModels` → `toSearchData`) и ищется на клиенте.
-- Подсказки: группа, класс (если в группе их больше одного), бренд (≥2 моделей бренда в классе — «Перфоратор SDS-plus Makita»), модель. Бренд — первое слово `offers.model`.
-- Каждое слово запроса — префикс слова подсказки (И по всем словам): «перфо maki» → Makita среди перфораторов. Прощает раскладку, транслит, одну опечатку; русские написания брендов — `BRAND_ALIASES`. Хоть одно слово должно попасть в саму подсказку, иначе «перфо» вывело бы все модели.
-- Синонимы групп — `keywords` в `catalog-data.ts` → `item_groups.search_keywords`.
-- Выбор бренда или модели ставит `m`: выдача (включая блоки вне рейтинга и цены у фильтров) — только эти модели; плашка «Показаны только … ✕» снимает фильтр, смена класса его сбрасывает.
+- **Что** (`search.ts`, `WhatField`): подсказки по мере набора — модели и классы по 5 с числом прокатов. Индекс из каталога, брендов и моделей города (`getSearchData`), ищется на клиенте. Выбор подсказки — сразу цель.
+- Текст без выбора → `/{city}/poisk?q=`, где `resolveQuery()` разбирает запрос по уровням ТЗ:
+  1. модель — страница модели (несколько моделей одного класса — фильтр по ним);
+  2. бренд (+ класс);
+  3. класс или группа;
+  4. неоднозначное слово — чипы, до выбора показываются все подходящие классы;
+  5. запасной `ILIKE '%q%'` по написанию моделей у прокатов (`findGroupsByRawModel`);
+  6. не найдено — «похожее» и форма «найдём за 30 минут».
+
+  Поиск не зависит от регистра, дефисов и косых черт; понимает кириллицу вместо латиницы и похожие буквы («НR2470»), неверную раскладку, до 2 опечаток, падежи (`stem`), синонимы групп, классов и брендов.
+- **Где** (`WhereField`, `geo.ts`):
+  - микрорайоны и округа — сразу из справочника (`matchPlaces`, синонимы и раскладка);
+  - адреса — Геосаджест Яндекса через `/api/geo/suggest` (задержка 300 мс), координаты — `/api/geo/resolve` (`src/server/geocoder.ts`: кэш, лимит `geo`); без ключей адреса не подсказываются, остальное работает;
+  - «Определить моё местоположение» — геолокация браузера, отказ — без ошибки;
+  - ввели и не выбрали — берётся первая подсказка, иначе город и «Не нашли такой адрес — уточните»;
+  - последнее место хранится в `localStorage` (`inr_loc`) и подставляется на главной.
+- Место в URL: `loc=d:<микрорайон>` | `o:<округ>` | `p:<lat>,<lon>` (+ `la` — подпись, `src=geo`). Округ и микрорайон точки определяются по границам OSM и ближайшему центру и показываются в сводке.
 
 ## URL-структура
 
 | URL | Что |
 |---|---|
-| `/`, `/{city}` | главная сравнения (город по умолчанию — `krasnodar`): поиск «что · когда», группы с ценой «от» |
-| `/{city}/{group}` | **страница сравнения**: `?c=класс&m=модель|бренд&from&to&pickup=1&tab&nodep&today&claimed&min1&area=` |
-| `/{city}/{category}` | все группы категории («Весь инструмент») |
-| `/{city}/prokaty`, `/{city}/prokaty/{shop}` | прокаты города, страница проката (цены, место в сравнении, «Это ваш прокат?») |
-| `/kak-schitaem-ceny`, `/dlya-prokatov` | методика; лендинг и заявка для прокатов |
-| `/moy-prokat` | кабинет проката (владелец подтверждённой карточки): цены, место, обращения за месяц |
-| `/login`, `/welcome`, `/reset`, `/banned`, `/profile` | вход/онбординг/сброс пароля/профиль |
-| `/admin/{shops,regular,leads}` | заявки на карточки и прокаты, «нужен регулярно», сводка обращений |
+| `/`, `/{city}` | главная (город по умолчанию — `krasnodar`): поиск «Что · Когда · Где», популярные классы и модели с ценой «от», «Как мы считаем цены» |
+| `/{city}/{group}` | **страница группы**, все классы вместе: `?c=класс&brand=&model=a,b&from&to&loc=&la=&src=&tab=&nodep&claimed&min1&open&okrug=` (`tab`: `optimal`, `cheapest`, `nearest`, `okrug`) |
+| `/{city}/{prokat или arenda}-{model}` | **страница модели** (`/krasnodar/prokat-karcher-puzzi-8-1`), те же параметры |
+| `/{city}/poisk?q=` | разбор текста: редирект на модель, бренд или класс; чипы при неоднозначности; «не нашли» (noindex) |
+| `/{city}/{category}` | все группы категории |
+| `/{city}/prokaty`, `/{city}/prokaty/{shop}` | прокаты города, страница проката |
+| `/kak-schitaem-ceny`, `/dlya-prokatov` | методика (итог, дорога, вкладки, источники данных); лендинг и заявка для прокатов |
+| `/moy-prokat` | кабинет проката: цены, место, обращения |
+| `/login`, `/welcome`, `/reset`, `/banned`, `/profile` | вход, онбординг, сброс пароля, профиль |
+| `/admin/{shops,regular,leads}` | заявки на карточки, заявки «регулярно» и «не нашли», сводка обращений |
 | `/admin/{users,cities,categories}` | пользователи, справочники |
-| `/api/{auth,oauth/vk,upload,health}` | системные; `/api/dev/login[?role=admin]` — dev-вход (404 в prod) |
+| `/api/{auth,oauth/vk,upload,health}`, `/api/geo/{suggest,resolve}` | системные и геокодер; `/api/dev/login[?role=admin]` — dev-вход (404 в prod) |
 
-Резолвер `/{city}/{seg}`: группа сравнения → категория сравнения → (с P2P) категория
-объявлений. `/{city}/{seg}/{sub}`: `prokaty/{shop}` → (с P2P) подкатегория или карточка товара.
+Резолвер `/{city}/{seg}`: `prokaty` → `poisk` → группа → модель → категория сравнения →
+(с P2P) категория объявлений. `/{city}/{seg}/{sub}`: `prokaty/{shop}` → (с P2P)
+подкатегория или карточка товара.
 
 ## Карта кода
 
 - **`drizzle/`** — `schema.ts` (источник схемы) + `migrations/`. Менять схему → `db:generate`.
 - **`scripts/`** — `seed.ts` (+ `seed-demo-offers.ts`), `migrate.ts`, `sync-catalog.ts`, `import-offers.ts`. Последние три в Docker собираются в `*.cjs` (в runner нет pnpm/tsx), `sync-catalog.cjs` запускается в `entrypoint.sh`.
-- **`src/lib/compare/`** — ядро сравнения, чистые функции: `pricing` (итог, ранжирование, вкладки), `view` (модель выдачи, тексты билета, место в сравнении), `scenario` (параметры URL), `search` (подсказки поиска), `faq`, `format` (даты «27 сен», телефоны, склонения), `catalog-data`, `offers-csv`, `visitor` (cookies посетителя).
-- **`src/server/compare.ts`, `src/server/shops.ts`** — read-слой сравнения и прокатов; **`src/server/compare/`** — синхронизация справочника и импорт CSV.
-- **`src/server/actions/leads.ts`** — «Показать телефон», «Цена устарела?», «Нужен регулярно», `claim_click`; **`actions/shops.ts`** — заявка на карточку, цены владельца, модерация.
-- **`src/components/compare/`** — `ComparePage`, `SearchBar`, `WhatField`, `DateRangeField`, `ResultTabs`, `OfferTicket`, `FiltersPanel`/`FiltersSheet`, `SavingsHint`, `OutOfRanking`, `CityHome`, `CategoryPage`, `GroupCard`, `ShopPage`, `ShopsList`, `ShopClaimForm`…; **`src/components/shop/`** — формы кабинета проката.
+- **`src/lib/compare/`** — ядро сравнения, чистые функции: `config` (параметры ТЗ, п. 10), `pricing` (итог), `ranking` (расстояние, оценка, вкладки, доминирование, пояснение), `view` (модель выдачи, фильтры, тексты карточки, место в сравнении), `scenario` (параметры URL), `search` (подсказки и разбор запроса), `geo` + `geo-data` + `okrug-bounds` (места, расстояния, «Где»), `models` + `models-data` (бренды, модели, `modelKey`), `hours`, `calendar`, `faq`, `format`, `catalog-data`, `offers-csv`, `visitor` (cookies посетителя).
+- **`src/server/compare.ts`, `src/server/shops.ts`** — read-слой сравнения и прокатов (предложения группы и модели с местом и моделью, `getCityGeo`, `getSearchData`, `getModelBySeg`); **`src/server/compare/`** — синхронизация справочников и импорт CSV; **`src/server/geocoder.ts`** — Яндекс Геокодер и Геосаджест (кэш; без ключа — выключен).
+- **`src/server/actions/leads.ts`** — «Показать телефон», «Цена устарела?», «Нужен регулярно», «Не нашли», `claim_click`; **`actions/shops.ts`** — заявка на карточку, цены владельца, модерация.
+- **`src/components/compare/`** — `ResultRoutes` (страницы группы, модели, поиска) → `ComparePage` (`ResultPage`), `SearchBar` (`WhatField`, `DateRangeField`, `WhereField`), `ResultTabs`, `OfferTicket`, `FiltersPanel`/`FiltersSheet`, `SavingsHint`, `OutOfRanking`, `NotFoundRequestForm`, `CityHome`, `CategoryPage`, `GroupCard` (+ `ModelCard`), `ShopPage`, `ShopsList`, `ShopClaimForm`…; **`src/components/shop/`** — формы кабинета проката.
 - **`src/server/*.ts`, `src/server/actions/*.ts`** (прочее) — P2P и общее: `catalog.ts`, `owner.ts`, `booking.ts`, `me.ts`, `admin.ts`, `profile.ts`.
 - **`src/lib/`** — `auth/`, `mail/`, `http/`, `catalog/` (P2P + общие `dates`), `features.ts`, `analytics.ts`, `rate-limit.ts`, `jsonld.ts`, `db.ts`, `id.ts`.
 - **`src/components/`** (прочее) — `layout/` (шапка-полоса бренда, подвал), `brand/` (знак «inrenta.», скобки-лоадер), `ui/` (`Modal` — лист снизу на телефоне), `auth/`, `admin/`, `account/`, `seo/`; P2P — `catalog/`, `booking/`, `cabinet/`, `home/`.
 - **`theme/`** — `tokens.css`, `tokens.schema.md` (контракт), `fonts.ts`, `typography.css`, `content.ts` (тексты), `seo.ts`.
-- **`tests/`** — Vitest, зеркалит `src`; сравнение — `tests/compare/`.
+- **`tests/`** — Vitest, зеркалит `src`; сравнение — `tests/compare/` (критерии приёмки ТЗ — в `search`, `pricing`, `view`, `geo`).
 
 ## Ключевые флоу
 
-- **Сравнение:** главная → `SearchBar` (только «что нужно» с подсказками и «когда»; поля пустые, даты не выбраны — завтра на 1 сутки; «заберу сам» и залог — фильтры страницы сравнения) → `/{city}/{group}?…` → сервер считает `buildCompareView` → вкладки, фильтры (сразу меняют URL), «билеты». Всё — SSR, ссылка открывает ту же выдачу.
-- **Обращение:** «Показать телефон» → `revealShopPhone` пишет `lead_events.show_phone` (вкладка, место, сценарий, UTM) и только тогда отдаёт номер; параллельно цель Метрики. Телефонов в HTML нет.
+- **Сравнение:** главная → `SearchBar` «Что · Когда · Где» (поля пустые; подсказка — сразу цель, текст — через `/poisk`) → страница группы или модели → сервер считает `buildResultView` (итог, дорога, вкладки, фильтры) → карточки. Всё — SSR, ссылка открывает ту же выдачу в том же порядке.
+- **Обращение:** лимиты обращений и форм — по сессии и по IP (`withinLimit`: cookie подделывается). «Показать телефон» → `revealShopPhone` пишет `lead_events.show_phone` (вкладка, место в выдаче, модель, сутки и тип места пользователя, UTM) и только тогда отдаёт номер и Telegram; параллельно цель Метрики. Телефонов в HTML нет. Пустая выдача → «найдём за 30 минут» → `regular_requests` (`kind=not_found`) + событие `request`.
 - **Цены на старте:** CSV → `db:import-offers` (в проде — `docker compose exec app node import-offers.cjs`). У каждой цены дата проверки.
 - **Подтверждение проката:** «Это ваш прокат?» (`claim_click`) → `/dlya-prokatov` → вход → заявка (`shop_claims`) → админ звонит на номер проката и одобряет в `/admin/shops` → `rental_shops.status=claimed`, `ownerUserId` → «Мой прокат» в меню → `/moy-prokat`: сохранение цен ставит `verifiedAt=сегодня`, `verifiedBy=shop`, бейдж «Подтвердил цены».
 - **Auth:** VK ID, Яндекс ID или почта с паролем → новый юзер выбирает `username` на `/welcome`. Регистрация по почте: письмо (24 ч) → `emailVerified` → сессия. Сброс пароля (1 ч) удаляет все сессии. Автосклейки с OAuth нет (дискриминатор — строки в `accounts`).
@@ -144,11 +183,11 @@ pnpm db:studio      # drizzle studio
 
 ## Dev-заметки
 
-- Поднять окружение: `docker compose up -d db` → `pnpm db:migrate && pnpm db:seed` → `pnpm dev`.
+- Поднять окружение: `docker compose up -d db` → `pnpm db:migrate && pnpm db:seed` → `pnpm dev`. Геокодер (адреса в «Где» и при импорте) — `YANDEX_GEOCODER_API_KEY` и `YANDEX_SUGGEST_API_KEY` в `.env`; без них работают микрорайоны, округа и геолокация.
 - Сброс dev-БД начисто: `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` + `DROP SCHEMA IF EXISTS drizzle CASCADE;` (журнал миграций живёт в схеме `drizzle`).
 - `.next/types` держит устаревшие типы удалённых роутов после dev-сервера → ложные `TS2307`; лечит `rm -rf .next/types`.
 - Перед `pnpm build` останавливать dev-сервер (общий каталог `.next`). Production-сборке нужны `DOMAIN`, `LETSENCRYPT_EMAIL`, `STORAGE_*` (env-валидация).
-- Seed создаёт: справочник сравнения (Краснодар, «Инструменты» — 10 групп, «Электровелосипеды» — 5 моделей), вне production — 8 демо-прокатов и 17 предложений (вымышленные, из макетов; одна цена старше 30 дней, один прокат только на самовывоз), и P2P-демо в Краснодаре: 5 владельцев, 20 товаров.
+- Seed создаёт: справочники (Краснодар; «Инструменты» — 9 групп, «Уборка» — 2, «Электровелосипеды» — 5 моделей; 4 округа и 30 микрорайонов; 12 брендов, 21 модель), вне production — 9 демо-прокатов и 26 предложений (вымышленные: адреса с координатами и без, прокат без местоположения, часы работы, Karcher Puzzi в разных написаниях, предложения без модели, одна цена старше 30 дней), и P2P-демо: 5 владельцев, 20 товаров.
 - Вне production seed раздаёт `ownerN@seed.local` пароль `prokat-dev-12345` и проставляет `emailVerified`. Без `SMTP_*` письма печатаются в консоль dev-сервера.
 - Проверить кабинет проката: `/api/dev/login` → заявка на `/dlya-prokatov` → `/api/dev/login?role=admin` → одобрить в `/admin/shops` → снова `/api/dev/login` → `/moy-prokat`.
 
