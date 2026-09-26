@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Б: сравнение с вкладками</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&amp;family=Unbounded:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Onest,system-ui,sans-serif;background:#EEF3F1;color:#16201D}
+a{color:#16201D}a:hover{color:#C24A06}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1900px; box-sizing: border-box; background: #EEF3F1; font-family: Onest, system-ui, sans-serif; color: #16201D; display: flex; flex-direction: column;">
+
+<div style="background: #0F3D35; padding: 0 64px 20px; display: flex; flex-direction: column; gap: 14px;">
+<div style="height: 64px; display: flex; align-items: center; gap: 24px;">
+<a href="HomeB.dc.html" style="font-family: Unbounded, Onest, sans-serif; font-weight: 700; font-size: 20px; text-decoration: none; color: #FFFFFF;">inrenta<span style="color: #FF8A3D;">.</span></a>
+<span style="font-size: 14px; color: #CFE3DD;">Краснодар</span>
+<div style="flex-grow: 1;"></div>
+<a href="Cabinet.dc.html" style="font-size: 14px; color: #CFE3DD; text-decoration: none;">Для прокатов</a>
+</div>
+<form style="background: #FFFFFF; border-radius: 14px; padding: 6px; display: flex; align-items: stretch;">
+<label for="cWhat" style="flex-grow: 1.4; flex-basis: 0; padding: 6px 16px; display: flex; flex-direction: column; gap: 1px; font-size: 11px; color: #56645F; border-right: 1px solid #DDE5E2;">Что нужно<input id="cWhat" value="Перфоратор SDS-plus" style="border: 0; padding: 0; font: 600 16px Onest, system-ui, sans-serif; color: #16201D; background: transparent;"></label>
+<label for="cDates" style="flex-grow: 1.2; flex-basis: 0; padding: 6px 16px; display: flex; flex-direction: column; gap: 1px; font-size: 11px; color: #56645F; border-right: 1px solid #DDE5E2;">Когда<input id="cDates" value="сб 27 — пн 29 сен · 2 суток" style="border: 0; padding: 0; font: 600 16px Onest, system-ui, sans-serif; color: #16201D; background: transparent;"></label>
+<label for="cWhere" style="flex-grow: 1; flex-basis: 0; padding: 6px 16px; display: flex; flex-direction: column; gap: 1px; font-size: 11px; color: #56645F;">Куда привезти<input id="cWhere" value="ФМР" style="border: 0; padding: 0; font: 600 16px Onest, system-ui, sans-serif; color: #16201D; background: transparent;"></label>
+<button type="button" style="flex-shrink: 0; padding: 0 28px; border: 0; border-radius: 10px; background: #C24A06; color: #FFFFFF; font: 600 16px Onest, system-ui, sans-serif; cursor: pointer;">Найти</button>
+</form>
+</div>
+
+<div style="padding: 24px 64px 48px; display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 28px; align-items: start;">
+
+<div style="display: flex; flex-direction: column; gap: 22px; font-size: 14px;">
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<span style="font-size: 15px; font-weight: 700;">Залог</span>
+<label for="fDep" style="display: flex; align-items: center; gap: 10px;"><input id="fDep" type="checkbox" style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">Без денежного залога</span><span style="color: #56645F;">от 1 350 ₽</span></label>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<span style="font-size: 15px; font-weight: 700;">Получение</span>
+<label for="fDel" style="display: flex; align-items: center; gap: 10px;"><input id="fDel" type="checkbox" checked style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">Привезти</span><span style="color: #56645F;">от 1 300 ₽</span></label>
+<label for="fToday" style="display: flex; align-items: center; gap: 10px;"><input id="fToday" type="checkbox" style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">Привезут сегодня</span><span style="color: #56645F;">от 1 550 ₽</span></label>
+<label for="fPick" style="display: flex; align-items: center; gap: 10px;"><input id="fPick" type="checkbox" style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">Заберу сам</span><span style="color: #56645F;">от 700 ₽</span></label>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<span style="font-size: 15px; font-weight: 700;">Прокат</span>
+<label for="fClaim" style="display: flex; align-items: center; gap: 10px;"><input id="fClaim" type="checkbox" style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">Подтвердил цены</span><span style="color: #56645F;">от 1 300 ₽</span></label>
+<label for="fOne" style="display: flex; align-items: center; gap: 10px;"><input id="fOne" type="checkbox" style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">Сдаёт от 1 суток</span><span style="color: #56645F;">от 1 300 ₽</span></label>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<span style="font-size: 15px; font-weight: 700;">Район проката</span>
+<label for="fR1" style="display: flex; align-items: center; gap: 10px;"><input id="fR1" type="checkbox" style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">ЮМР</span><span style="color: #56645F;">1 300 ₽</span></label>
+<label for="fR2" style="display: flex; align-items: center; gap: 10px;"><input id="fR2" type="checkbox" style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">ФМР</span><span style="color: #56645F;">1 350 ₽</span></label>
+<label for="fR3" style="display: flex; align-items: center; gap: 10px;"><input id="fR3" type="checkbox" style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">Фестивальный</span><span style="color: #56645F;">1 490 ₽</span></label>
+<label for="fR4" style="display: flex; align-items: center; gap: 10px;"><input id="fR4" type="checkbox" style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">Музыкальный</span><span style="color: #56645F;">1 550 ₽</span></label>
+<label for="fR5" style="display: flex; align-items: center; gap: 10px;"><input id="fR5" type="checkbox" style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">Энка</span><span style="color: #56645F;">1 700 ₽</span></label>
+<label for="fR6" style="display: flex; align-items: center; gap: 10px;"><input id="fR6" type="checkbox" style="width: 18px; height: 18px; accent-color: #0F3D35;"><span style="flex-grow: 1;">Центр</span><span style="color: #56645F;">1 800 ₽</span></label>
+</div>
+<div style="background: #FFFFFF; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+<span style="font-size: 15px; font-weight: 700;">Какой перфоратор брать</span>
+<span style="font-size: 13px; line-height: 1.5; color: #56645F;">SDS-plus (2–4 Дж) — дюбели, штробы, плитка. SDS-max (5–12 Дж) — монолит, проёмы, демонтаж.</span>
+<a href="#" style="font-size: 13px; font-weight: 600; color: #C24A06;">Подробнее</a>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<h1 style="margin: 0; font-family: Unbounded, Onest, sans-serif; font-size: 28px; font-weight: 600; letter-spacing: -0.01em;">Прокат перфоратора в Краснодаре</h1>
+<span style="font-size: 14px; color: #56645F;">8 прокатов · итог за 2 суток с доставкой в ФМР · от 1 300 до 1 800 ₽</span>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #FFFFFF; border-radius: 14px; padding: 4px; gap: 4px;">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+<button type="button" onClick="{{t.pick}}" style="{{t.style}}"><span style="{{t.labelStyle}}">{{t.label}}</span><span style="font-family: Unbounded, Onest, sans-serif; font-size: 20px; font-weight: 600;">{{t.price}}</span><span style="{{t.noteStyle}}">{{t.note}}</span></button>
+</sc-for>
+</div>
+
+<div style="background: #FFF1E6; border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; font-size: 14px;">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C24A06" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M17 7H9.5a3 3 0 0 0 0 6h5a3 3 0 0 1 0 6H6"/></svg>
+<span style="flex-grow: 1;">Нужен на неделю? У «Инструмента у дома» недельный тариф — <b style="font-weight: 700;">2 400 ₽</b> вместо 3 150 ₽ по суточной цене.</span>
+<button type="button" style="border: 0; background: none; padding: 0; font: 600 14px Onest, system-ui, sans-serif; color: #C24A06; cursor: pointer;">Посчитать на 7 дней</button>
+</div>
+
+<sc-for list="{{offers}}" as="o" hint-placeholder-count="6">
+<div style="background: #FFFFFF; border-radius: 16px; display: grid; grid-template-columns: 240px minmax(0, 1fr); box-shadow: 0 1px 2px rgba(15,61,53,0.06), 0 8px 24px -16px rgba(15,61,53,0.25); position: relative;">
+<div style="padding: 20px 22px; border-right: 2px dashed #DDE5E2; display: flex; flex-direction: column; gap: 10px;">
+<sc-if value="{{o.winner}}" hint-placeholder-val="{{false}}"><span style="align-self: flex-start; font-size: 12px; font-weight: 700; color: #C24A06;">{{o.winLabel}}</span></sc-if>
+<span style="font-family: Unbounded, Onest, sans-serif; font-size: 30px; font-weight: 600; letter-spacing: -0.01em; line-height: 1;">{{o.totalTxt}}</span>
+<span style="font-size: 12px; line-height: 1.4; color: #56645F;">{{o.sub}}</span>
+<sc-if value="{{o.hidden}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{o.show}}" style="{{o.btnStyle}}">Показать телефон</button></sc-if>
+<sc-if value="{{o.shown}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 17px; font-weight: 700;">{{o.phone}}</span><span style="font-size: 12px; color: #56645F;">Скажите, что нашли на inrenta</span></div></sc-if>
+</div>
+<div style="padding: 20px 22px; display: flex; gap: 18px; align-items: flex-start; min-width: 0;">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+<span style="font-size: 18px; font-weight: 600;">{{o.name}}</span>
+<sc-if value="{{o.claimed}}" hint-placeholder-val="{{false}}"><span style="display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: #0E6B5F; background: #DDF0EC; border-radius: 6px; padding: 2px 8px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0E6B5F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>Подтвердил цены</span></sc-if>
+</div>
+<span style="font-size: 14px; color: #56645F;">{{o.model}} · {{o.area}} · <span style="{{o.whenStyle}}">{{o.when}}</span></span>
+<div style="display: flex; gap: 6px; flex-wrap: wrap;">
+<span style="font-size: 13px; background: #EEF3F1; border-radius: 8px; padding: 4px 10px;">Залог: {{o.dep}}</span>
+<span style="{{o.minStyle}}">{{o.min}}</span>
+<span style="font-size: 13px; background: #EEF3F1; border-radius: 8px; padding: 4px 10px;">{{o.week}}</span>
+<span style="font-size: 13px; color: #56645F; padding: 4px 2px;">Цена проверена {{o.chk}}</span>
+</div>
+</div>
+<div style="width: 88px; height: 88px; border-radius: 12px; background: #EEF3F1; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; text-align: center; color: #56645F; padding: 6px; box-sizing: border-box;">[фото модели]</div>
+</div>
+<div style="position: absolute; left: 229px; top: -1px; width: 22px; height: 11px; border-radius: 0 0 11px 11px; background: #EEF3F1;"></div>
+<div style="position: absolute; left: 229px; bottom: -1px; width: 22px; height: 11px; border-radius: 11px 11px 0 0; background: #EEF3F1;"></div>
+</div>
+</sc-for>
+
+<sc-if value="{{showNoDepNote}}" hint-placeholder-val="{{false}}"><div style="font-size: 14px; color: #56645F; padding: 4px 4px 0;">Остальные 5 прокатов просят денежный залог от 1 500 до 10 000 ₽.</div></sc-if>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 8px;">
+<div style="border: 1px dashed #C9D6D1; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px;">
+<span style="font-size: 13px; font-weight: 700; color: #8A5800;">Цена на перепроверке</span>
+<span style="font-size: 15px;"><b style="font-weight: 600;">Мастерская Фёдорова</b> · 1 100 ₽ по данным 2 авг</span>
+<span style="font-size: 13px; line-height: 1.45; color: #56645F;">Не ставим в рейтинг, пока не подтвердим цену звонком.</span>
+</div>
+<div style="border: 1px dashed #C9D6D1; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px;">
+<span style="font-size: 13px; font-weight: 700; color: #56645F;">Только самовывоз</span>
+<span style="font-size: 15px;"><b style="font-weight: 600;">РемПрокат-23</b> · 700 ₽ за 2 суток</span>
+<span style="font-size: 13px; line-height: 1.45; color: #56645F;">Гидрострой. Не возят — отметьте «Заберу сам», чтобы сравнить.</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1900}}'>
+var OFFERS = [
+  {id: "a", name: "Инструмент у дома", model: "Makita HR2470", area: "ЮМР", total: 1300, sub: "900 ₽ аренда + 400 ₽ доставка", dep: "3 000 ₽", money: true, when: "привезут завтра", today: false, min: "от 1 суток", minWarn: false, week: "2 400 ₽ за неделю", chk: "18 сен", claimed: true},
+  {id: "b", name: "Бур и Молот", model: "Bosch GBH 2-26", area: "ФМР", total: 1350, sub: "1 000 ₽ аренда + 350 ₽ доставка", dep: "паспорт", money: false, when: "привезут завтра", today: false, min: "от 1 суток", minWarn: false, week: "без недельного тарифа", chk: "15 сен", claimed: false},
+  {id: "h", name: "Прокат «Кран-Балка»", model: "Зубр ЗП-26", area: "Фестивальный", total: 1490, sub: "1 140 ₽ за 3 суток (минимум) + 350 ₽", dep: "1 500 ₽", money: true, when: "привезут завтра", today: false, min: "от 3 суток", minWarn: true, week: "без недельного тарифа", chk: "16 сен", claimed: false},
+  {id: "g", name: "Дрель и Ко", model: "Metabo KHE 2660", area: "Музыкальный", total: 1550, sub: "1 100 ₽ аренда + 450 ₽ доставка", dep: "3 000 ₽", money: true, when: "сегодня до 20:00", today: true, min: "от 1 суток", minWarn: false, week: "2 800 ₽ за неделю", chk: "17 сен", claimed: false},
+  {id: "d", name: "Склад на Уральской", model: "DeWalt D25133", area: "Энка", total: 1700, sub: "1 200 ₽ аренда + 500 ₽ доставка", dep: "5 000 ₽", money: true, when: "привезут завтра", today: false, min: "от 1 суток", minWarn: false, week: "3 000 ₽ за неделю", chk: "12 сен", claimed: true},
+  {id: "f", name: "Точка инструмента", model: "Hilti TE 2", area: "Центр", total: 1800, sub: "1 800 ₽ аренда, доставка бесплатно", dep: "10 000 ₽", money: true, when: "сегодня за 2 часа", today: true, min: "от 1 суток", minWarn: false, week: "без недельного тарифа", chk: "19 сен", claimed: false}
+];
+var TABS = [
+  {label: "Самый дешёвый", win: "Самый дешёвый за ваши даты", filter: function (o) { return true; }},
+  {label: "Без денежного залога", win: "Без денежного залога — дешевле всех", filter: function (o) { return !o.money; }},
+  {label: "Привезут сегодня", win: "Сегодня — дешевле всех", filter: function (o) { return o.today; }}
+];
+function fmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₽"; }
+var CHIP = "font-size: 13px; border-radius: 8px; padding: 4px 10px; ";
+class Component extends DCLogic {
+  constructor(...args) {
+    super(...args);
+    this.state = { tab: 0, shown: {} };
+  }
+  renderVals() {
+    var self = this, s = this.state;
+    var list = OFFERS.filter(TABS[s.tab].filter).slice().sort(function (a, b) { return a.total - b.total; });
+    var tabs = TABS.map(function (t, i) {
+      var top = OFFERS.filter(t.filter).sort(function (a, b) { return a.total - b.total; })[0];
+      var on = i === s.tab;
+      return {
+        label: t.label, price: fmt(top.total), note: top.name + (i === 1 ? " · залог паспорт" : (i === 2 ? " · " + top.when : "")),
+        pick: function () { self.setState({ tab: i }); },
+        style: "border: 0; border-radius: 11px; padding: 12px 16px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 2px; font-family: Onest, system-ui, sans-serif; " + (on ? "background: #0F3D35; color: #FFFFFF;" : "background: transparent; color: #16201D;"),
+        labelStyle: "font-size: 13px; font-weight: 600; color: " + (on ? "#CFE3DD" : "#56645F") + ";",
+        noteStyle: "font-size: 12px; color: " + (on ? "#CFE3DD" : "#56645F") + ";"
+      };
+    });
+    var offers = list.map(function (o, i) {
+      var shown = !!s.shown[o.id], winner = i === 0;
+      return {
+        name: o.name, model: o.model, area: o.area, totalTxt: fmt(o.total), sub: o.sub, dep: o.dep, when: o.when,
+        whenStyle: o.today ? "color: #0E6B5F; font-weight: 600;" : "",
+        min: o.min, week: o.week, chk: o.chk, claimed: o.claimed,
+        minStyle: CHIP + (o.minWarn ? "background: #FBF0D6; color: #8A5800;" : "background: #EEF3F1;"),
+        winner: winner, winLabel: TABS[s.tab].win,
+        shown: shown, hidden: !shown,
+        phone: "+7 900 000-00-" + String(10 + o.id.charCodeAt(0) % 90),
+        btnStyle: "height: 44px; border: 0; border-radius: 10px; font: 600 15px Onest, system-ui, sans-serif; cursor: pointer; color: #FFFFFF; background: " + (winner ? "#C24A06" : "#0F3D35") + ";",
+        show: function () { var n = Object.assign({}, self.state.shown); n[o.id] = true; self.setState({ shown: n }); }
+      };
+    });
+    return { tabs: tabs, offers: offers, showNoDepNote: s.tab === 1 };
+  }
+}
+</script>
+</body>
+</html>

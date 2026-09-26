@@ -1,0 +1,87 @@
+/* inrenta — дизайн-токены (вариант Б). Подключить один раз в app/globals.css. */
+:root {
+  /* цвета */
+  --c-ground: #EEF3F1;
+  --c-surface: #FFFFFF;
+  --c-brand: #0F3D35;
+  --c-brand-text: #CFE3DD;
+  --c-ink: #16201D;
+  --c-muted: #56645F;
+  --c-line: #DDE5E2;
+  --c-line-strong: #C9D6D1;
+  --c-accent: #C24A06;
+  --c-accent-on: #FFFFFF;
+  --c-accent-bright: #FF8A3D;
+  --c-accent-soft: #FFF1E6;
+  --c-ok: #0E6B5F;
+  --c-ok-soft: #DDF0EC;
+  --c-warn: #8A5800;
+  --c-warn-soft: #FBF0D6;
+  --c-warn-line: #EBD9A8;
+  --c-photo: #DDE8E4;
+
+  /* шрифты: подключить через next/font (Unbounded 600/700, Onest 400–700, subsets: cyrillic, latin) */
+  --font-display: "Unbounded", "Onest", system-ui, sans-serif;
+  --font-text: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* радиусы */
+  --r-badge: 6px;
+  --r-chip: 8px;
+  --r-button: 10px;
+  --r-field: 12px;
+  --r-tabs: 14px;
+  --r-card: 16px;
+  --r-hero-search: 18px;
+
+  /* тени */
+  --shadow-card: 0 1px 2px rgba(15, 61, 53, 0.06), 0 8px 24px -16px rgba(15, 61, 53, 0.25);
+  --shadow-hero-search: 0 20px 40px -24px rgba(0, 0, 0, 0.5);
+
+  /* отступы (шаг 4) */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px;
+  --s-7: 28px; --s-8: 32px; --s-12: 48px; --s-16: 64px;
+
+  /* раскладка */
+  --page-gutter: 64px;
+  --filters-width: 260px;
+  --ticket-left: 240px;
+
+  color-scheme: light;
+}
+
+@media (max-width: 760px) {
+  :root { --page-gutter: 16px; }
+}
+
+/* ЧЕРНОВИК тёмной темы — в макетах её нет, перед запуском отрисовать и проверить контраст.
+   Включается по системной настройке или атрибутом data-theme="dark". */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --c-ground: #0E1412; --c-surface: #161E1B; --c-brand: #0B2E28; --c-brand-text: #A9C7BF;
+    --c-ink: #E6ECE9; --c-muted: #9DAAA4; --c-line: #26312D; --c-line-strong: #34423D;
+    --c-accent: #FF7A33; --c-accent-on: #1A0E06; --c-accent-bright: #FF8A3D; --c-accent-soft: #3A2416;
+    --c-ok: #4CC7B4; --c-ok-soft: #173430; --c-warn: #E8B04A; --c-warn-soft: #352A14; --c-warn-line: #4A3A1C;
+    --c-photo: #1D2724;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.6);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --c-ground: #0E1412; --c-surface: #161E1B; --c-brand: #0B2E28; --c-brand-text: #A9C7BF;
+  --c-ink: #E6ECE9; --c-muted: #9DAAA4; --c-line: #26312D; --c-line-strong: #34423D;
+  --c-accent: #FF7A33; --c-accent-on: #1A0E06; --c-accent-bright: #FF8A3D; --c-accent-soft: #3A2416;
+  --c-ok: #4CC7B4; --c-ok-soft: #173430; --c-warn: #E8B04A; --c-warn-soft: #352A14; --c-warn-line: #4A3A1C;
+  --c-photo: #1D2724;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.6);
+}
+
+body {
+  background: var(--c-ground);
+  color: var(--c-ink);
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.num, .price { font-variant-numeric: tabular-nums; }
+.price { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; }

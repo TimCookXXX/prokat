@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Сравнение: перфоратор</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&amp;family=Unbounded:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Onest,system-ui,sans-serif;background:#F4F6F4;color:#18211E}
+a{color:#18211E}a:hover{color:#C24A06}
+</style>
+</helmet>
+<div style="width: 1280px; height: 2600px; box-sizing: border-box; background: #F4F6F4; font-family: Onest, system-ui, sans-serif; color: #18211E; display: flex; flex-direction: column;">
+
+<div style="height: 64px; box-sizing: border-box; padding: 0 64px; background: #FFFFFF; border-bottom: 1px solid #DCE2DE; display: flex; align-items: center; gap: 24px; flex-shrink: 0;">
+<a href="Home.dc.html" style="font-family: Unbounded, Onest, sans-serif; font-weight: 700; font-size: 20px; text-decoration: none; color: #18211E;">inrenta<span style="color: #E0560B;">.</span></a>
+<span style="font-size: 14px; color: #5B6863;">Город: <b style="color: #18211E; font-weight: 600;">Краснодар</b></span>
+<div style="flex-grow: 1;"></div>
+<a href="Category.dc.html" style="font-size: 14px; color: #5B6863; text-decoration: none;">Все категории</a>
+<a href="#how" style="font-size: 14px; color: #5B6863; text-decoration: none;">Как считаем цены</a>
+<a href="Cabinet.dc.html" style="font-size: 14px; color: #5B6863; text-decoration: none;">Для прокатов</a>
+</div>
+
+<div style="padding: 24px 64px 48px; display: flex; flex-direction: column; gap: 20px;">
+<div style="font-size: 13px; color: #5B6863; display: flex; gap: 6px;">
+<a href="Home.dc.html" style="color: #5B6863; text-decoration: none;">Краснодар</a><span>/</span><a href="Category.dc.html" style="color: #5B6863; text-decoration: none;">Инструмент</a><span>/</span><span style="color: #18211E;">Перфораторы</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<h1 style="margin: 0; font-family: Unbounded, Onest, sans-serif; font-size: 38px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.15;">Прокат перфоратора в Краснодаре</h1>
+<div style="font-size: 16px; color: #5B6863;">{{lede}}</div>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; padding: 16px 20px 14px; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; justify-content: space-between; gap: 16px; font-size: 13px; color: #5B6863;">
+<span>Цена за сутки у разных прокатов: <b style="color: #18211E; font-weight: 600;">{{rangeTxt}}</b></span>
+<span>{{spreadTxt}}</span>
+</div>
+<div style="position: relative; height: 44px; margin: 0 8px;">
+<div style="position: absolute; left: 0; right: 0; top: 15px; height: 4px; border-radius: 4px; background: #E3EBE7;"></div>
+<sc-for list="{{dots}}" as="d" hint-placeholder-count="8">
+<div style="{{d.style}}"></div>
+</sc-for>
+<span style="position: absolute; left: 0; top: 28px; font-size: 12px; color: #5B6863;">{{loTxt}}</span>
+<span style="position: absolute; right: 0; top: 28px; font-size: 12px; color: #5B6863;">{{hiTxt}}</span>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start;">
+
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 20px; box-shadow: 0 6px 20px -12px rgba(24,33,30,0.18);">
+<div style="font-size: 16px; font-weight: 600;">Посчитать под свою задачу</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5B6863;">Какой нужен</span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; padding: 3px; background: #EDF1EE; border-radius: 8px;">
+<button type="button" onClick="{{pickPlus}}" style="{{plusStyle}}">SDS-plus<span style="display: block; font-size: 11px; font-weight: 400; color: #5B6863;">до 4 Дж · дюбели, штробы</span></button>
+<button type="button" onClick="{{pickMax}}" style="{{maxStyle}}">SDS-max<span style="display: block; font-size: 11px; font-weight: 400; color: #5B6863;">от 5 Дж · бетон, демонтаж</span></button>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5B6863;">На сколько дней</span>
+<div style="display: flex; align-items: center; border: 1px solid #DCE2DE; border-radius: 8px; overflow: hidden;">
+<button type="button" onClick="{{dec}}" aria-label="Меньше дней" style="width: 48px; height: 44px; border: 0; background: #EDF1EE; font-size: 20px; cursor: pointer; color: #18211E;">−</button>
+<div style="flex-grow: 1; text-align: center; font-size: 16px; font-weight: 600;">{{daysTxt}}</div>
+<button type="button" onClick="{{inc}}" aria-label="Больше дней" style="width: 48px; height: 44px; border: 0; background: #EDF1EE; font-size: 20px; cursor: pointer; color: #18211E;">+</button>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px;">
+<sc-for list="{{chips}}" as="ch" hint-placeholder-count="4">
+<button type="button" onClick="{{ch.pick}}" style="{{ch.style}}">{{ch.label}}</button>
+</sc-for>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: center; justify-content: space-between;">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5B6863;">Доставка</span>
+<button type="button" onClick="{{toggleDeliv}}" aria-label="Нужна доставка" aria-pressed="{{delivPressed}}" style="{{switchStyle}}"><span style="{{knobStyle}}"></span></button>
+</div>
+<label for="district" style="font-size: 13px; color: #5B6863;">Район</label>
+<select id="district" style="height: 44px; border: 1px solid #DCE2DE; border-radius: 8px; padding: 0 12px; font: 15px Onest, system-ui, sans-serif; background: #FFFFFF; color: #18211E;">
+<option>ФМР</option><option>ЮМР</option><option>ЧМР</option><option>КМР</option><option>Центр</option><option>Гидрострой</option><option>Музыкальный</option><option>Пашковский</option><option>Фестивальный</option><option>Энка</option>
+</select>
+</div>
+
+<div style="border-top: 1px dashed #DCE2DE; padding-top: 14px; font-size: 13px; line-height: 1.5; color: #5B6863;">Итог = аренда за ваш срок с учётом минимального срока и недельных тарифов + доставка. Залог не входит в итог — его возвращают.</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 3px;">
+<div style="font-size: 18px; font-weight: 600;">{{resTitle}}</div>
+<div style="font-size: 14px; color: #5B6863;">{{resSub}}</div>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #5B6863;">
+<label for="sortBy">Сортировка</label>
+<select id="sortBy" style="height: 36px; border: 1px solid #DCE2DE; border-radius: 8px; padding: 0 10px; font: 14px Onest, system-ui, sans-serif; background: #FFFFFF; color: #18211E;"><option>по итоговой сумме</option><option>по цене за сутки</option><option>по залогу</option></select>
+</div>
+</div>
+
+<sc-for list="{{offers}}" as="o" hint-placeholder-count="8">
+<div style="{{o.cardStyle}}">
+<div style="display: flex; gap: 24px; align-items: center;">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+<span style="font-size: 17px; font-weight: 600;">{{o.name}}</span>
+<sc-if value="{{o.isBest}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; font-weight: 600; background: #C24A06; color: #FFFFFF; border-radius: 5px; padding: 2px 8px;">Дешевле всего под ваш срок</span></sc-if>
+<sc-if value="{{o.claimed}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; font-weight: 600; background: #DDF0EC; color: #0E6B5F; border-radius: 5px; padding: 2px 8px;">Прокат подтвердил цены</span></sc-if>
+</div>
+<div style="font-size: 13px; color: #5B6863;">{{o.area}} · {{o.model}}</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px 28px;">
+<div style="display: flex; flex-direction: column; gap: 1px;"><span style="font-size: 12px; color: #5B6863;">За сутки</span><span style="font-size: 14px; font-weight: 500;">{{o.dayTxt}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 1px;"><span style="font-size: 12px; color: #5B6863;">Неделя</span><span style="font-size: 14px; font-weight: 500;">{{o.weekTxt}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 1px;"><span style="font-size: 12px; color: #5B6863;">Срок</span><span style="{{o.minStyle}}">{{o.minTxt}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 1px;"><span style="font-size: 12px; color: #5B6863;">Залог</span><span style="font-size: 14px; font-weight: 500;">{{o.dep}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 1px;"><span style="font-size: 12px; color: #5B6863;">Доставка</span><span style="{{o.delStyle}}">{{o.delTxt}}</span></div>
+</div>
+</div>
+<div style="width: 250px; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; text-align: right;">
+<div style="font-family: Unbounded, Onest, sans-serif; font-size: 24px; font-weight: 600; letter-spacing: -0.01em;">{{o.totalTxt}}</div>
+<div style="font-size: 12px; color: #5B6863;">{{o.sub}}</div>
+<sc-if value="{{o.phoneHidden}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{o.show}}" style="{{o.btnStyle}}">Показать телефон</button></sc-if>
+<sc-if value="{{o.phoneShown}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 2px; align-items: flex-end;"><span style="font-size: 17px; font-weight: 600;">{{o.phone}}</span><span style="font-size: 12px; color: #5B6863;">Скажите, что нашли цену на inrenta</span></div></sc-if>
+</div>
+</div>
+<div style="border-top: 1px solid #DCE2DE; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+<span style="{{o.chkStyle}}">{{o.chkTxt}}</span>
+<button type="button" style="border: 0; background: none; padding: 0; font: 13px Onest, system-ui, sans-serif; color: #5B6863; text-decoration: underline; cursor: pointer;">Цена устарела?</button>
+</div>
+</div>
+</sc-for>
+
+<div style="margin-top: 12px; background: #EDF1EE; border-radius: 12px; padding: 22px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<div style="font-size: 18px; font-weight: 600;">Инструмент нужен регулярно?</div>
+<div style="font-size: 14px; line-height: 1.5; color: #5B6863;">Для бригад и мастеров соберём предложения от 3 прокатов с ценой за месяц и пришлём в течение дня.</div>
+</div>
+<form style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<label for="regWhat" style="grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #5B6863;">Что нужно<input id="regWhat" value="Перфоратор SDS-max, штроборез" style="height: 42px; border: 1px solid #DCE2DE; border-radius: 8px; padding: 0 12px; font: 15px Onest, system-ui, sans-serif; color: #18211E; background: #FFFFFF;"></label>
+<label for="regFreq" style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #5B6863;">Как часто<select id="regFreq" style="height: 42px; border: 1px solid #DCE2DE; border-radius: 8px; padding: 0 10px; font: 15px Onest, system-ui, sans-serif; color: #18211E; background: #FFFFFF;"><option>Каждую неделю</option><option>2–3 раза в месяц</option><option>На объект 1–3 месяца</option></select></label>
+<label for="regPhone" style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #5B6863;">Телефон или Telegram<input id="regPhone" placeholder="+7 или @username" style="height: 42px; border: 1px solid #DCE2DE; border-radius: 8px; padding: 0 12px; font: 15px Onest, system-ui, sans-serif; color: #18211E; background: #FFFFFF;"></label>
+<button type="button" style="grid-column: 1 / -1; height: 44px; border: 0; border-radius: 8px; background: #18211E; color: #FFFFFF; font: 600 15px Onest, system-ui, sans-serif; cursor: pointer;">Собрать предложения</button>
+</form>
+</div>
+
+<div id="how" style="margin-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px;">
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<h2 style="margin: 0; font-family: Unbounded, Onest, sans-serif; font-size: 20px; font-weight: 600;">Какой перфоратор брать</h2>
+<p style="margin: 0; font-size: 15px; line-height: 1.55;">Главное — энергия удара в джоулях. От неё зависит, возьмёт ли инструмент ваш материал, и цена аренды.</p>
+<div style="display: grid; grid-template-columns: 90px 80px minmax(0, 1fr); font-size: 14px; line-height: 1.45;">
+<span style="padding: 8px 0; border-bottom: 1px solid #DCE2DE; font-size: 12px; font-weight: 600; color: #5B6863; text-transform: uppercase; letter-spacing: 0.05em;">Класс</span><span style="padding: 8px 0; border-bottom: 1px solid #DCE2DE; font-size: 12px; font-weight: 600; color: #5B6863; text-transform: uppercase; letter-spacing: 0.05em;">Энергия</span><span style="padding: 8px 0; border-bottom: 1px solid #DCE2DE; font-size: 12px; font-weight: 600; color: #5B6863; text-transform: uppercase; letter-spacing: 0.05em;">Для чего</span>
+<span style="padding: 8px 0; border-bottom: 1px solid #DCE2DE;">SDS-plus</span><span style="padding: 8px 0; border-bottom: 1px solid #DCE2DE;">2–4 Дж</span><span style="padding: 8px 0; border-bottom: 1px solid #DCE2DE;">Дюбели до 12 мм, штробы в кирпиче и газобетоне, снятие плитки</span>
+<span style="padding: 8px 0; border-bottom: 1px solid #DCE2DE;">SDS-max</span><span style="padding: 8px 0; border-bottom: 1px solid #DCE2DE;">5–12 Дж</span><span style="padding: 8px 0; border-bottom: 1px solid #DCE2DE;">Монолит, проёмы, снятие стяжки, демонтаж перегородок</span>
+</div>
+<p style="margin: 0; font-size: 15px; line-height: 1.55;">Для ремонта квартиры почти всегда хватает SDS-plus. Сносить стены или сверлить монолит — берите SDS-max, это сэкономит день работы.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 0;">
+<h2 style="margin: 0 0 8px; font-family: Unbounded, Onest, sans-serif; font-size: 20px; font-weight: 600;">Частые вопросы</h2>
+<div style="border-bottom: 1px solid #DCE2DE; padding: 12px 0; display: flex; flex-direction: column; gap: 6px;"><span style="font-weight: 600;">Почему у прокатов такие разные цены?</span><span style="font-size: 14px; line-height: 1.5; color: #5B6863;">Разный инструмент и разные условия: бесплатная доставка от суммы, минимальный срок 2–3 дня. Поэтому сравниваем итог под ваш срок, а не цену за сутки.</span></div>
+<div style="border-bottom: 1px solid #DCE2DE; padding: 12px 0;"><span style="font-weight: 600;">Что такое минимальный срок?</span></div>
+<div style="border-bottom: 1px solid #DCE2DE; padding: 12px 0;"><span style="font-weight: 600;">Нужен ли залог?</span></div>
+<div style="border-bottom: 1px solid #DCE2DE; padding: 12px 0;"><span style="font-weight: 600;">Цена не совпала с ценой по телефону</span></div>
+</div>
+</div>
+
+<div style="margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+<span style="font-size: 13px; color: #5B6863; margin-right: 4px;">Ещё в Краснодаре:</span>
+<a href="Category.dc.html" style="border: 1px solid #DCE2DE; border-radius: 20px; padding: 7px 13px; font-size: 14px; text-decoration: none; background: #FFFFFF;">Отбойный молоток</a>
+<a href="Category.dc.html" style="border: 1px solid #DCE2DE; border-radius: 20px; padding: 7px 13px; font-size: 14px; text-decoration: none; background: #FFFFFF;">Штроборез</a>
+<a href="Category.dc.html" style="border: 1px solid #DCE2DE; border-radius: 20px; padding: 7px 13px; font-size: 14px; text-decoration: none; background: #FFFFFF;">Бетономешалка</a>
+<a href="Category.dc.html" style="border: 1px solid #DCE2DE; border-radius: 20px; padding: 7px 13px; font-size: 14px; text-decoration: none; background: #FFFFFF;">Виброплита</a>
+<a href="Category.dc.html" style="border: 1px solid #DCE2DE; border-radius: 20px; padding: 7px 13px; font-size: 14px; text-decoration: none; background: #FFFFFF;">Генератор</a>
+<a href="Category.dc.html" style="border: 1px solid #DCE2DE; border-radius: 20px; padding: 7px 13px; font-size: 14px; text-decoration: none; background: #FFFFFF;">Моющий пылесос</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":2600}}'>
+var DATA = {
+  plus: [
+    {id: "a", name: "Инструмент у дома", area: "ЮМР", model: "Makita HR2470", day: 450, week: 2400, min: 1, dep: "3 000 ₽", del: {p: 400, free: 2000}, chk: "18 сен", stale: false, claimed: true},
+    {id: "b", name: "Бур и Молот", area: "ФМР", model: "Bosch GBH 2-26", day: 500, min: 1, dep: "паспорт", del: {p: 350}, chk: "15 сен", stale: false},
+    {id: "c", name: "РемПрокат-23", area: "Гидрострой", model: "Интерскол П-26", day: 350, min: 2, dep: "2 000 ₽", del: null, chk: "20 сен", stale: false},
+    {id: "d", name: "Склад на Уральской", area: "Энка", model: "DeWalt D25133", day: 600, week: 3000, min: 1, dep: "5 000 ₽", del: {p: 500, free: 3000}, chk: "12 сен", stale: false, claimed: true},
+    {id: "e", name: "Мастерская Фёдорова", area: "ЧМР", model: "Makita HR2470", day: 400, min: 1, dep: "паспорт + 2 000 ₽", del: {p: 300}, chk: "2 авг", stale: true},
+    {id: "f", name: "Точка инструмента", area: "Центр", model: "Hilti TE 2", day: 900, min: 1, dep: "10 000 ₽", del: {p: 0}, chk: "19 сен", stale: false},
+    {id: "g", name: "Дрель и Ко", area: "Музыкальный", model: "Metabo KHE 2660", day: 550, week: 2800, min: 1, dep: "3 000 ₽", del: {p: 450}, chk: "17 сен", stale: false},
+    {id: "h", name: "Прокат «Кран-Балка»", area: "Фестивальный", model: "Зубр ЗП-26", day: 380, min: 3, dep: "1 500 ₽", del: {p: 350}, chk: "16 сен", stale: false}
+  ],
+  max: [
+    {id: "i", name: "Бур и Молот", area: "ФМР", model: "Bosch GBH 8-45", day: 1200, min: 1, dep: "7 000 ₽", del: {p: 350}, chk: "15 сен", stale: false},
+    {id: "j", name: "Склад на Уральской", area: "Энка", model: "Makita HR4013", day: 1100, week: 5500, min: 1, dep: "8 000 ₽", del: {p: 500, free: 3000}, chk: "12 сен", stale: false, claimed: true},
+    {id: "k", name: "Точка инструмента", area: "Центр", model: "Hilti TE 60", day: 1800, min: 1, dep: "15 000 ₽", del: {p: 0}, chk: "19 сен", stale: false},
+    {id: "l", name: "РемПрокат-23", area: "Гидрострой", model: "Интерскол П-45", day: 900, min: 2, dep: "5 000 ₽", del: null, chk: "20 сен", stale: false},
+    {id: "m", name: "Мастерская Фёдорова", area: "ЧМР", model: "Makita HR4511", day: 1000, min: 1, dep: "паспорт + 5 000 ₽", del: {p: 300}, chk: "2 авг", stale: true}
+  ]
+};
+function fmt(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₽"; }
+function plural(n, a, b, c) { var m10 = n % 10, m100 = n % 100; if (m10 === 1 && m100 !== 11) return a; if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return b; return c; }
+function daysWord(n) { return n + " " + plural(n, "день", "дня", "дней"); }
+function calc(o, s) {
+  var d = Math.max(s.days, o.min);
+  var rent = (o.week && d >= 7) ? Math.floor(d / 7) * o.week + (d % 7) * o.day : d * o.day;
+  var deliv = 0, noDel = false;
+  if (s.deliv) { if (!o.del) { noDel = true; } else { deliv = (o.del.free && rent >= o.del.free) ? 0 : o.del.p; } }
+  return { billed: d, rent: rent, deliv: deliv, total: rent + deliv, noDel: noDel };
+}
+var SEG = "border: 0; border-radius: 6px; padding: 8px 6px; font: 14px Onest, system-ui, sans-serif; line-height: 1.25; cursor: pointer; color: #18211E; ";
+var CHIP = "border-radius: 20px; padding: 0 12px; height: 32px; font: 13px Onest, system-ui, sans-serif; cursor: pointer; background: #FFFFFF; ";
+class Component extends DCLogic {
+  constructor(...args) {
+    super(...args);
+    this.state = { cls: "plus", days: 2, deliv: true, shown: {} };
+  }
+  renderVals() {
+    var self = this, s = this.state;
+    var items = DATA[s.cls].map(function (o) { return Object.assign({}, o, { c: calc(o, s) }); });
+    var days = items.map(function (o) { return o.day; });
+    var lo = Math.min.apply(null, days), hi = Math.max.apply(null, days);
+    var pool = items.filter(function (o) { return !o.c.noDel; });
+    if (!pool.length) pool = items;
+    var best = pool.reduce(function (a, b) { return a.c.total <= b.c.total ? a : b; });
+    var worst = pool.reduce(function (a, b) { return a.c.total >= b.c.total ? a : b; });
+    items.sort(function (a, b) { return (a.c.noDel - b.c.noDel) || (a.c.total - b.c.total); });
+    var offers = items.map(function (o) {
+      var c = o.c, isBest = o.id === best.id;
+      var sub;
+      if (c.noDel) sub = "не везут — только самовывоз";
+      else sub = "аренда " + fmt(c.rent) + (c.billed > s.days ? " за " + daysWord(c.billed) : "") + (s.deliv ? " + доставка " + fmt(c.deliv) : "");
+      var delTxt = !o.del ? "только самовывоз" : (o.del.p === 0 ? "бесплатно" : fmt(o.del.p) + (o.del.free ? ", от " + fmt(o.del.free) + " — 0 ₽" : ""));
+      var shown = !!s.shown[o.id];
+      return {
+        name: o.name, area: o.area, model: o.model, claimed: !!o.claimed, isBest: isBest,
+        dayTxt: fmt(o.day), weekTxt: o.week ? fmt(o.week) : "—",
+        minTxt: o.min > 1 ? "от " + daysWord(o.min) : "от 1 дня",
+        minStyle: "font-size: 14px; font-weight: 500; color: " + (o.min > 1 ? "#8A5800" : "#18211E") + ";",
+        dep: o.dep, delTxt: delTxt,
+        delStyle: "font-size: 14px; font-weight: 500; color: " + (!o.del ? "#8A5800" : "#18211E") + ";",
+        totalTxt: fmt(c.total), sub: sub,
+        chkTxt: o.stale ? "Цена проверена " + o.chk + " — могла измениться" : "Цена проверена " + o.chk,
+        chkStyle: o.stale ? "color: #8A5800; background: #FBF0D6; border-radius: 5px; padding: 2px 8px;" : "color: #5B6863;",
+        cardStyle: "background: #FFFFFF; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; " + (isBest ? "border: 1px solid #E0560B; box-shadow: 0 0 0 1px #E0560B inset;" : "border: 1px solid #DCE2DE;") + (c.noDel ? " opacity: 0.6;" : ""),
+        btnStyle: "border: 0; border-radius: 8px; padding: 0 18px; height: 44px; font: 600 15px Onest, system-ui, sans-serif; cursor: pointer; color: #FFFFFF; background: " + (isBest ? "#C24A06" : "#18211E") + ";",
+        phoneShown: shown, phoneHidden: !shown,
+        phone: "+7 900 000-00-" + String(10 + o.id.charCodeAt(0) % 90),
+        show: function () { var n = Object.assign({}, self.state.shown); n[o.id] = true; self.setState({ shown: n }); }
+      };
+    });
+    var dots = DATA[s.cls].map(function (o) {
+      var x = hi === lo ? 50 : (o.day - lo) / (hi - lo) * 100;
+      var on = o.id === best.id;
+      return { style: "position: absolute; top: 10px; left: " + x + "%; width: 14px; height: 14px; margin-left: -7px; box-sizing: border-box; border-radius: 50%; " + (on ? "background: #E0560B; border: 2px solid #E0560B;" : "background: #FFFFFF; border: 2px solid #5B6863;") };
+    });
+    var chips = [{ d: 1, label: "1 день" }, { d: 2, label: "2 дня" }, { d: 3, label: "выходные" }, { d: 7, label: "неделя" }].map(function (ch) {
+      var on = ch.d === s.days;
+      return { label: ch.label, pick: function () { self.setState({ days: ch.d }); }, style: CHIP + (on ? "border: 1px solid #18211E; color: #18211E; font-weight: 600;" : "border: 1px solid #DCE2DE; color: #5B6863;") };
+    });
+    var on = "background: #FFFFFF; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.08);";
+    var off = "background: transparent; font-weight: 500;";
+    return {
+      lede: items.length + " " + plural(items.length, "прокат", "проката", "прокатов") + " · от " + fmt(lo) + " до " + fmt(hi) + " в сутки · цены проверены 2 авг — 20 сен",
+      rangeTxt: fmt(lo) + " — " + fmt(hi), loTxt: fmt(lo), hiTxt: fmt(hi),
+      spreadTxt: "Самый дорогой в " + (hi / lo).toFixed(1).replace(".", ",") + " раза дороже самого дешёвого",
+      dots: dots, offers: offers, chips: chips,
+      plusStyle: SEG + (s.cls === "plus" ? on : off), maxStyle: SEG + (s.cls === "max" ? on : off),
+      pickPlus: function () { self.setState({ cls: "plus", shown: {} }); },
+      pickMax: function () { self.setState({ cls: "max", shown: {} }); },
+      daysTxt: daysWord(s.days),
+      dec: function () { self.setState({ days: Math.max(1, self.state.days - 1) }); },
+      inc: function () { self.setState({ days: Math.min(30, self.state.days + 1) }); },
+      delivPressed: s.deliv ? "true" : "false",
+      toggleDeliv: function () { self.setState({ deliv: !self.state.deliv }); },
+      switchStyle: "position: relative; width: 44px; height: 26px; border: 0; border-radius: 26px; cursor: pointer; padding: 0; background: " + (s.deliv ? "#C24A06" : "#DCE2DE") + ";",
+      knobStyle: "position: absolute; top: 3px; left: " + (s.deliv ? "21px" : "3px") + "; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF;",
+      resTitle: "Итог под ваш срок: " + daysWord(s.days) + (s.deliv ? ", с доставкой в ФМР" : ", самовывоз"),
+      resSub: "Разница между самым дешёвым и самым дорогим вариантом — " + fmt(worst.c.total - best.c.total) + "."
+    };
+  }
+}
+</script>
+</body>
+</html>

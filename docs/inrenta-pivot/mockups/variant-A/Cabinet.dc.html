@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Кабинет проката</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&amp;family=Unbounded:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Onest,system-ui,sans-serif;background:#F4F6F4;color:#18211E}
+a{color:#18211E}a:hover{color:#C24A06}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1040px; box-sizing: border-box; background: #F4F6F4; font-family: Onest, system-ui, sans-serif; color: #18211E; display: flex; flex-direction: column;">
+
+<div style="height: 64px; box-sizing: border-box; padding: 0 32px; background: #18211E; color: #F4F6F4; display: flex; align-items: center; gap: 20px; flex-shrink: 0;">
+<a href="Home.dc.html" style="font-family: Unbounded, Onest, sans-serif; font-weight: 700; font-size: 20px; text-decoration: none; color: #F4F6F4;">inrenta<span style="color: #FF7A33;">.</span></a>
+<span style="font-size: 14px; color: #C9D2CD;">Кабинет проката</span>
+<div style="flex-grow: 1;"></div>
+<span style="font-size: 14px;">Инструмент у дома</span>
+<span style="font-size: 12px; font-weight: 600; background: #DDF0EC; color: #0E6B5F; border-radius: 5px; padding: 3px 8px;">Карточка подтверждена</span>
+</div>
+
+<div style="flex-grow: 1; display: flex;">
+<div style="width: 240px; flex-shrink: 0; background: #FFFFFF; border-right: 1px solid #DCE2DE; padding: 24px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px;">
+<a href="#" style="height: 40px; padding: 0 12px; border-radius: 8px; background: #EDF1EE; font-size: 15px; font-weight: 600; text-decoration: none; display: flex; align-items: center;">Цены и условия</a>
+<a href="#" style="height: 40px; padding: 0 12px; border-radius: 8px; font-size: 15px; color: #5B6863; text-decoration: none; display: flex; align-items: center;">Обращения</a>
+<a href="Shop.dc.html" style="height: 40px; padding: 0 12px; border-radius: 8px; font-size: 15px; color: #5B6863; text-decoration: none; display: flex; align-items: center;">Карточка на сайте</a>
+<a href="#" style="height: 40px; padding: 0 12px; border-radius: 8px; font-size: 15px; color: #5B6863; text-decoration: none; display: flex; align-items: center;">Оплата</a>
+<a href="#" style="height: 40px; padding: 0 12px; border-radius: 8px; font-size: 15px; color: #5B6863; text-decoration: none; display: flex; align-items: center;">Заявки в Telegram</a>
+</div>
+
+<div style="flex-grow: 1; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px; min-width: 0;">
+<div style="display: flex; justify-content: space-between; align-items: flex-end;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<h1 style="margin: 0; font-family: Unbounded, Onest, sans-serif; font-size: 28px; font-weight: 600;">Сентябрь</h1>
+<span style="font-size: 14px; color: #5B6863;">Сколько клиентов пришло к вам через inrenta</span>
+</div>
+<select aria-label="Период" style="height: 40px; border: 1px solid #DCE2DE; border-radius: 8px; padding: 0 12px; font: 14px Onest, system-ui, sans-serif; background: #FFFFFF; color: #18211E;"><option>Сентябрь 2026</option><option>Август 2026</option></select>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 6px;"><span style="font-size: 13px; color: #5B6863;">Просмотры ваших предложений</span><span style="font-family: Unbounded, Onest, sans-serif; font-size: 28px; font-weight: 600;">[1 240]</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 6px;"><span style="font-size: 13px; color: #5B6863;">Показали ваш телефон</span><span style="font-family: Unbounded, Onest, sans-serif; font-size: 28px; font-weight: 600;">[46]</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 6px;"><span style="font-size: 13px; color: #5B6863;">Звонки длиннее 30 секунд</span><span style="font-family: Unbounded, Onest, sans-serif; font-size: 28px; font-weight: 600;">[31]</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 6px;"><span style="font-size: 13px; color: #5B6863;">Заявки от бригад</span><span style="font-family: Unbounded, Onest, sans-serif; font-size: 28px; font-weight: 600;">[5]</span></div>
+</div>
+
+<div style="background: #FBF0D6; border: 1px solid #EBD9A8; border-radius: 10px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 14px;">
+<span>Цены обновлены 18 сен. Без обновления до 18 окт они получат пометку «могла измениться».</span>
+<span style="font-weight: 600; color: #8A5800;">Осталось 25 дней</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; justify-content: space-between; align-items: center;">
+<h2 style="margin: 0; font-size: 20px; font-weight: 600;">Ваши цены</h2>
+<button type="button" style="height: 40px; padding: 0 16px; border: 1px solid #DCE2DE; border-radius: 8px; background: #FFFFFF; font: 600 14px Onest, system-ui, sans-serif; color: #18211E; cursor: pointer;">Добавить инструмент</button>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; overflow: hidden;">
+<div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) 120px 120px 110px minmax(0, 1.2fr); background: #EDF1EE; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #5B6863;">
+<div style="padding: 12px 16px;">Инструмент</div><div style="padding: 12px 16px;">Модель</div><div style="padding: 12px 16px;">₽ / сутки</div><div style="padding: 12px 16px;">₽ / неделя</div><div style="padding: 12px 16px;">Залог, ₽</div><div style="padding: 12px 16px;">Ваше место</div>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) 120px 120px 110px minmax(0, 1.2fr); border-top: 1px solid #DCE2DE; align-items: center; font-size: 15px;">
+<div style="padding: 12px 16px; font-weight: 600;">Перфоратор SDS-plus</div><div style="padding: 12px 16px; color: #5B6863;">Makita HR2470</div>
+<div style="padding: 8px 16px;"><label for="p1d" style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Цена за сутки</label><input id="p1d" value="450" style="width: 88px; height: 36px; box-sizing: border-box; border: 1px solid #DCE2DE; border-radius: 6px; padding: 0 10px; font: 15px Onest, system-ui, sans-serif; color: #18211E;"></div>
+<div style="padding: 8px 16px;"><label for="p1w" style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Цена за неделю</label><input id="p1w" value="2400" style="width: 88px; height: 36px; box-sizing: border-box; border: 1px solid #DCE2DE; border-radius: 6px; padding: 0 10px; font: 15px Onest, system-ui, sans-serif; color: #18211E;"></div>
+<div style="padding: 12px 16px;">3 000</div>
+<div style="padding: 12px 16px;"><span style="font-weight: 600;">2-е из 8</span><span style="display: block; font-size: 13px; color: #5B6863;">до 1-го места — 200 ₽</span></div>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) 120px 120px 110px minmax(0, 1.2fr); border-top: 1px solid #DCE2DE; align-items: center; font-size: 15px;">
+<div style="padding: 12px 16px; font-weight: 600;">Отбойный молоток до 20 Дж</div><div style="padding: 12px 16px; color: #5B6863;">Makita HM1203C</div>
+<div style="padding: 8px 16px;"><label for="p2d" style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Цена за сутки</label><input id="p2d" value="1000" style="width: 88px; height: 36px; box-sizing: border-box; border: 1px solid #DCE2DE; border-radius: 6px; padding: 0 10px; font: 15px Onest, system-ui, sans-serif; color: #18211E;"></div>
+<div style="padding: 8px 16px;"><label for="p2w" style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Цена за неделю</label><input id="p2w" value="5000" style="width: 88px; height: 36px; box-sizing: border-box; border: 1px solid #DCE2DE; border-radius: 6px; padding: 0 10px; font: 15px Onest, system-ui, sans-serif; color: #18211E;"></div>
+<div style="padding: 12px 16px;">5 000</div>
+<div style="padding: 12px 16px;"><span style="font-weight: 600;">1-е из 6</span><span style="display: block; font-size: 13px; color: #0E6B5F;">самый выгодный</span></div>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) 120px 120px 110px minmax(0, 1.2fr); border-top: 1px solid #DCE2DE; align-items: center; font-size: 15px;">
+<div style="padding: 12px 16px; font-weight: 600;">Бетономешалка свыше 160 л</div><div style="padding: 12px 16px; color: #5B6863;">Лебедянь СБР-180</div>
+<div style="padding: 8px 16px;"><label for="p3d" style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Цена за сутки</label><input id="p3d" value="650" style="width: 88px; height: 36px; box-sizing: border-box; border: 1px solid #DCE2DE; border-radius: 6px; padding: 0 10px; font: 15px Onest, system-ui, sans-serif; color: #18211E;"></div>
+<div style="padding: 8px 16px;"><label for="p3w" style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Цена за неделю</label><input id="p3w" placeholder="—" style="width: 88px; height: 36px; box-sizing: border-box; border: 1px solid #DCE2DE; border-radius: 6px; padding: 0 10px; font: 15px Onest, system-ui, sans-serif; color: #18211E;"></div>
+<div style="padding: 12px 16px;">3 000</div>
+<div style="padding: 12px 16px;"><span style="font-weight: 600;">3-е из 7</span></div>
+</div>
+</div>
+<div style="display: flex; gap: 12px; align-items: center;">
+<button type="button" style="height: 44px; padding: 0 20px; border: 0; border-radius: 8px; background: #C24A06; color: #FFFFFF; font: 600 15px Onest, system-ui, sans-serif; cursor: pointer;">Сохранить цены</button>
+<span style="font-size: 13px; color: #5B6863;">Изменения появятся в сравнении сразу, дата проверки обновится.</span>
+</div>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #DCE2DE; border-radius: 12px; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; gap: 20px;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 16px; font-weight: 600;">Сейчас — бесплатно</span>
+<span style="font-size: 14px; color: #5B6863;">С [даты] — [цена] ₽ за звонок длиннее 30 секунд. Записи звонков — в разделе «Обращения».</span>
+</div>
+<a href="#" style="font-size: 14px; font-weight: 600; color: #C24A06; flex-shrink: 0;">Условия оплаты</a>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
