@@ -6,24 +6,31 @@ import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatRub, type Rub } from "@/lib/compare/pricing";
 import {
-  activeFilterCount, compareHref, patchParams, type CompareParams, type ParamsPatch,
+  activeFilterCount, patchParams, resultHref, type ParamsPatch, type ResultParams,
 } from "@/lib/compare/scenario";
 import type { FilterPrices } from "@/lib/compare/view";
+import type { TabId } from "@/lib/compare/ranking";
 import { Modal, ModalContent, ModalTitle } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/button";
 
 interface Props {
-  citySlug: string;
-  groupSlug: string;
-  params: CompareParams;
+  /** Путь страницы выдачи — параметры фильтров дописываются к нему. */
+  path: string;
+  params: ResultParams;
   prices: FilterPrices;
+  /** Фильтр по модели — только при поиске по классу (на странице модели он не нужен). */
+  showModels?: boolean;
+  /** Вкладка выдачи — цены у фильтров считаются для неё. */
+  activeTab: TabId;
+  /** Префикс id: панель рисуется дважды (сбоку и в листе на телефоне) — id не должны совпадать. */
+  idPrefix?: string;
   guide?: { title: string; text: string } | null;
 }
 
-// Боковая панель фильтров (DESIGN_SYSTEM → FiltersSidebar): у каждого варианта —
-// минимальный итог при этом фильтре. Изменение сразу уходит в URL; сервер
+// Боковая панель фильтров (ТЗ, п. 5.6): у каждого варианта — минимальный итог при
+// этом фильтре; фильтры сочетаются по «И». Изменение сразу уходит в URL; сервер
 // пересчитывает выдачу. Состояние отмечаем локально, чтобы галочка не ждала сети.
-export function FiltersPanel({ citySlug, groupSlug, params, prices, guide, className }: Props & { className?: string }) {
+export function FiltersPanel({ path, params, prices, showModels = true, activeTab, idPrefix = "f", guide, className }: Props & { className?: string }) {
   const router = useRouter();
   const [local, setLocal] = useState(params);
   const [pending, start] = useTransition();
@@ -32,44 +39,50 @@ export function FiltersPanel({ citySlug, groupSlug, params, prices, guide, class
   const apply = (patch: ParamsPatch) => {
     const next = patchParams(local, patch);
     setLocal(next);
-    start(() => router.replace(compareHref(citySlug, groupSlug, next) as never, { scroll: false }));
+    start(() => router.replace(resultHref(path, next) as never, { scroll: false }));
   };
   const f = local.filters;
+  // Цена у варианта — итог первой карточки после его применения; на «Самом дешёвом»
+  // это и минимальный итог, поэтому «от».
+  const fromLabel = activeTab === "cheapest";
 
   return (
     <div className={cn("flex flex-col gap-[22px] text-sm transition-opacity", pending && "opacity-70", className)}>
       <Group title="Залог">
-        <Row id="f-nodep" label="Без денежного залога" price={prices.noMoneyDeposit} from
+        <Row id={`${idPrefix}-nodep`} label="Без денежного залога" price={prices.noMoneyDeposit} from={fromLabel}
           checked={f.noMoneyDeposit} onChange={(v) => apply({ filters: { noMoneyDeposit: v } })} />
       </Group>
 
-      <Group title="Получение">
-        <Row id="f-delivery" type="radio" name="getting" label="Привезти" price={prices.delivery} from
-          checked={!local.pickup} onChange={() => apply({ pickup: false })} />
-        <Row id="f-today" label="Привезут сегодня" price={prices.sameDay} from disabled={local.pickup}
-          checked={f.sameDay && !local.pickup} onChange={(v) => apply({ filters: { sameDay: v } })} />
-        <Row id="f-pickup" type="radio" name="getting" label="Заберу сам" price={prices.pickup} from
-          checked={local.pickup} onChange={() => apply({ pickup: true, filters: { sameDay: false } })} />
-      </Group>
-
       <Group title="Прокат">
-        <Row id="f-claimed" label="Подтвердил цены" price={prices.claimed} from
+        <Row id={`${idPrefix}-claimed`} label="Подтвердил цены" price={prices.claimed} from={fromLabel}
           checked={f.claimed} onChange={(v) => apply({ filters: { claimed: v } })} />
-        <Row id="f-min1" label="Сдаёт от 1 суток" price={prices.oneDay} from
+        <Row id={`${idPrefix}-min1`} label="Сдаёт от 1 суток" price={prices.oneDay} from={fromLabel}
           checked={f.oneDay} onChange={(v) => apply({ filters: { oneDay: v } })} />
+        <Row id={`${idPrefix}-open`} label="Работает сегодня" price={prices.openToday} from={fromLabel}
+          checked={f.openToday} onChange={(v) => apply({ filters: { openToday: v } })} />
       </Group>
 
-      {prices.areas.length > 1 && (
-        <Group title="Район проката">
-          {prices.areas.map((a, i) => (
-            <Row key={a.name} id={`f-area-${i}`} label={a.name} price={a.min}
-              checked={f.areas.includes(a.name)}
+      {showModels && prices.models.length > 1 && (
+        <Group title="Модель">
+          {prices.models.map((m, i) => (
+            <Row key={m.slug} id={`${idPrefix}-model-${i}`} label={m.name} hint={`${m.count}`} price={m.min} from={fromLabel}
+              checked={f.models.includes(m.slug)}
               onChange={(v) => apply({
-                filters: { areas: v ? [...f.areas, a.name] : f.areas.filter((x) => x !== a.name) },
+                filters: { models: v ? [...f.models, m.slug] : f.models.filter((x) => x !== m.slug) },
               })} />
           ))}
         </Group>
       )}
+
+      <Group title="Округ">
+        {prices.okrugs.map((o, i) => (
+          <Row key={o.slug} id={`${idPrefix}-okrug-${i}`} label={o.name.replace(" округ", "")} price={o.min} from={fromLabel}
+            checked={f.okrugs.includes(o.slug)}
+            onChange={(v) => apply({
+              filters: { okrugs: v ? [...f.okrugs, o.slug] : f.okrugs.filter((x) => x !== o.slug) },
+            })} />
+        ))}
+      </Group>
 
       {guide && (
         <div className="flex flex-col gap-2 rounded-tabs bg-card p-4">
@@ -91,10 +104,12 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 }
 
 function Row({
-  id, label, price, from = false, checked, onChange, type = "checkbox", name, disabled = false,
+  id, label, hint, price, from = false, checked, onChange, type = "checkbox", name, disabled = false,
 }: {
   id: string;
   label: string;
+  /** Число предложений рядом с названием: «Makita HR2470 · 3». */
+  hint?: string;
   price: Rub | null;
   /** «от 1 350 ₽» вместо просто суммы. */
   from?: boolean;
@@ -122,7 +137,10 @@ function Row({
         onChange={(e) => onChange(e.target.checked)}
         className="h-[18px] w-[18px] shrink-0 accent-primary"
       />
-      <span className="flex-1">{label}</span>
+      <span className="min-w-0 flex-1">
+        {label}
+        {hint && <span className="text-muted-foreground"> · {hint}</span>}
+      </span>
       <span className="tabular-nums text-muted-foreground">
         {empty ? "нет" : `${from ? "от " : ""}${formatRub(price)}`}
       </span>
@@ -133,7 +151,7 @@ function Row({
 /** Телефон: «Фильтры · N» открывает панель полноэкранным листом. */
 export function FiltersSheet(props: Props & { summary: string }) {
   const [open, setOpen] = useState(false);
-  const n = activeFilterCount(props.params.filters) + (props.params.pickup ? 1 : 0);
+  const n = activeFilterCount(props.params.filters);
   return (
     <div className="flex items-center gap-2 md:hidden">
       <Modal open={open} onOpenChange={setOpen}>
@@ -147,7 +165,7 @@ export function FiltersSheet(props: Props & { summary: string }) {
         </button>
         <ModalContent className="md:max-w-md">
           <ModalTitle className="mb-4 font-display text-lg font-semibold">Фильтры</ModalTitle>
-          <FiltersPanel {...props} />
+          <FiltersPanel {...props} idPrefix="fm" />
           <Button className="mt-5 w-full" onClick={() => setOpen(false)}>Показать</Button>
         </ModalContent>
       </Modal>

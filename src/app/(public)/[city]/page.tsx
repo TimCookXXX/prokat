@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const cityIn = `в ${city.namePrepositional ?? city.name}`;
   return {
     title: seo.titleTemplate(`Сравнение цен прокатов ${cityIn}`),
-    description: `Цены и условия прокатов ${cityIn}: итог за ваши даты с доставкой, залог и дата проверки каждой цены.`,
+    description: `Цены и условия прокатов ${cityIn}: итог за ваши даты, расстояние до проката, залог и дата проверки каждой цены.`,
     alternates: { canonical: `${siteConfig.url}/${city.slug}` },
   };
 }

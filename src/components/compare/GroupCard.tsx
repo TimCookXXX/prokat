@@ -56,3 +56,33 @@ export function GroupCard({ group, href }: { group: NavGroup; href: string }) {
     </Link>
   );
 }
+
+/** Карточка популярной модели: как у группы, но с моделью и её ценой «от». */
+export function ModelCard({
+  title, groupSlug, shops, fromDay, href,
+}: {
+  title: string;
+  groupSlug: string;
+  shops: number;
+  fromDay: number | null;
+  href: string;
+}) {
+  const Icon = groupIcon(groupSlug);
+  return (
+    <Link href={href as never} className="flex items-center gap-3.5 rounded-lg bg-card p-3.5 shadow-card transition-transform hover:-translate-y-0.5">
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-field bg-photo text-primary/70">
+        <Icon className="h-6 w-6" strokeWidth={1.5} aria-hidden="true" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-[15px] font-semibold">{title}</span>
+        <span className="text-[13px] text-muted-foreground">{shopsLabel(shops)}</span>
+      </span>
+      {fromDay != null && (
+        <span className="flex shrink-0 flex-col items-end">
+          <span className="text-xs text-muted-foreground">от</span>
+          <span className="price text-base">{formatRub(fromDay)}</span>
+        </span>
+      )}
+    </Link>
+  );
+}

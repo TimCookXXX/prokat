@@ -6,7 +6,10 @@ import {
 } from "@/server/catalog";
 import { listingPath } from "@/lib/catalog/listing-path";
 import { isP2PEnabled } from "@/lib/features";
-import { getGroupsWithOffers } from "@/server/compare";
+import { getGroupsWithOffers, getModelsWithOffers } from "@/server/compare";
+import { addDaysStr } from "@/lib/catalog/dates";
+import { STALE_AFTER_DAYS } from "@/lib/compare/config";
+import { localToday } from "@/lib/compare/scenario";
 import { getCityShops } from "@/server/shops";
 import { SHOPS_SEGMENT } from "@/lib/compare/catalog-data";
 import { getDb } from "@/lib/db";
@@ -27,7 +30,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Сравнение: города, категории и группы с ценами, прокаты. Пустые группы
   // («цены собираем») в индекс не отдаём.
-  const groups = await getGroupsWithOffers();
+  const [groups, models] = await Promise.all([
+    getGroupsWithOffers(),
+    getModelsWithOffers(addDaysStr(localToday(), -STALE_AFTER_DAYS)),
+  ]);
   const groupCategory = new Map((await getDb()
     .select({ group: itemGroups.slug, category: categories.slug })
     .from(itemGroups).innerJoin(categories, eq(categories.id, itemGroups.categoryId)))
@@ -41,6 +47,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
     for (const g of cityGroups) {
       out.push({ url: `${base}/${city.slug}/${g.groupSlug}`, changeFrequency: "daily", priority: 0.9 });
+    }
+    for (const m of models.filter((x) => x.citySlug === city.slug)) {
+      out.push({ url: `${base}/${city.slug}/${m.seoWord}-${m.modelSlug}`, changeFrequency: "weekly", priority: 0.7 });
     }
     out.push({ url: `${base}/${city.slug}/${SHOPS_SEGMENT}`, changeFrequency: "weekly", priority: 0.5 });
     for (const shop of await getCityShops(city.id)) {

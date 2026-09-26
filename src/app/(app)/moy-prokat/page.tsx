@@ -59,10 +59,9 @@ export default async function ShopCabinetPage({ searchParams }: { searchParams: 
     city ? getCompareCatalog(city.id, addDaysStr(today, -STALE_AFTER_DAYS)) : [],
   ]);
   const byClass = city ? await getCityOffersByClass(city.id, [...new Set(rows.map((r) => r.cls.id))]) : new Map();
-  const scenario = { days: 1, needDelivery: true };
 
   const editable: EditableOffer[] = rows.map((r) => {
-    const p = r.isActive ? placeInComparison(byClass.get(r.cls.id) ?? [], r.offer.id, scenario, today) : null;
+    const p = r.isActive ? placeInComparison(byClass.get(r.cls.id) ?? [], r.offer.id, 1, today) : null;
     const gap = p?.kind === "ranked" && p.place > 1 ? ` · до 1-го места — ${formatRub(p.gapToFirst)}` : p?.kind === "ranked" ? " · самый выгодный" : "";
     const o = r.offer;
     return {

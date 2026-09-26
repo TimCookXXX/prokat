@@ -5,7 +5,7 @@ import type { RentalShop } from "@/server/compare";
 import { getCityOffersByClass, getShopOffers, type ShopOfferRow } from "@/server/shops";
 import { formatRub } from "@/lib/compare/pricing";
 import { deliverySummary, depositSummary, placeInComparison, placeLabel, type Place } from "@/lib/compare/view";
-import { compareHref, defaultDates, localToday, parseCompareParams, patchParams } from "@/lib/compare/scenario";
+import { emptyParams, groupPath, localToday, patchParams, resultHref } from "@/lib/compare/scenario";
 import { daysLabel, shortDate } from "@/lib/compare/format";
 import { ruPlural } from "@/lib/plural";
 import { buildBreadcrumbJsonLd, type JsonLd as LdObject } from "@/lib/jsonld";
@@ -22,18 +22,13 @@ export async function ShopPage({ city, shop }: { city: City; shop: RentalShop })
   const rows = await getShopOffers(shop);
   const byClass = await getCityOffersByClass(city.id, [...new Set(rows.map((r) => r.cls.id))]);
   const offers = rows.map((r) => r.offer);
-  // Место — по итогу за 1 сутки с доставкой; не возят — при самовывозе.
-  const delivery = { days: 1, needDelivery: true };
-  const place = (r: ShopOfferRow): { p: Place | null; pickup: boolean } => {
-    const p = placeInComparison(byClass.get(r.cls.id) ?? [], r.offer.id, delivery, today);
-    if (p?.kind !== "pickupOnly") return { p, pickup: false };
-    return { p: placeInComparison(byClass.get(r.cls.id) ?? [], r.offer.id, { ...delivery, needDelivery: false }, today), pickup: true };
-  };
+  // Место — по итогу за 1 сутки среди предложений класса в городе.
+  const place = (r: ShopOfferRow): Place | null => placeInComparison(byClass.get(r.cls.id) ?? [], r.offer.id, 1, today);
   const lastChecked = offers.map((o) => o.verifiedAt).sort().at(-1);
   const minDays = offers.length ? Math.min(...offers.map((o) => o.minDays)) : null;
   const classes = new Set(rows.map((r) => r.cls.id)).size;
   const claimed = shop.status === "claimed";
-  const defaults = parseCompareParams(defaultDates(today), today);
+  const defaults = emptyParams(today);
   const cityIn = `в ${city.namePrepositional ?? city.name}`;
 
   const facts: [string, string][] = [
@@ -74,7 +69,7 @@ export async function ShopPage({ city, shop }: { city: City; shop: RentalShop })
             {claimed && <ClaimedBadge />}
           </div>
           <p className="text-sm text-muted-foreground">
-            Прокат {cityIn}{shop.district ? ` · ${shop.district}` : ""}{shop.address ? `, ${shop.address}` : ""}
+            Прокат {cityIn}{shop.microdistrict ? ` · ${shop.microdistrict.name}` : ""}{shop.address ? `, ${shop.address}` : ""}
           </p>
           <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {facts.map(([k, v]) => (
@@ -134,8 +129,8 @@ export async function ShopPage({ city, shop }: { city: City; shop: RentalShop })
               </thead>
               <tbody className="max-md:block">
                 {rows.map((r) => {
-                  const { p, pickup } = place(r);
-                  const href = compareHref(city.slug, r.group.slug, patchParams(defaults, { classSlug: r.cls.slug, pickup }));
+                  const p = place(r);
+                  const href = resultHref(groupPath(city.slug, r.group.slug), patchParams(defaults, { classSlug: r.cls.slug }));
                   return (
                     <tr key={r.offer.id} className="border-b border-border last:border-0 max-md:grid max-md:grid-cols-2 max-md:gap-x-3 max-md:gap-y-1 max-md:px-4 max-md:py-3">
                       <td className="px-4 py-3 font-semibold max-md:col-span-2 max-md:p-0">
@@ -144,7 +139,7 @@ export async function ShopPage({ city, shop }: { city: City; shop: RentalShop })
                       <td className="px-4 py-3 text-muted-foreground max-md:col-span-2 max-md:p-0">{r.offer.model ?? "—"}</td>
                       <td className="price px-4 py-3 text-right max-md:p-0 max-md:text-left">{r.offer.priceDay != null ? formatRub(r.offer.priceDay) : "—"}<span className="font-text font-normal text-muted-foreground md:hidden"> / сутки</span></td>
                       <td className="price px-4 py-3 text-right max-md:p-0">{r.offer.priceWeek ? formatRub(r.offer.priceWeek) : "—"}<span className="font-text font-normal text-muted-foreground md:hidden"> / неделя</span></td>
-                      <td className="px-4 py-3 max-md:p-0">{placeLabel(p)}{pickup && p?.kind === "ranked" ? " при самовывозе" : ""}</td>
+                      <td className="px-4 py-3 max-md:p-0">{placeLabel(p)}</td>
                       <td className="px-4 py-3 text-muted-foreground max-md:p-0 max-md:text-right">{shortDate(r.offer.verifiedAt)}</td>
                     </tr>
                   );
@@ -154,7 +149,7 @@ export async function ShopPage({ city, shop }: { city: City; shop: RentalShop })
           </div>
         )}
         <p className="text-[13px] text-muted-foreground">
-          Место считаем по итогу за 1 сутки с доставкой; если прокат не возит — при самовывозе.{" "}
+          Место считаем по итогу за 1 сутки среди всех прокатов города.{" "}
           <Link href="/kak-schitaem-ceny" className="text-accent hover:underline">Как считаем цены</Link>
         </p>
       </section>

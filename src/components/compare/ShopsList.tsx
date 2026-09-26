@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ruPlural } from "@/lib/plural";
 import type { City } from "@/server/catalog";
 import { getCityShops } from "@/server/shops";
 import { SHOPS_SEGMENT } from "@/lib/compare/catalog-data";
@@ -28,7 +29,7 @@ export async function ShopsList({ city }: { city: City }) {
             >
               <span className="flex flex-wrap items-center gap-2 font-semibold">{s.name}{s.claimed && <ClaimedBadge />}</span>
               <span className="text-sm text-muted-foreground">
-                {[s.district, s.offers ? `${s.offers} цен в сравнении` : "цен пока нет"].filter(Boolean).join(" · ")}
+                {[s.district, s.offers ? `${s.offers} ${ruPlural(s.offers, "цена", "цены", "цен")} в сравнении` : "цен пока нет"].filter(Boolean).join(" · ")}
               </span>
             </Link>
           </li>

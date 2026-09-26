@@ -3,9 +3,9 @@ import { cn } from "@/lib/utils";
 import { formatRub } from "@/lib/compare/pricing";
 import type { TabSummary } from "@/lib/compare/view";
 
-// Три вкладки: «Самый дешёвый · Без денежного залога · Привезут сегодня».
-// Вкладка — фильтр + сортировка по итогу; в каждой — цена лучшего и кто это.
-// Ссылки, а не кнопки: выбор живёт в URL и открывается той же выдачей.
+// Вкладки «Оптимальный · Самый дешёвый · Ближе всего» (ТЗ, п. 5.2): у города —
+// две, у округа третья — «Сначала в вашем округе». В каждой — итог лучшего
+// варианта и его прокат. Ссылки, а не кнопки: выбор живёт в URL.
 export function ResultTabs({
   tabs,
   current,
@@ -16,7 +16,13 @@ export function ResultTabs({
   hrefFor: Record<string, string>;
 }) {
   return (
-    <nav aria-label="Как сравнивать" className="grid grid-cols-3 gap-1 rounded-tabs bg-card p-1 max-md:gap-2 max-md:bg-transparent max-md:p-0">
+    <nav
+      aria-label="Как сравнивать"
+      className={cn(
+        "grid gap-1 rounded-tabs bg-card p-1 max-md:gap-2 max-md:bg-transparent max-md:p-0",
+        tabs.length === 3 ? "grid-cols-3" : "grid-cols-2",
+      )}
+    >
       {tabs.map((t) => {
         const on = t.id === current;
         return (
@@ -37,7 +43,7 @@ export function ResultTabs({
             </span>
             <span className="price text-[17px] md:text-xl">{t.best ? formatRub(t.best.total) : "—"}</span>
             <span className={cn("truncate text-xs max-md:hidden", on ? "text-primary-foreground/80" : "text-muted-foreground")}>
-              {t.note ?? "нет предложений"}
+              {t.best?.offer.shopName ?? "нет предложений"}
             </span>
           </Link>
         );

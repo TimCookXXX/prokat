@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { authPanelProps } from "@/lib/auth/panel-props";
 import { getActiveCities, getCityBySlug, getRecentListings } from "@/server/catalog";
 import { DEFAULT_CITY_SLUG } from "@/lib/compare/catalog-data";
+import { siteConfig } from "@/lib/site-config";
 import { isP2PEnabled } from "@/lib/features";
 import { CityHome } from "@/components/compare/CityHome";
 import { RecentItems } from "@/components/home/RecentItems";
@@ -16,6 +17,8 @@ export const metadata: Metadata = {
   // layout и имя задвоится.
   title: { absolute: seo.defaultTitle },
   description: seo.defaultDescription,
+  // Главная показывает то же, что /{город по умолчанию} — канонический адрес там.
+  alternates: { canonical: `${siteConfig.url}/${DEFAULT_CITY_SLUG}` },
 };
 
 // Главная — сравнение прокатов в городе по умолчанию (Краснодар). P2P-контур,

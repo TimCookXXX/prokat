@@ -8,7 +8,7 @@ import {
   cities, itemClasses, itemGroups, leadEvents, offers, regularRequests, rentalShops, shopClaims, users,
 } from "@db/schema";
 import type { CompareOffer } from "@/lib/compare/view";
-import { toCompareOffer, type RentalShop } from "@/server/compare";
+import { shopMd, shopOkrug, shopPlaceCols, toCompareOffer, withPlace, type RentalShop } from "@/server/compare";
 
 export interface ShopOfferRow {
   offer: CompareOffer;
@@ -39,16 +39,19 @@ export async function getCityOffersByClass(cityId: string, classIds: string[]): 
   const out = new Map<string, CompareOffer[]>();
   if (classIds.length === 0) return out;
   const rows = await getDb()
-    .select({ offer: offers, shop: rentalShops })
+    .select({ offer: offers, shop: rentalShops, ...shopPlaceCols })
     .from(offers)
     .innerJoin(rentalShops, eq(rentalShops.id, offers.shopId))
+    .leftJoin(shopMd, eq(shopMd.id, rentalShops.microdistrictId))
+    .leftJoin(shopOkrug, eq(shopOkrug.id, rentalShops.okrugId))
     .where(and(
       eq(rentalShops.cityId, cityId), ne(rentalShops.status, "hidden"),
       eq(offers.isActive, true), inArray(offers.itemClassId, classIds),
     ));
-  for (const { offer, shop } of rows) {
+  for (const r of rows) {
+    const { offer } = r;
     const list = out.get(offer.itemClassId) ?? [];
-    list.push(toCompareOffer(offer, shop));
+    list.push(toCompareOffer(offer, withPlace(r)));
     out.set(offer.itemClassId, list);
   }
   return out;
@@ -67,37 +70,42 @@ export async function getCityShops(cityId: string): Promise<CityShopRow[]> {
     .select({
       slug: rentalShops.slug,
       name: rentalShops.name,
-      district: rentalShops.district,
+      district: shopMd.name,
       status: rentalShops.status,
       offers: sql<number>`count(${offers.id}) filter (where ${offers.isActive})::int`,
     })
     .from(rentalShops)
     .leftJoin(offers, eq(offers.shopId, rentalShops.id))
+    .leftJoin(shopMd, eq(shopMd.id, rentalShops.microdistrictId))
     .where(and(eq(rentalShops.cityId, cityId), ne(rentalShops.status, "hidden")))
-    .groupBy(rentalShops.id)
+    .groupBy(rentalShops.id, shopMd.name)
     .orderBy(asc(rentalShops.name));
   return rows.map((r) => ({ slug: r.slug, name: r.name, district: r.district, claimed: r.status === "claimed", offers: r.offers }));
 }
 
 export async function getShopById(id: string): Promise<(RentalShop & { citySlug: string }) | null> {
   const [row] = await getDb()
-    .select({ shop: rentalShops, citySlug: cities.slug })
+    .select({ shop: rentalShops, citySlug: cities.slug, ...shopPlaceCols })
     .from(rentalShops)
     .innerJoin(cities, eq(cities.id, rentalShops.cityId))
+    .leftJoin(shopMd, eq(shopMd.id, rentalShops.microdistrictId))
+    .leftJoin(shopOkrug, eq(shopOkrug.id, rentalShops.okrugId))
     .where(eq(rentalShops.id, id))
     .limit(1);
-  return row ? { ...row.shop, citySlug: row.citySlug } : null;
+  return row ? { ...withPlace(row), citySlug: row.citySlug } : null;
 }
 
 /** Подтверждённые прокаты юзера (кабинет проката). */
 export async function getOwnedShops(userId: string): Promise<(RentalShop & { citySlug: string })[]> {
   const rows = await getDb()
-    .select({ shop: rentalShops, citySlug: cities.slug })
+    .select({ shop: rentalShops, citySlug: cities.slug, ...shopPlaceCols })
     .from(rentalShops)
     .innerJoin(cities, eq(cities.id, rentalShops.cityId))
+    .leftJoin(shopMd, eq(shopMd.id, rentalShops.microdistrictId))
+    .leftJoin(shopOkrug, eq(shopOkrug.id, rentalShops.okrugId))
     .where(and(eq(rentalShops.ownerUserId, userId), eq(rentalShops.status, "claimed")))
     .orderBy(asc(rentalShops.name));
-  return rows.map((r) => ({ ...r.shop, citySlug: r.citySlug }));
+  return rows.map((r) => ({ ...withPlace(r), citySlug: r.citySlug }));
 }
 
 export async function userOwnsShop(userId: string): Promise<boolean> {
@@ -134,8 +142,9 @@ export async function getUserClaims(userId: string): Promise<(ShopClaim & { name
 /** Прокаты города, которые ещё можно подтвердить — для формы заявки. */
 export async function getClaimableShops(cityId: string): Promise<{ id: string; name: string; district: string | null }[]> {
   return getDb()
-    .select({ id: rentalShops.id, name: rentalShops.name, district: rentalShops.district })
+    .select({ id: rentalShops.id, name: rentalShops.name, district: shopMd.name })
     .from(rentalShops)
+    .leftJoin(shopMd, eq(shopMd.id, rentalShops.microdistrictId))
     .where(and(eq(rentalShops.cityId, cityId), eq(rentalShops.status, "unclaimed")))
     .orderBy(asc(rentalShops.name));
 }
@@ -172,7 +181,7 @@ export async function adminListShops() {
       id: rentalShops.id,
       name: rentalShops.name,
       slug: rentalShops.slug,
-      district: rentalShops.district,
+      district: shopMd.name,
       phone: rentalShops.phone,
       status: rentalShops.status,
       citySlug: cities.slug,
@@ -182,7 +191,8 @@ export async function adminListShops() {
     .from(rentalShops)
     .innerJoin(cities, eq(cities.id, rentalShops.cityId))
     .leftJoin(offers, eq(offers.shopId, rentalShops.id))
-    .groupBy(rentalShops.id, cities.slug)
+    .leftJoin(shopMd, eq(shopMd.id, rentalShops.microdistrictId))
+    .groupBy(rentalShops.id, cities.slug, shopMd.name)
     .orderBy(asc(rentalShops.name));
 }
 
