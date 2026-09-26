@@ -21,6 +21,7 @@ export function YandexMetrika({ counterId }: Props) {
             k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
             (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
             ym(${JSON.stringify(id)}, "init", { clickmap: true, trackLinks: true, accurateTrackBounce: true });
+            window.__ymCounterId = ${JSON.stringify(id)};
           `,
         }}
       />

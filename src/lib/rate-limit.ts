@@ -4,7 +4,7 @@
 // Ключ — произвольная строка: для доменных действий это userId, для входа и
 // писем — почта, IP или их пара.
 
-export type LimitKind = "comment" | "post" | "booking" | "login" | "register" | "resend" | "reset" | "mail_ip";
+export type LimitKind = "comment" | "post" | "booking" | "login" | "register" | "resend" | "reset" | "mail_ip" | "lead" | "lead_form";
 export type LimitResult =
   | { ok: true }
   | { ok: false; retryAfterSec: number; reason: "gap" | "window" };
@@ -24,6 +24,11 @@ const RULES: Record<LimitKind, Rule> = {
   // Второй контур для всего, что шлёт письма: лимит по почте не мешает бомбить
   // разные ящики, а смена IP снимала бы лимит по почте.
   mail_ip:  { windowMs: 60 * 60 * 1000, maxInWindow: 10, gapMs: 0 },
+  // Клики «показать телефон» / «цена устарела»: человек честно сравнивает
+  // десяток прокатов, а скрипт, выкачивающий телефоны, упирается в потолок.
+  lead:      { windowMs: 60 * 60 * 1000, maxInWindow: 40, gapMs: 0 },
+  // Формы с контактом (заявка «нужен регулярно», «это ваш прокат?»).
+  lead_form: { windowMs: 60 * 60 * 1000, maxInWindow: 5,  gapMs: 10_000 },
 };
 
 const MAX_KEYS = 10_000;
