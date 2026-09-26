@@ -1,5 +1,6 @@
-// Расчёт итога и ранжирование предложений прокатов — единственное место, где
-// считается итог (эталон: docs/inrenta-pivot/code/pricing.ts).
+// Расчёт итога предложения — единственное место, где считается итог (ТЗ, п. 4.1;
+// эталон: docs/inrenta-pivot/code/pricing.ts). В версии 1 только самовывоз:
+// доставка хранится и показывается справочно, но в итог не входит.
 // Чистые функции без БД. Суммы — целые рубли, даты — строки YYYY-MM-DD
 // (календарные дни, как в lib/catalog/dates: от часового пояса сервера не зависят).
 //
@@ -8,6 +9,9 @@
 // (priceDay = null) — тогда оплачиваются целые недели.
 
 import { formatPrice } from "@/lib/catalog/format";
+import { STALE_AFTER_DAYS, WEEK_HINT_MIN_SHARE } from "@/lib/compare/config";
+
+export { STALE_AFTER_DAYS } from "@/lib/compare/config";
 
 export type Rub = number;
 
@@ -28,6 +32,7 @@ export interface OfferInput {
   depositRub: Rub | null;
   /** Берут паспорт/документ в залог. */
   depositDocument: boolean;
+  /** Условия доставки — справочно («Есть доставка — уточняйте у проката»), в итог не входят. */
   delivery: {
     available: boolean;
     price: Rub;
@@ -42,23 +47,17 @@ export interface OfferInput {
   claimed: boolean;
 }
 
-export interface Scenario {
-  /** Число суток аренды. Из диапазона дат — через rentalDays(). */
-  days: number;
-  needDelivery: boolean;
-}
-
 export interface Quote {
   offer: OfferInput;
+  /** Запрошенные сутки. */
+  days: number;
+  /** Оплачиваемые сутки: max(запрошенные, минимальный срок); у понедельных — целые недели. */
   billedDays: number;
-  rent: Rub;
-  deliveryFee: Rub;
   total: Rub;
   /** Оплачиваемый срок больше запрошенного: минимальный срок или целые недели. */
   minApplied: boolean;
 }
 
-export const STALE_AFTER_DAYS = 30;
 const DAY_MS = 86_400_000;
 
 function dayNumber(date: string): number {
@@ -85,18 +84,11 @@ export function rentFor(offer: OfferInput, days: number): Rub {
   return days * priceDay;
 }
 
-/** Итог по одному предложению. null — предложение не подходит (нужна доставка, а её нет). */
-export function quote(offer: OfferInput, s: Scenario): Quote | null {
-  if (s.needDelivery && !offer.delivery.available) return null;
-  let billedDays = Math.max(s.days, offer.minDays);
+/** Итог по одному предложению за `days` суток. */
+export function quote(offer: OfferInput, days: number): Quote {
+  let billedDays = Math.max(days, offer.minDays);
   if (offer.priceDay == null) billedDays = Math.ceil(billedDays / 7) * 7;
-  const rent = rentFor(offer, billedDays);
-  let deliveryFee = 0;
-  if (s.needDelivery) {
-    const free = offer.delivery.freeFrom != null && rent >= offer.delivery.freeFrom;
-    deliveryFee = free ? 0 : offer.delivery.price;
-  }
-  return { offer, billedDays, rent, deliveryFee, total: rent + deliveryFee, minApplied: billedDays > s.days };
+  return { offer, days, billedDays, total: rentFor(offer, billedDays), minApplied: billedDays > days };
 }
 
 /** @param today YYYY-MM-DD */
@@ -104,65 +96,38 @@ export function isStale(offer: OfferInput, today: string, maxAgeDays = STALE_AFT
   return dayNumber(today) - dayNumber(offer.verifiedAt) > maxAgeDays;
 }
 
+/** Дней с проверки цены — для сортировки «свежее выше». */
+export function ageDays(offer: OfferInput, today: string): number {
+  return dayNumber(today) - dayNumber(offer.verifiedAt);
+}
+
 export function hasMoneyDeposit(offer: OfferInput): boolean {
   return offer.depositRub != null && offer.depositRub > 0;
 }
 
-export interface Ranking {
-  /** Участвуют в рейтинге: свежая цена и подходят под сценарий. По возрастанию итога. */
-  ranked: Quote[];
-  /** Цена старше 30 дней — показываем отдельно, в рейтинг не ставим. */
+export interface Priced {
+  /** Свежие цены — участвуют в рейтинге. По возрастанию итога. */
+  fresh: Quote[];
+  /** Цена старше STALE_AFTER_DAYS — блок «на перепроверке», в рейтинг и вкладки не входит. */
   recheck: Quote[];
-  /** Нужна доставка, а прокат только на самовывоз. Итог — как при самовывозе. */
-  pickupOnly: Quote[];
 }
 
 /** Цена суток для равных итогов: у понедельного проката — седьмая часть недели. */
 const dayRate = (o: OfferInput) => o.priceDay ?? (o.priceWeek ?? 0) / 7;
 
-const byTotal = (a: Quote, b: Quote) =>
+export const byTotal = (a: Quote, b: Quote) =>
   a.total - b.total || dayRate(a.offer) - dayRate(b.offer) || Number(b.offer.claimed) - Number(a.offer.claimed);
 
 /** @param today YYYY-MM-DD */
-export function rank(offers: OfferInput[], s: Scenario, today: string): Ranking {
-  const ranked: Quote[] = [];
+export function priceAll(offers: OfferInput[], days: number, today: string): Priced {
+  const fresh: Quote[] = [];
   const recheck: Quote[] = [];
-  const pickupOnly: Quote[] = [];
-  for (const o of offers) {
-    const q = quote(o, s);
-    if (!q) {
-      const pickup = quote(o, { ...s, needDelivery: false });
-      if (pickup) pickupOnly.push(pickup);
-      continue;
-    }
-    (isStale(o, today) ? recheck : ranked).push(q);
-  }
-  return { ranked: ranked.sort(byTotal), recheck: recheck.sort(byTotal), pickupOnly: pickupOnly.sort(byTotal) };
-}
-
-export type TabId = "cheapest" | "noMoneyDeposit" | "sameDay";
-
-export const TABS: { id: TabId; label: string; winnerLabel: string; test: (q: Quote) => boolean }[] = [
-  { id: "cheapest", label: "Самый дешёвый", winnerLabel: "Самый дешёвый за ваши даты", test: () => true },
-  {
-    id: "noMoneyDeposit",
-    label: "Без денежного залога",
-    winnerLabel: "Без денежного залога — дешевле всех",
-    // Только явный ноль. Залог «уточняется» (null) не считаем отсутствием залога.
-    // Паспорт в залог допустим: это не деньги.
-    test: (q) => q.offer.depositRub === 0,
-  },
-  { id: "sameDay", label: "Привезут сегодня", winnerLabel: "Сегодня — дешевле всех", test: (q) => q.offer.delivery.sameDay },
-];
-
-/** Список для вкладки: фильтр вкладки поверх ранжирования. */
-export function tabList(r: Ranking, tab: TabId): Quote[] {
-  const t = TABS.find((x) => x.id === tab)!;
-  return r.ranked.filter(t.test);
+  for (const o of offers) (isStale(o, today) ? recheck : fresh).push(quote(o, days));
+  return { fresh: fresh.sort(byTotal), recheck: recheck.sort(byTotal) };
 }
 
 /** Минимальный итог при условии — для цен у фильтров («Без денежного залога — от 1 350 ₽»). */
-export function minTotal(quotes: Quote[], where: (q: Quote) => boolean = () => true): Rub | null {
+export function minTotal<Q extends Quote>(quotes: Q[], where: (q: Q) => boolean = () => true): Rub | null {
   let min: Rub | null = null;
   for (const q of quotes) if (where(q) && (min === null || q.total < min)) min = q.total;
   return min;
@@ -176,15 +141,15 @@ export interface SavingsHint {
 }
 
 /**
- * Подсказка «возьмите на неделю»: показываем, если срок меньше 7 суток и недельный тариф
- * дешевле 7 × суточной цены хотя бы на 10%. Берём самую низкую недельную цену
- * (при равенстве — с большей экономией): человеку важен итог, а не процент скидки.
- * Понедельные прокаты (без суточной цены) не участвуют — сравнивать не с чем.
+ * Подсказка «возьмите на неделю» (ТЗ, п. 5.7): срок меньше 7 суток, а недельный тариф
+ * дешевле 7 × суточной цены хотя бы на WEEK_HINT_MIN_SHARE. Берём самую низкую
+ * недельную цену (при равенстве — с большей экономией). Понедельные прокаты
+ * (без суточной цены) не участвуют — сравнивать не с чем.
  */
-export function weekSavingsHint(r: Ranking, s: Scenario, minShare = 0.1): SavingsHint | null {
-  if (s.days >= 7) return null;
+export function weekSavingsHint(quotes: Quote[], days: number, minShare = WEEK_HINT_MIN_SHARE): SavingsHint | null {
+  if (days >= 7) return null;
   let best: SavingsHint | null = null;
-  for (const q of r.ranked) {
+  for (const q of quotes) {
     const w = q.offer.priceWeek;
     if (!w || q.offer.priceDay == null) continue;
     const daily = 7 * q.offer.priceDay;

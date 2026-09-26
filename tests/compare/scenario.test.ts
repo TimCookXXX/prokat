@@ -1,41 +1,63 @@
 import { describe, it, expect } from "vitest";
 import {
-  activeFilterCount, compareHref, compareQuery, localToday, parseCompareParams, patchParams, pickRangeDay,
+  activeFilterCount, emptyParams, localToday, modelPath, parseResultParams, patchParams, pickRangeDay,
+  resultHref, resultQuery,
 } from "@/lib/compare/scenario";
+import { CITY_GEO } from "@/lib/compare/geo-data";
 
 const TODAY = "2026-09-23";
+const geo = CITY_GEO[0];
+const parse = (sp: Record<string, string>) => parseResultParams(sp, TODAY, geo);
 
-describe("parseCompareParams", () => {
-  it("defaults to tomorrow for one day with delivery", () => {
-    const p = parseCompareParams({}, TODAY);
-    expect(p).toMatchObject({
-      classSlug: null, model: null, from: "2026-09-24", to: "2026-09-25", days: 1, pickup: false,
-      tab: "cheapest",
-      filters: { noMoneyDeposit: false, sameDay: false, claimed: false, oneDay: false, areas: [] },
+describe("parseResultParams", () => {
+  // ТЗ, п. 3.2: без дат — с сегодняшнего дня на 1 сутки, с пометкой.
+  it("no dates — today for one day, marked as not given", () => {
+    expect(parse({})).toMatchObject({
+      classSlug: null, brandSlug: null, from: TODAY, to: "2026-09-24", days: 1, datesGiven: false,
+      loc: { kind: "city" }, tab: null,
+      filters: { noMoneyDeposit: false, claimed: false, oneDay: false, openToday: false, models: [], okrugs: [] },
     });
   });
 
   it("reads every parameter", () => {
-    const p = parseCompareParams({
-      c: "perforator-sds-max", from: "2026-09-26", to: "2026-09-28", pickup: "1", r: "ФМР",
-      tab: "sameDay", nodep: "1", today: "1", claimed: "1", min1: "1", area: "ЮМР, ФМР,ЮМР",
-    }, TODAY);
+    const p = parse({
+      c: "perforator-sds-max", brand: "makita", model: "makita-hr2470,bosch-gbh-2-26", from: "2026-09-26", to: "2026-09-28",
+      loc: "d:yubileynyy", tab: "nearest", nodep: "1", claimed: "1", min1: "1", open: "1", okrug: "zapadnyy,karasunskiy",
+    });
     expect(p).toMatchObject({
-      classSlug: "perforator-sds-max", days: 2, pickup: true, tab: "sameDay",
-      filters: { noMoneyDeposit: true, sameDay: true, claimed: true, oneDay: true, areas: ["ЮМР", "ФМР"] },
+      classSlug: "perforator-sds-max", brandSlug: "makita", days: 2, datesGiven: true,
+      loc: { kind: "microdistrict", microdistrict: "yubileynyy" }, tab: "nearest",
+      filters: { noMoneyDeposit: true, claimed: true, oneDay: true, openToday: true, models: ["makita-hr2470", "bosch-gbh-2-26"], okrugs: ["zapadnyy", "karasunskiy"] },
     });
   });
 
-  it("repairs bad dates instead of failing", () => {
-    expect(parseCompareParams({ from: "2026-02-30" }, TODAY).from).toBe("2026-09-24");
-    expect(parseCompareParams({ from: "2026-09-01" }, TODAY).from).toBe("2026-09-24"); // прошлое
-    expect(parseCompareParams({ from: "2026-09-26", to: "2026-09-20" }, TODAY).to).toBe("2026-09-27");
-    expect(parseCompareParams({ from: "2026-09-26", to: "2027-09-26" }, TODAY).days).toBe(90);
-    expect(parseCompareParams({ tab: "hack" }, TODAY).tab).toBe("cheapest");
+  it("repairs bad values instead of failing", () => {
+    expect(parse({ from: "2026-02-30" }).datesGiven).toBe(false);
+    expect(parse({ from: "2026-09-01" }).from).toBe(TODAY); // прошлое
+    expect(parse({ from: "2026-09-26", to: "2026-09-20" }).to).toBe("2026-09-27");
+    expect(parse({ from: "2026-09-26", to: "2027-09-26" }).days).toBe(90);
+    expect(parse({ tab: "hack", c: "../x", loc: "d:nowhere" })).toMatchObject({ tab: null, classSlug: null, loc: { kind: "city" } });
+  });
+});
+
+describe("resultQuery / resultHref", () => {
+  it("round-trips through the URL", () => {
+    const p = parse({ c: "x", brand: "makita", model: "a,b", from: "2026-09-26", to: "2026-09-28", loc: "p:45.06210,38.95200", la: "ул. Северная, 15", nodep: "1", okrug: "zapadnyy" });
+    expect(parse(Object.fromEntries(new URLSearchParams(resultQuery(p))))).toEqual(p);
   });
 
-  it("allows same-day return as one day", () => {
-    expect(parseCompareParams({ from: "2026-09-26", to: "2026-09-26" }, TODAY).days).toBe(1);
+  it("omits defaults: no dates, city, default tab", () => {
+    expect(resultHref("/krasnodar/prokat-perforatora", emptyParams(TODAY))).toBe("/krasnodar/prokat-perforatora");
+  });
+
+  it("patching dates marks them as given; filters merge", () => {
+    const p = patchParams(parse({ nodep: "1" }), { to: "2026-10-01", filters: { claimed: true } });
+    expect(p).toMatchObject({ datesGiven: true, days: 8 });
+    expect(activeFilterCount(p.filters)).toBe(2);
+  });
+
+  it("model page path uses the group's seo word", () => {
+    expect(modelPath("krasnodar", "prokat", "karcher-puzzi-8-1")).toBe("/krasnodar/prokat-karcher-puzzi-8-1");
   });
 });
 
@@ -45,43 +67,15 @@ describe("pickRangeDay", () => {
     expect(one).toEqual({ from: "2026-09-26", to: null });
     expect(pickRangeDay(one, "2026-09-28")).toEqual({ from: "2026-09-26", to: "2026-09-28" });
     expect(pickRangeDay(one, "2026-09-24")).toEqual({ from: "2026-09-24", to: "2026-09-26" });
-    expect(pickRangeDay(one, "2026-09-26")).toEqual({ from: "2026-09-26", to: "2026-09-26" });
   });
-
-  it("a click on a finished range starts over", () => {
+  it("a click on a finished range starts over; the range is capped", () => {
     expect(pickRangeDay({ from: "2026-09-24", to: "2026-09-25" }, "2026-09-26")).toEqual({ from: "2026-09-26", to: null });
-  });
-
-  it("caps the range at the maximum term", () => {
     expect(pickRangeDay({ from: "2026-09-24", to: null }, "2027-06-01").to).toBe("2026-12-23");
-  });
-});
-
-describe("compareQuery / compareHref", () => {
-  it("round-trips through the URL", () => {
-    const p = parseCompareParams({ c: "x", m: "Makita HR2470", from: "2026-09-26", to: "2026-09-28", r: "ФМР", nodep: "1", area: "ЮМР" }, TODAY);
-    const again = parseCompareParams(Object.fromEntries(new URLSearchParams(compareQuery(p))), TODAY);
-    expect(again).toEqual(p);
-  });
-
-  it("omits defaults and ignores the removed district parameter", () => {
-    const p = patchParams(parseCompareParams({ r: "ФМР" }, TODAY), { pickup: true });
-    expect(compareHref("krasnodar", "prokat-perforatora", p))
-      .toBe("/krasnodar/prokat-perforatora?from=2026-09-24&to=2026-09-25&pickup=1");
-  });
-
-  it("patches filters without dropping the others", () => {
-    const p = parseCompareParams({ nodep: "1" }, TODAY);
-    const next = patchParams(p, { filters: { claimed: true }, to: "2026-10-01" });
-    expect(next.filters).toMatchObject({ noMoneyDeposit: true, claimed: true });
-    expect(next.days).toBe(7);
-    expect(activeFilterCount(next.filters)).toBe(2);
   });
 });
 
 describe("localToday", () => {
   it("uses Moscow time, not UTC", () => {
-    // 22:30 UTC 23 сен = 01:30 24 сен по Москве.
     expect(localToday(new Date("2026-09-23T22:30:00Z"))).toBe("2026-09-24");
   });
 });

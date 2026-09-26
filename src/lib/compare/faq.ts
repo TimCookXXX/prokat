@@ -4,6 +4,7 @@
 
 import { formatRub, isStale, quote, type OfferInput } from "@/lib/compare/pricing";
 import { shopsGenitive } from "@/lib/compare/format";
+import { ruPlural } from "@/lib/plural";
 
 export interface FaqItem { q: string; a: string }
 
@@ -23,17 +24,14 @@ export function buildFaq({
 
   if (fresh.length) {
     const dayPrices = fresh.map((o) => o.priceDay).filter((p): p is number => p != null);
-    const totals = fresh
-      .map((o) => quote(o, { days: 1, needDelivery: true }))
-      .filter((q) => q !== null)
-      .map((q) => q.total);
+    const totals = fresh.map((o) => quote(o, 1).total);
     const parts = [
       dayPrices.length
         ? `Суточная цена — от ${formatRub(Math.min(...dayPrices))} у ${shopsGenitive(shops)} ${cityIn}.`
         : `Сдают понедельно: от ${formatRub(Math.min(...fresh.map((o) => o.priceWeek ?? Infinity)))} за неделю.`,
     ];
     if (totals.length) {
-      parts.push(`Итог за 1 сутки с доставкой — от ${formatRub(Math.min(...totals))}: мы сразу добавляем доставку и учитываем минимальный срок проката.`);
+      parts.push(`Итог за 1 сутки — от ${formatRub(Math.min(...totals))}: мы сразу учитываем минимальный срок и недельный тариф проката.`);
     }
     items.push({ q: `Сколько стоит ${title.toLowerCase()} ${cityIn}?`, a: parts.join(" ") });
 
@@ -42,20 +40,20 @@ export function buildFaq({
     const unknown = fresh.filter((o) => o.depositRub == null).length;
     const dep: string[] = [];
     dep.push(noMoney.length
-      ? `Без денежного залога — ${noMoney.length} из ${fresh.length} предложений${noMoney.some((o) => o.depositDocument) ? " (часть просит паспорт)" : ""}.`
+      ? `Без денежного залога — ${noMoney.length} из ${fresh.length} ${ruPlural(fresh.length, "предложения", "предложений", "предложений")}${noMoney.some((o) => o.depositDocument) ? " (часть просит паспорт)" : ""}.`
       : "Все прокаты с известными условиями просят денежный залог.");
     if (withMoney.length) {
       dep.push(`Денежный залог — от ${formatRub(Math.min(...withMoney))} до ${formatRub(Math.max(...withMoney))}, его возвращают после аренды. В итог он не входит.`);
     }
-    if (unknown) dep.push(`У ${unknown} залог уточняем.`);
+    if (unknown) dep.push(`У ${unknown} ${ruPlural(unknown, "предложения", "предложений", "предложений")} залог уточняем.`);
     items.push({ q: "Нужен ли залог?", a: dep.join(" ") });
 
-    const sameDay = new Set(fresh.filter((o) => o.delivery.available && o.delivery.sameDay).map((o) => o.shopId)).size;
+    const delivers = new Set(fresh.filter((o) => o.delivery.available).map((o) => o.shopId)).size;
     items.push({
-      q: "Можно привезти сегодня?",
-      a: sameDay
-        ? `Доставка в день заказа есть у ${shopsGenitive(sameDay)} — смотрите вкладку «Привезут сегодня».`
-        : "Пока никто из прокатов не обещает доставку в день заказа — лучше заказывать заранее.",
+      q: "Как выбрать прокат поближе?",
+      a: "Укажите в поле «Где» микрорайон или адрес — покажем расстояние и время в пути до каждого проката. "
+        + "Вкладка «Оптимальный» учитывает и цену, и дорогу: забрать и вернуть — это четыре поездки."
+        + (delivers ? ` Доставка есть у ${shopsGenitive(delivers)} — её условия уточняйте у проката, в итог она не входит.` : ""),
     });
   }
 
