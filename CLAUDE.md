@@ -40,7 +40,7 @@ commit-сообщения — на английском.
 - **Стили:** Tailwind + CSS-токены `theme/tokens.css` (дизайн-система «вариант Б»), шрифты Unbounded + Onest (`theme/fonts.ts`), светлая тема по умолчанию + тёмная (`next-themes`).
 - **ID:** ULID (`newId()` в `src/lib/id.ts`). **Цены:** целые рубли. **Даты:** строки `YYYY-MM-DD`. **Слаги:** `slugify()`.
 - **Аналитика:** Яндекс Метрика (цели через `reachGoal()` в `src/lib/analytics.ts`) + серверные `lead_events`.
-- **Тесты:** Vitest (481 тест, только в `tests/**`, импорт через `@/`).
+- **Тесты:** Vitest (490 тестов, только в `tests/**`, импорт через `@/`).
 - **Деплой:** docker-compose (Caddy + app + Postgres + backup), HTTPS via Let's Encrypt. См. `docs/DEPLOY.md`, `docs/RECOVERY.md`.
 
 ## Команды
@@ -94,7 +94,7 @@ pnpm db:studio      # drizzle studio
 
 - Итог считается **только** в `pricing.ts` и не хранится. Оплачиваемые сутки = max(сутки, `minDays`); без `priceDay` — целые недели. Недельный тариф: недели × `priceWeek` + min(остаток × `priceDay`, `priceWeek`). Месячного тарифа нет. **Доставка в итог не входит** (версия 1 — самовывоз).
 - Срок — **датами** (сб 27 → пн 29 = 2 суток, минимум 1). Дат нет — сегодня на 1 сутки и пометка «укажите даты». Календарь — свой (`DateRangeField`, `calendar.ts`): два клика в любом порядке (`pickRangeDay`).
-- Место проката: координаты адреса → центр микрорайона (≈) → неизвестно. Расстояние = по прямой × `ROUTE_FACTOR` (1,3), время = км ÷ `CITY_SPEED_KMH` (25); «≈», если хоть одна точка — центр микрорайона (`geo.ts`).
+- Место проката: координаты адреса → центр микрорайона (≈) → неизвестно. Путь — **по дорогам** (`src/server/routing.ts`, цепочка `Router`, одна матрица «пользователь → точки прокатов» на страницу): 1) Яндекс Матрица расстояний (`YANDEX_ROUTING_API_KEY`, отдельный платный ключ; расстояние и время с пробками, как на Яндекс Картах; до 100 точек за запрос, кэш 10 мин); 2) свой OSRM (`OSRM_URL`, сервис `osrm` в compose, граф `scripts/osrm/prepare.sh` → `data/osrm/`; время = км ÷ `CITY_SPEED_KMH`, кэш сутки); 3) по прямой × `ROUTE_FACTOR` (1,3) — ошибается через Кубань. Непосчитанные точки досчитывает следующий; «≈», если хоть одна точка — центр микрорайона (`geo.ts`).
 - Оценка «Оптимального» = итог + `TRIPS_PER_RENTAL` (4) × минуты × `MINUTE_COST_RUB` (10).
 - Вкладки (`ranking.ts`):
   - город — «Оптимальный» (он же «Самый дешёвый») и «Самый дешёвый»;
@@ -183,7 +183,7 @@ pnpm db:studio      # drizzle studio
 
 ## Dev-заметки
 
-- Поднять окружение: `docker compose up -d db` → `pnpm db:migrate && pnpm db:seed` → `pnpm dev`. Геокодер (адреса в «Где» и при импорте) — `YANDEX_GEOCODER_API_KEY` и `YANDEX_SUGGEST_API_KEY` в `.env`; без них работают микрорайоны, округа и геолокация.
+- Поднять окружение: `docker compose up -d db` → `pnpm db:migrate && pnpm db:seed` → `pnpm dev`. Расстояния по дорогам: `bash scripts/osrm/prepare.sh` → `docker compose up -d osrm` → `OSRM_URL=http://127.0.0.1:5001` в `.env`. Геокодер (адреса в «Где» и при импорте) — `YANDEX_GEOCODER_API_KEY` и `YANDEX_SUGGEST_API_KEY` в `.env`; без них работают микрорайоны, округа и геолокация.
 - Сброс dev-БД начисто: `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` + `DROP SCHEMA IF EXISTS drizzle CASCADE;` (журнал миграций живёт в схеме `drizzle`).
 - `.next/types` держит устаревшие типы удалённых роутов после dev-сервера → ложные `TS2307`; лечит `rm -rf .next/types`.
 - Перед `pnpm build` останавливать dev-сервер (общий каталог `.next`). Production-сборке нужны `DOMAIN`, `LETSENCRYPT_EMAIL`, `STORAGE_*` (env-валидация).
