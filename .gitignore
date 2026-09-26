@@ -31,3 +31,6 @@ inrenta Design System (cabinet)/
 pg_data/
 caddy_data/
 caddy_config/
+
+# OSRM: граф дорог (scripts/osrm/prepare.sh)
+data/osrm/
