@@ -16,6 +16,7 @@ import { slugify } from "@/lib/slugify";
 import { checkLimit } from "@/lib/rate-limit";
 import { normalizePhone } from "@/lib/compare/offers-csv";
 import { localToday } from "@/lib/compare/scenario";
+import { loadModelLookup, resolveOfferModel } from "@/server/compare/import-offers";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
@@ -149,11 +150,16 @@ export async function addShopOffer(shopId: string, input: unknown): Promise<Acti
   const db = getDb();
   const [cls] = await db.select({ id: itemClasses.id }).from(itemClasses).where(eq(itemClasses.slug, classSlug)).limit(1);
   if (!cls) return { ok: false, error: "Нет такого класса" };
+  // Модель — так же, как при импорте: справочник и ключ уникальности (прокат, класс, модель).
+  const m = resolveOfferModel(await loadModelLookup(db), model || null, cls.id);
+  if (m.wrongClass) return { ok: false, error: "Эта модель относится к другому классу" };
   const inserted = await db.insert(offers).values({
     id: newId(),
     shopId,
     itemClassId: cls.id,
     model: model || null,
+    modelId: m.modelId,
+    modelKey: m.modelKey,
     ...normalizeDelivery(fields),
     verifiedAt: localToday(),
     verifiedBy: "shop",

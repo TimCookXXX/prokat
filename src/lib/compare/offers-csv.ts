@@ -3,7 +3,8 @@
 // server/compare/import-offers. Ошибки копятся со строкой файла, чтобы таблицу
 // можно было поправить за один проход.
 
-import { verifiedBy } from "@db/schema";
+import { verifiedBy, type WeekHours } from "@db/schema";
+import { parseHours } from "@/lib/compare/hours";
 
 export type VerifiedBy = (typeof verifiedBy.enumValues)[number];
 
@@ -12,13 +13,21 @@ export interface OfferRow {
   line: number;
   citySlug: string;
   shopName: string;
-  district: string | null;
+  /** Микрорайон как в файле: «ФМР», «Фестивальный» — сверяется со справочником мест. */
+  microdistrict: string | null;
   address: string | null;
+  /** Координаты адреса, если известны; иначе импорт геокодирует адрес. */
+  lat: number | null;
+  lon: number | null;
+  hours: WeekHours | null;
+  telegram: string | null;
   /** +7XXXXXXXXXX */
   phone: string | null;
   website: string | null;
   classSlug: string;
   model: string | null;
+  /** Что входит в аренду: «моющее средство», «2 бура». */
+  includes: string | null;
   /** null — только недельный тариф. */
   priceDay: number | null;
   priceWeek: number | null;
@@ -42,14 +51,17 @@ export interface RowError {
 }
 
 export const OFFER_COLUMNS = [
-  "city_slug", "shop_name", "district", "address", "phone", "website",
-  "class_slug", "model", "price_day", "price_week", "min_days",
+  "city_slug", "shop_name", "microdistrict", "address", "lat", "lon", "hours", "phone", "telegram", "website",
+  "class_slug", "model", "includes", "price_day", "price_week", "min_days",
   "deposit_rub", "deposit_document",
   "delivery_available", "delivery_price", "delivery_free_from", "delivery_same_day",
   "verified_at", "verified_by", "source_url",
 ] as const;
 
 type Column = (typeof OFFER_COLUMNS)[number];
+
+/** Старые названия колонок, которые ещё понимаем. */
+const COLUMN_ALIASES: Record<string, Column> = { district: "microdistrict" };
 
 // price_day может быть пустым у понедельного проката, но колонка в файле нужна.
 const REQUIRED_COLUMNS: Column[] = ["city_slug", "shop_name", "class_slug", "price_day", "verified_at"];
@@ -140,6 +152,21 @@ function bool(v: string, column: string): boolean | null {
   throw new RowProblem(`${column}: «${v}» — ожидается true/false`);
 }
 
+function coord(v: string, column: string, [min, max]: [number, number]): number | null {
+  const t = v.trim().replace(",", ".");
+  if (t === "") return null;
+  const n = Number(t);
+  if (!/^-?\d+(\.\d+)?$/.test(t) || n < min || n > max) throw new RowProblem(`${column}: «${v}» — не координата`);
+  return n;
+}
+
+function telegram(v: string): string | null {
+  const t = v.trim().replace(/^https?:\/\/t\.me\//i, "").replace(/^@/, "");
+  if (t === "") return null;
+  if (!/^[A-Za-z0-9_]{4,64}$/.test(t)) throw new RowProblem(`telegram: «${v}» — ожидается @username или ссылка t.me`);
+  return t;
+}
+
 function url(v: string, column: string): string | null {
   const t = v.trim();
   if (t === "") return null;
@@ -179,7 +206,7 @@ export function parseOffersCsv(csv: string, today: string): ParseResult {
   if (records.length === 0) return { rows: [], errors: [{ line: 0, message: "Файл пуст" }] };
 
   const [header, ...data] = records;
-  const names = header.cells.map((c) => c.trim().toLowerCase());
+  const names = header.cells.map((c) => c.trim().toLowerCase()).map((n) => COLUMN_ALIASES[n] ?? n);
   const known = new Set<string>(OFFER_COLUMNS);
   const errors: RowError[] = [];
   const unknown = names.filter((n) => !known.has(n));
@@ -221,6 +248,10 @@ function toRow(line: number, get: (c: Column) => string, today: string): OfferRo
   if (!shopName) throw new RowProblem("shop_name: пусто");
   if (!classSlug) throw new RowProblem("class_slug: пусто");
   if (TEMPLATE_MARKER.test(shopName)) throw new RowProblem(`shop_name: «${shopName}» — строка-пример из шаблона`);
+  // Длины — как у колонок БД: длинное значение иначе уронит импорт без номера строки.
+  for (const [col, max] of [["shop_name", 200], ["model", 120], ["microdistrict", 80]] as const) {
+    if (get(col).trim().length > max) throw new RowProblem(`${col}: длиннее ${max} символов`);
+  }
 
   const rawPhone = get("phone").trim();
   const phone = rawPhone === "" ? null : normalizePhone(rawPhone);
@@ -244,16 +275,31 @@ function toRow(line: number, get: (c: Column) => string, today: string): OfferRo
     throw new RowProblem(`verified_by: «${rawVerifiedBy}» — одно из ${verifiedByValues.join(", ")}`);
   }
 
+  const lat = coord(get("lat"), "lat", [-90, 90]);
+  const lon = coord(get("lon"), "lon", [-180, 180]);
+  if ((lat === null) !== (lon === null)) throw new RowProblem("lat/lon: нужны обе координаты или ни одной");
+  let hours: WeekHours | null;
+  try {
+    hours = parseHours(get("hours"));
+  } catch (e) {
+    throw new RowProblem((e as Error).message);
+  }
+
   return {
     line,
     citySlug: citySlug.toLowerCase(),
     shopName,
-    district: text(get("district")),
+    microdistrict: text(get("microdistrict")),
     address: text(get("address")),
+    lat,
+    lon,
+    hours,
+    telegram: telegram(get("telegram")),
     phone,
     website: url(get("website"), "website"),
     classSlug: classSlug.toLowerCase(),
     model: text(get("model")),
+    includes: text(get("includes")),
     priceDay,
     priceWeek,
     minDays: int(get("min_days"), "min_days", { min: 1 }) ?? 1,

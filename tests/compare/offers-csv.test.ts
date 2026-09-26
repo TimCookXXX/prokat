@@ -7,7 +7,8 @@ const HEADER = OFFER_COLUMNS.join(",");
 
 // Строка в порядке OFFER_COLUMNS; неуказанные колонки пустые.
 function row(fields: Partial<Record<(typeof OFFER_COLUMNS)[number], string>>): string {
-  return OFFER_COLUMNS.map((c) => fields[c] ?? "").join(",");
+  const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  return OFFER_COLUMNS.map((c) => cell(fields[c] ?? "")).join(",");
 }
 
 const BASE = {
@@ -56,7 +57,7 @@ describe("normalizePhone", () => {
 describe("parseOffersCsv", () => {
   it("normalizes a full row", () => {
     const csv = [HEADER, row({
-      ...BASE, district: " ЮМР ", phone: "8 900 100-00-01", model: "Makita HR2470",
+      ...BASE, microdistrict: " ЮМР ", phone: "8 900 100-00-01", model: "Makita HR2470",
       price_week: "2 400", min_days: "", deposit_rub: "3000", deposit_document: "нет",
       delivery_available: "true", delivery_price: "400", delivery_free_from: "2000",
       delivery_same_day: "false", verified_by: "site", source_url: "https://example.ru/x",
@@ -64,13 +65,37 @@ describe("parseOffersCsv", () => {
     const { rows, errors } = parseOffersCsv(csv, TODAY);
     expect(errors).toEqual([]);
     expect(rows).toEqual([{
-      line: 2, citySlug: "krasnodar", shopName: "Инструмент у дома", district: "ЮМР",
-      address: null, phone: "+79001000001", website: null, classSlug: "perforator-sds-plus",
-      model: "Makita HR2470", priceDay: 450, priceWeek: 2400, minDays: 1, depositRub: 3000,
+      line: 2, citySlug: "krasnodar", shopName: "Инструмент у дома", microdistrict: "ЮМР",
+      address: null, lat: null, lon: null, hours: null, telegram: null,
+      phone: "+79001000001", website: null, classSlug: "perforator-sds-plus",
+      model: "Makita HR2470", includes: null, priceDay: 450, priceWeek: 2400, minDays: 1, depositRub: 3000,
       depositDocument: false, deliveryAvailable: true, deliveryPrice: 400, deliveryFreeFrom: 2000,
       deliverySameDay: false, verifiedAt: "2026-09-18", verifiedBy: "site",
       sourceUrl: "https://example.ru/x",
     }]);
+  });
+
+  it("reads place, hours, messenger and what is included", () => {
+    const csv = [HEADER, row({
+      ...BASE, address: "ул. Северная, 15", lat: "45,0621", lon: "38.952", hours: "пн-пт 9-20; сб 10-16",
+      telegram: "https://t.me/burmolot", includes: "2 бура",
+    })].join("\n");
+    const { rows, errors } = parseOffersCsv(csv, TODAY);
+    expect(errors).toEqual([]);
+    expect(rows[0]).toMatchObject({
+      address: "ул. Северная, 15", lat: 45.0621, lon: 38.952, telegram: "burmolot", includes: "2 бура",
+      hours: { mon: [["09:00", "20:00"]], fri: [["09:00", "20:00"]], sat: [["10:00", "16:00"]] },
+    });
+  });
+
+  it("rejects half coordinates and unreadable hours", () => {
+    const csv = [HEADER, row({ ...BASE, lat: "45.06" }), row({ ...BASE, shop_name: "Другой", hours: "всегда" })].join("\n");
+    expect(parseOffersCsv(csv, TODAY).errors.map((e) => e.line)).toEqual([2, 3]);
+  });
+
+  it("still understands the old «district» column", () => {
+    const csv = "city_slug,shop_name,district,class_slug,price_day,verified_at\nkrasnodar,Бур и Молот,ФМР,perforator-sds-plus,500,2026-09-15";
+    expect(parseOffersCsv(csv, TODAY).rows[0].microdistrict).toBe("ФМР");
   });
 
   it("keeps unknown deposit apart from no deposit", () => {
