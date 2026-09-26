@@ -23,7 +23,7 @@ export default async function AdminRegularPage() {
                 <span className="ml-2 rounded-pill bg-muted px-2 py-0.5 text-xs text-muted-foreground">{STATUS[req.status]}</span>
               </p>
               <p className="text-muted-foreground">
-                {[req.frequency, req.contact, req.createdAt.toLocaleDateString("ru-RU")].filter(Boolean).join(" · ")}
+                {[req.kind === "not_found" ? "не нашли в выдаче" : "нужен регулярно", req.period, req.frequency, req.contact, req.createdAt.toLocaleDateString("ru-RU")].filter(Boolean).join(" · ")}
               </p>
             </div>
             <div className="flex gap-2">

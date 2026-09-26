@@ -1,11 +1,12 @@
 "use client";
 
+import type { LeadScenario } from "@db/schema";
 import { useState, useTransition } from "react";
 import { Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { revealShopPhone } from "@/server/actions/leads";
 import { reachGoal } from "@/lib/analytics";
-import type { TabId } from "@/lib/compare/pricing";
+import type { TabId } from "@/lib/compare/ranking";
 
 // «Показать телефон»: номер приходит с сервера только по клику — так обращение
 // попадает и в lead_events, и в цели Метрики. После клика — номер ссылкой tel:
@@ -25,10 +26,10 @@ export function PhoneReveal({
   winner?: boolean;
   tab?: TabId;
   rank?: number;
-  scenario?: { days: number; needDelivery: boolean };
+  scenario?: LeadScenario;
   className?: string;
 }) {
-  const [phone, setPhone] = useState<{ phone: string; display: string } | null>(null);
+  const [phone, setPhone] = useState<{ phone: string; display: string; telegram: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -38,6 +39,16 @@ export function PhoneReveal({
         <a href={`tel:${phone.phone}`} className="block text-[17px] font-bold tabular-nums hover:text-accent">
           {phone.display}
         </a>
+        {phone.telegram && (
+          <a
+            href={`https://t.me/${phone.telegram}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-0.5 inline-flex min-h-[32px] items-center text-sm font-semibold text-accent hover:underline"
+          >
+            Написать в Telegram
+          </a>
+        )}
         <p className="text-xs text-muted-foreground">Скажите, что нашли на inrenta</p>
       </div>
     );
@@ -56,7 +67,7 @@ export function PhoneReveal({
             const res = await revealShopPhone({ offerId, shopId, tab, rank, scenario });
             if (res.ok) {
               setPhone(res.data);
-              reachGoal("show_phone", { tab, rank });
+              reachGoal("show_phone", { tab, rank, loc: scenario?.loc });
             } else {
               setError(res.error === "no_phone"
                 ? "Телефона пока нет — уточняем"
