@@ -6,7 +6,7 @@ import {
   LOW_SPREAD_SHARE, MINUTE_COST_RUB, TRIPS_PER_RENTAL,
 } from "@/lib/compare/config";
 import { ageDays, formatRub, type OfferInput, type Quote, type Rub } from "@/lib/compare/pricing";
-import { tripBetween, type GeoPoint, type Trip, type UserLocation } from "@/lib/compare/geo";
+import { tripBetween, type GeoPoint, type RoadRoute, type Trip, type UserLocation } from "@/lib/compare/geo";
 import { ruPlural } from "@/lib/plural";
 
 export interface Placed extends Quote {
@@ -29,12 +29,16 @@ export interface PlaceInput {
   shopPoint: (o: OfferInput) => { point: GeoPoint; approx: boolean } | null;
   shopOkrug: (o: OfferInput) => string | null;
   today: string;
+  /** Путь по дорогам от пользователя до точки проката; нет — по прямой. */
+  road?: (shop: GeoPoint) => RoadRoute | null;
 }
 
 export function place(quotes: Quote[], ctx: PlaceInput): Placed[] {
   return quotes.map((q) => {
     const sp = ctx.user ? ctx.shopPoint(q.offer) : null;
-    const trip = ctx.user && sp ? tripBetween(ctx.user.point, sp.point, ctx.user.approx || sp.approx) : null;
+    const trip = ctx.user && sp
+      ? tripBetween(ctx.user.point, sp.point, ctx.user.approx || sp.approx, ctx.road?.(sp.point))
+      : null;
     return {
       ...q,
       trip,

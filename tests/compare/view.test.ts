@@ -219,3 +219,17 @@ describe("regressions", () => {
     expect(v.summary.shops).toBe(1);
   });
 });
+
+describe("road distances", () => {
+  it("a shop across the river is not «near» when road distances are known", () => {
+    const user: UserLocation = { kind: "point", point: { lat: 45.0106, lon: 38.9367 }, label: null, source: "address" };
+    const across = O({ id: "across", priceDay: 1000, place: { microdistrict: null, okrug: null, lat: 45.028, lon: 38.908, address: "x" } });
+    const sameBank = O({ id: "same", priceDay: 1000, place: { microdistrict: null, okrug: null, lat: 45.04, lon: 38.976, address: "y" } });
+    const straight = buildResultView([across, sameBank], withLoc(user, { tab: "nearest" }), ctx);
+    expect(ids(straight)[0]).toBe("across"); // по прямой ближе
+    const roads = new Map([["45.02800,38.90800", { km: 8.7, minutes: null }], ["45.04000,38.97600", { km: 6, minutes: 17 }]]);
+    const byRoad = buildResultView([across, sameBank], withLoc(user, { tab: "nearest" }), { ...ctx, roads });
+    expect(ids(byRoad)[0]).toBe("same");
+    expect(byRoad.sections[0].items[0].trip).toMatchObject({ km: 6, minutes: 17 }); // время — маршрутизатора (Яндекс)
+  });
+});

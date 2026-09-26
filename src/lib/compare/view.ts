@@ -10,7 +10,7 @@ import {
 import {
   TAB_LABELS, defaultTab, explainFirst, place, sortForTab, tabsFor, type Placed, type TabId,
 } from "@/lib/compare/ranking";
-import { shopPoint, userOkrug, userPoint, type CityGeo, type UserLocation } from "@/lib/compare/geo";
+import { pointKey, shopPoint, userOkrug, userPoint, type CityGeo, type GeoPoint, type RoadRoute, type UserLocation } from "@/lib/compare/geo";
 import { openState, type WeekHours } from "@/lib/compare/hours";
 import type { ResultFilters, ResultParams } from "@/lib/compare/scenario";
 import type { VerifiedBy } from "@/lib/compare/offers-csv";
@@ -85,6 +85,8 @@ export interface ViewContext {
   /** Местное время города: день недели (пн = 0) и «ЧЧ:ММ» — для «Работает сегодня». */
   now: { weekday: number; time: string };
   geo: CityGeo;
+  /** Пути по дорогам до точек проката: pointKey → км и время (src/server/routing.ts). */
+  roads?: Map<string, RoadRoute>;
 }
 
 type Predicate = (q: Placed) => boolean;
@@ -122,6 +124,7 @@ export function buildResultView(offers: CompareOffer[], p: ResultParams, ctx: Vi
     },
     shopOkrug: (o: OfferInput) => (o as CompareOffer).place?.okrug ?? null,
     today,
+    road: (pt: GeoPoint) => ctx.roads?.get(pointKey(pt)) ?? null,
   };
   const all = place(priced.fresh, placeCtx);
   const recheck = place(priced.recheck, placeCtx);

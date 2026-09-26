@@ -61,9 +61,26 @@ export interface Trip {
   approx: boolean;
 }
 
-export function tripBetween(a: GeoPoint, b: GeoPoint, approx: boolean): Trip {
-  const km = haversineKm(a, b) * ROUTE_FACTOR;
-  return { km, minutes: Math.round((km / CITY_SPEED_KMH) * 60), approx };
+/** Путь по дорогам от маршрутизатора (src/server/routing.ts). */
+export interface RoadRoute {
+  km: number;
+  /** Время с пробками (Яндекс); null — по средней скорости города. */
+  minutes: number | null;
+}
+
+/**
+ * Путь между точками. `road` — от маршрутизатора; нет его — по прямой ×
+ * ROUTE_FACTOR (ТЗ, п. 4.3), что ошибается через реку. Время — маршрутизатора
+ * (Яндекс, с пробками) или по средней скорости города, в которой заложены пробки.
+ */
+export function tripBetween(a: GeoPoint, b: GeoPoint, approx: boolean, road?: RoadRoute | null): Trip {
+  const km = road?.km ?? haversineKm(a, b) * ROUTE_FACTOR;
+  return { km, minutes: road?.minutes ?? Math.round((km / CITY_SPEED_KMH) * 60), approx };
+}
+
+/** Ключ точки для карты расстояний (~1 м точности). */
+export function pointKey(p: GeoPoint): string {
+  return `${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
 }
 
 /** «3,2 км · ~8 мин»; приблизительное — «≈ 3 км · ~8 мин». */

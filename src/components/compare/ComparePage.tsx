@@ -12,8 +12,9 @@ import {
 import { buildResultView, type CompareOffer } from "@/lib/compare/view";
 import { cityNow, openLabel, openState } from "@/lib/compare/hours";
 import {
-  locationLabel, nearestMicrodistrict, okrugName, userOkrug, type CityGeo,
+  locationLabel, nearestMicrodistrict, okrugName, shopPoint, userOkrug, userPoint, type CityGeo,
 } from "@/lib/compare/geo";
+import { roadRoutes } from "@/server/routing";
 import type { Chip, SearchTarget } from "@/lib/compare/search";
 import { buildFaq } from "@/lib/compare/faq";
 import { dateRangeLabel, daysLabel, shopsLabel } from "@/lib/compare/format";
@@ -91,7 +92,16 @@ export async function ResultPage({
   const brandSlug = p.brandSlug && search.brands.some((b) => b.slug === p.brandSlug) ? p.brandSlug : null;
   const brandOffers = brandSlug ? offers.filter((o) => o.brandSlug === brandSlug) : offers;
   const scoped = classSlug ? brandOffers.filter((o) => classOf(o, scope) === classSlug) : brandOffers;
-  const view = buildResultView(scoped, { ...p, classSlug, brandSlug }, { today, now, geo });
+  // Пути по дорогам: одна матрица «пользователь → точки прокатов» (Яндекс → OSRM).
+  const user = userPoint(p.loc, geo);
+  const shopPoints = user
+    ? scoped.flatMap((o) => {
+      const sp = o.place ? shopPoint({ lat: o.place.lat, lon: o.place.lon, microdistrict: o.place.microdistrict }, geo) : null;
+      return sp ? [sp.point] : [];
+    })
+    : [];
+  const roads = user ? await roadRoutes(user.point, shopPoints) : undefined;
+  const view = buildResultView(scoped, { ...p, classSlug, brandSlug }, { today, now, geo, roads });
   const itemClassId = scope.itemClassId ?? scope.classes?.find((c) => c.slug === classSlug)?.id;
 
   const href = (patch: ParamsPatch) => resultHref(scope.path, patchParams(p, patch));

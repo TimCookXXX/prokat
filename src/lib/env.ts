@@ -49,6 +49,13 @@ const schema = z.object({
   YANDEX_GEOCODER_API_KEY: z.string().min(1).optional(),
   YANDEX_SUGGEST_API_KEY: z.string().min(1).optional(),
 
+  // Маршрутизатор OSRM (сервис osrm в docker-compose) — расстояние до проката по
+  // дорогам. Без него — по прямой × коэффициент (ошибается через Кубань).
+  OSRM_URL: z.string().url().optional(),
+  // Яндекс Матрица расстояний: путь и время с пробками, как на Яндекс Картах.
+  // Опрашивается первой; без ключа или при сбое — OSRM, затем по прямой.
+  YANDEX_ROUTING_API_KEY: z.string().min(1).optional(),
+
   // Старый P2P-контур: объявления юзеров, календарь занятости, заявки на бронь.
   // Продукт — сравнение цен прокатов, поэтому контур выключен, но не удалён.
   FEATURE_P2P: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
