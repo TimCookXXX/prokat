@@ -14,6 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
+    "db:sync-catalog": "tsx --env-file=.env scripts/sync-catalog.ts",
+    "db:import-offers": "tsx --env-file=.env scripts/import-offers.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

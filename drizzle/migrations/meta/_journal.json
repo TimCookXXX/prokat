@@ -15,6 +15,20 @@
       "when": 1786454834968,
       "tag": "0001_adorable_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790190083231,
+      "tag": "0002_secret_carnage",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790192601933,
+      "tag": "0003_worried_madelyne_pryor",
+      "breakpoints": true
     }
   ]
 }

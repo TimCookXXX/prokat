@@ -16,10 +16,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG STORAGE_PUBLIC_BASE
 ENV STORAGE_PUBLIC_BASE=$STORAGE_PUBLIC_BASE
 RUN pnpm build
-RUN pnpm exec esbuild scripts/migrate.ts \
-    --bundle --platform=node --target=node20 \
-    --format=cjs --outfile=migrate.cjs \
-    --external:pg-native
+RUN for s in migrate sync-catalog import-offers; do \
+      pnpm exec esbuild scripts/$s.ts \
+        --bundle --platform=node --target=node20 \
+        --format=cjs --outfile=$s.cjs \
+        --external:pg-native || exit 1; \
+    done
 
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -33,7 +35,7 @@ COPY --from=builder --chown=app:app /app/.next/standalone ./
 COPY --from=builder --chown=app:app /app/.next/static ./.next/static
 COPY --from=builder --chown=app:app /app/public ./public
 COPY --from=builder --chown=app:app /app/drizzle ./drizzle
-COPY --from=builder --chown=app:app /app/migrate.cjs ./migrate.cjs
+COPY --from=builder --chown=app:app /app/migrate.cjs /app/sync-catalog.cjs /app/import-offers.cjs ./
 COPY --chown=app:app scripts/entrypoint.sh ./entrypoint.sh
 USER app
 EXPOSE 3000

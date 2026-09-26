@@ -1,5 +1,8 @@
-// Dev/staging seeds: тестовый город, 7 категорий, 5 юзеров-владельцев и 20 товаров.
-// Идемпотентен: если город уже есть — выходит.
+// Dev/staging seeds. Идемпотентен, части независимы:
+// 1) справочник сравнения — Краснодар, категории, группы, классы (syncCatalog);
+// 2) демо-прокаты и цены — только вне production, через тот же импорт, что CSV;
+// 3) демо P2P-контура (FEATURE_P2P) — 5 владельцев и 20 товаров в Краснодаре;
+//    пропускается, если владельцы уже есть.
 // Запуск: pnpm db:seed (нужен DATABASE_URL в .env, миграции применены).
 
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -8,6 +11,10 @@ import { Pool } from "pg";
 import {
   users, cities, categories, listings, availability,
 } from "../drizzle/schema";
+import { syncCatalog } from "../src/server/compare/catalog-sync";
+import { importOffers } from "../src/server/compare/import-offers";
+import { DEFAULT_CITY_SLUG } from "../src/lib/compare/catalog-data";
+import { demoOfferRows } from "./seed-demo-offers";
 import { newId } from "../src/lib/id";
 import { slugify } from "../src/lib/slugify";
 import { addDaysStr, todayStr } from "../src/lib/catalog/dates";
@@ -22,10 +29,11 @@ async function main() {
   const pool = new Pool({ connectionString: url });
   const db = drizzle(pool);
 
-  // Пароли раздаются до проверки идемпотентности: на уже засеянной базе seed
-  // выходит раньше, и владельцы остались бы без входа по паролю.
-  const seedHash = await devSeedPassword(process.env.NODE_ENV);
-  if (seedHash) {
+  // Пароли раздаются и до проверки идемпотентности (на уже засеянной базе P2P-часть
+  // пропускается), и после создания владельцев — чтобы вход работал с первого запуска.
+  const grantDevPasswords = async () => {
+    const seedHash = await devSeedPassword(process.env.NODE_ENV);
+    if (!seedHash) return;
     const updated = await db.update(users)
       .set({ passwordHash: seedHash, emailVerified: new Date() })
       .where(and(like(users.email, "%@seed.local"), isNull(users.passwordHash)))
@@ -33,32 +41,43 @@ async function main() {
     if (updated.length > 0) {
       console.log(`Seed owners got a dev password (${updated.length}): ${DEV_SEED_PASSWORD}`);
     }
+  };
+  await grantDevPasswords();
+
+  // --- 1. Справочник сравнения ---
+  const catalog = await syncCatalog(db);
+  console.log(`Catalog: ${catalog.groupsUpserted} groups, ${catalog.classesUpserted} classes`);
+  const [city] = await db.select({ id: cities.id }).from(cities).where(eq(cities.slug, DEFAULT_CITY_SLUG)).limit(1);
+  const cityId = city.id;
+
+  // --- 2. Демо-прокаты и цены ---
+  if (process.env.NODE_ENV !== "production") {
+    const demo = await importOffers(db, demoOfferRows(todayStr()));
+    if (demo.errors.length) throw new Error(`Demo offers: ${demo.errors.map((e) => e.message).join("; ")}`);
+    console.log(
+      `Demo offers: ${demo.shopsCreated} shops created, ` +
+      `${demo.offersCreated} offers created, ${demo.offersUpdated} updated`,
+    );
   }
 
-  const existing = await db.select({ id: cities.id }).from(cities).where(eq(cities.slug, "kazan")).limit(1);
+  // --- 3. Демо P2P-контура ---
+  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, "owner1@seed.local")).limit(1);
   if (existing.length > 0) {
-    console.log("Seeds already applied (city 'kazan' exists), nothing to do");
+    console.log("P2P demo already applied (seed owners exist), skipping");
     await pool.end();
     return;
   }
 
-  // --- Город ---
-  const cityId = newId();
-  await db.insert(cities).values({
-    id: cityId,
-    name: "Казань",
-    slug: "kazan",
-    region: "Республика Татарстан",
-    lat: 55.7963,
-    lon: 49.1088,
-  });
-
-  // --- Категории (дерево 2 уровня) ---
+  // Категории (дерево 2 уровня). Справочник общий со сравнением — корневая
+  // «Инструменты» уже может быть создана syncCatalog, поэтому find-or-create.
   const cat = async (
     name: string, vertical: string, parentId: string | null = null, slug?: string,
   ) => {
+    const s = slug ?? slugify(name);
+    const [found] = await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, s)).limit(1);
+    if (found) return found.id;
     const id = newId();
-    await db.insert(categories).values({ id, parentId, name, slug: slug ?? slugify(name), vertical });
+    await db.insert(categories).values({ id, parentId, name, slug: s, vertical });
     return id;
   };
 
@@ -143,8 +162,8 @@ async function main() {
   const ownerDefs = [
     { username: "prokatmaster", name: "Артём", phone: "+7 900 111-22-33" },
     { username: "instrument116", name: "Роман", phone: "+7 900 222-33-44" },
-    { username: "velokazan", name: "Дмитрий", phone: "+7 900 333-44-55" },
-    { username: "sup-kazanka", name: "Игорь", phone: "+7 900 444-55-66" },
+    { username: "velokrd", name: "Дмитрий", phone: "+7 900 333-44-55" },
+    { username: "sup-kuban", name: "Игорь", phone: "+7 900 444-55-66" },
     { username: "platye-naprokat", name: "Марина", phone: "+7 900 555-66-77" },
   ];
 
@@ -241,9 +260,10 @@ async function main() {
     }
   }
 
-  await pool.end();
+  await grantDevPasswords();
   const catCount = (await db.select({ c: sql<number>`count(*)::int` }).from(categories))[0].c;
-  console.log(`Seeded: 1 city, ${catCount} categories, ${ownerDefs.length} owners, ${listingDefs.length} listings, ${availRows} availability rows`);
+  await pool.end();
+  console.log(`P2P demo: ${catCount} categories, ${ownerDefs.length} owners, ${listingDefs.length} listings, ${availRows} availability rows`);
 }
 
 main().catch((err) => {
