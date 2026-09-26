@@ -1,137 +1,193 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildSearchIndex, highlight, modelMatches, normalize, searchSuggestions, switchLayout, transliterate,
-  type SearchGroupInput, type SearchModelInput,
+  buildSearchIndex, highlight, matchedBrand, normalize, resolveQuery, searchSuggestions, stem, switchLayout,
+  transliterate, type SearchData,
 } from "@/lib/compare/search";
+import { CATALOG } from "@/lib/compare/catalog-data";
+import { BRANDS, MODELS } from "@/lib/compare/models-data";
+import { brandWordSet, modelAliasKeys, stopWordSet } from "@/lib/compare/models";
 
-const groups: SearchGroupInput[] = [
-  {
-    slug: "prokat-perforatora", name: "Перфоратор", nameGenitive: "перфоратора", category: "Инструменты",
-    keywords: ["перф", "бурилка"], shops: 8, fromPrice: { rub: 380, per: "day" },
-    classes: [
-      { slug: "perforator-sds-plus", name: "Перфоратор SDS-plus", shortHint: "2–4 Дж · дюбели, штробы, плитка" },
-      { slug: "perforator-sds-max", name: "Перфоратор SDS-max", shortHint: "5–12 Дж · монолит, проёмы" },
-    ],
-  },
-  {
-    slug: "prokat-bolgarki", name: "УШМ (болгарка)", nameGenitive: "болгарки", category: "Инструменты",
-    keywords: ["болгарка", "ушм", "турбинка"], shops: 2, fromPrice: { rub: 300, per: "day" },
-    classes: [
-      { slug: "ushm-125", name: "УШМ 125 мм", shortHint: "металл, профиль, плитка" },
-      { slug: "ushm-230", name: "УШМ 230 мм", shortHint: "бетон, камень" },
-    ],
-  },
-  {
-    slug: "prokat-shtroboreza", name: "Штроборез", nameGenitive: "штробореза", category: "Инструменты",
-    keywords: ["штроба"], shops: 0, fromPrice: null,
-    classes: [{ slug: "shtroborez", name: "Штроборез", shortHint: "штробы под проводку" }],
-  },
-];
+// Написания моделей — как в продакшене: ключи model_aliases (getSearchData), а не сырые строки.
+const keyOpts = {
+  brandWords: brandWordSet(BRANDS),
+  stopWords: stopWordSet(CATALOG.flatMap((c) => c.groups.flatMap((g) => [g.name, ...g.classes.map((cl) => cl.name)]))),
+};
 
-const models: SearchModelInput[] = [
-  { groupSlug: "prokat-perforatora", classSlug: "perforator-sds-plus", model: "Makita HR2470", shops: 2, fromDay: 380 },
-  { groupSlug: "prokat-perforatora", classSlug: "perforator-sds-plus", model: "Makita HR2630", shops: 1, fromDay: 550 },
-  { groupSlug: "prokat-perforatora", classSlug: "perforator-sds-plus", model: "Bosch GBH 2-26", shops: 1, fromDay: 500 },
-  { groupSlug: "prokat-perforatora", classSlug: "perforator-sds-max", model: "Hilti TE 2", shops: 1, fromDay: 900 },
-];
+// Индекс из настоящего справочника; у каждой модели «есть» прокат, у групп — цены.
+const data: SearchData = {
+  groups: CATALOG.flatMap((cat) => cat.groups.map((g) => ({
+    slug: g.slug, name: g.name, nameGenitive: g.nameGenitive, category: cat.name, keywords: g.keywords ?? [],
+    shops: 3, fromPrice: { rub: 500, per: "day" as const },
+    classes: g.classes.map((c) => ({ slug: c.slug, name: c.name, shortHint: c.shortHint ?? null, keywords: c.keywords, chip: c.chip ?? null })),
+  }))),
+  brands: BRANDS,
+  models: MODELS.map((m) => ({
+    slug: m.slug, brand: m.brand, name: m.name, family: m.family ?? null,
+    aliases: modelAliasKeys(m, BRANDS.find((b) => b.slug === m.brand)!, keyOpts),
+    classSlug: m.cls,
+    groupSlug: CATALOG.flatMap((c) => c.groups).find((g) => g.classes.some((c) => c.slug === m.cls))!.slug,
+    shops: 2, fromDay: 500,
+  })),
+};
+const index = buildSearchIndex(data);
+const resolve = (q: string) => resolveQuery(index, q, data);
 
-const index = buildSearchIndex(groups, models);
-const titles = (q: string) => searchSuggestions(index, q).map((s) => s.title);
-
-describe("normalize / layout / translit", () => {
+describe("normalization", () => {
   it("lowercases, folds ё and strips punctuation", () => {
     expect(normalize("  Проёмы, SDS-plus!  ")).toBe("проемы sds plus");
   });
-  it("switches keyboard layout both ways", () => {
+  it("switches layout and transliterates both ways", () => {
     expect(switchLayout("gthajhfnjh")).toBe("перфоратор");
-    expect(switchLayout("ьфлшеф")).toBe("makita");
-  });
-  it("transliterates both ways", () => {
+    expect(switchLayout("gepb")).toBe("пузи");
+    expect(transliterate("пузи")).toBe("puzi");
     expect(transliterate("perforator")).toBe("перфоратор");
-    expect(transliterate("макита")).toBe("makita");
+  });
+  it("stems Russian endings", () => {
+    expect(stem("перфоратора")).toBe("перфоратор");
+    expect(stem("перфораторы")).toBe("перфоратор");
+    expect(stem("моющего")).toBe("моющ");
   });
 });
 
-describe("searchSuggestions", () => {
-  it("prefix of a group shows the group and its classes, not every model", () => {
-    const r = searchSuggestions(index, "перфо");
-    expect(r[0]).toMatchObject({ kind: "group", title: "Перфоратор" });
-    expect(r.map((s) => s.kind)).toEqual(["group", "class", "class"]);
-    expect(r.slice(1).map((s) => s.classSlug)).toEqual(["perforator-sds-plus", "perforator-sds-max"]);
+// ТЗ, п. 12, критерии 1–5.
+describe("acceptance: search", () => {
+  it("1. «пуззи», «ПУЗИ», «puzzi 8/1», «gepb 8/1» find Karcher Puzzi 8/1 C", () => {
+    for (const q of ["пуззи 8/1", "ПУЗИ 8/1", "puzzi 8/1", "gepb 8/1", "puzzi8/1"]) {
+      const r = resolve(q);
+      expect(r.level, q).toBe("model");
+      expect(r.level === "model" && r.target.modelSlugs, q).toEqual(["karcher-puzzi-8-1"]);
+    }
+    for (const q of ["пуззи", "ПУЗИ", "gepb"]) {
+      expect(searchSuggestions(index, q).models.map((s) => s.title), q).toContain("Karcher Puzzi 8/1 C");
+    }
   });
 
-  it("second word narrows to the brand inside the group", () => {
-    const r = searchSuggestions(index, "перфо maki");
-    expect(r.map((s) => s.title)).toEqual(["Перфоратор SDS-plus Makita", "Makita HR2470", "Makita HR2630"]);
-    expect(r[0]).toMatchObject({ kind: "brand", model: "Makita", classSlug: "perforator-sds-plus" });
-    expect(r[1]).toMatchObject({ kind: "model", model: "Makita HR2470" });
+  it("2. «перфоратор» shows the whole perforator group", () => {
+    expect(resolve("перфоратор")).toMatchObject({ level: "class", target: { groupSlug: "prokat-perforatora" } });
+    expect(resolve("перфоратор").level === "class" && (resolve("перфоратор") as { target: { classSlug?: string } }).target.classSlug).toBeFalsy();
   });
 
-  it("finds a model by digits and by a spaced or joined article", () => {
-    expect(titles("2470")).toEqual(["Makita HR2470"]);
-    expect(titles("gbh226")).toEqual(["Bosch GBH 2-26"]);
-    expect(titles("gbh 2-26")).toEqual(["Bosch GBH 2-26"]);
+  it("3. «пылесос» asks to choose: Моющий / Строительный", () => {
+    const r = resolve("пылесос");
+    expect(r.level).toBe("ambiguous");
+    expect(r.level === "ambiguous" && r.chips.map((c) => c.label).sort()).toEqual(["Моющий", "Строительный"]);
   });
 
-  it("finds by synonyms", () => {
-    expect(titles("болгарка")[0]).toBe("УШМ (болгарка)");
-    expect(titles("турбин")[0]).toBe("УШМ (болгарка)");
-    expect(titles("бурилка")).toEqual(["Перфоратор"]);
+  it("4. genitive «перфоратора» and plural find the class", () => {
+    for (const q of ["перфоратора", "перфораторы", "перфаратор"]) {
+      expect(resolve(q), q).toMatchObject({ level: "class", target: { groupSlug: "prokat-perforatora" } });
+    }
   });
 
-  it("forgives wrong layout, translit, Russian brand names and typos", () => {
-    expect(titles("gthajh")[0]).toBe("Перфоратор");
-    expect(titles("perforator")[0]).toBe("Перфоратор");
-    expect(titles("макита")[0]).toBe("Перфоратор SDS-plus Makita");
-    expect(titles("бош")).toContain("Bosch GBH 2-26");
-    expect(titles("хилти")).toEqual(["Hilti TE 2"]);
-    expect(titles("пефоратор")[0]).toBe("Перфоратор");
+  it("5. nothing found — similar classes are offered", () => {
+    const r = resolve("кувалдометр");
+    expect(r.level).toBe("none");
+    expect(r.level === "none" && r.similar.length).toBeGreaterThan(0);
+  });
+});
+
+describe("levels", () => {
+  it("model by article, joined article and Cyrillic look-alike", () => {
+    expect(resolve("HR2470")).toMatchObject({ level: "model", target: { modelSlugs: ["makita-hr2470"] } });
+    expect(resolve("НR2470")).toMatchObject({ level: "model", target: { modelSlugs: ["makita-hr2470"] } });
+    expect(resolve("gbh226")).toMatchObject({ level: "model", target: { modelSlugs: ["bosch-gbh-2-26"] } });
+    expect(resolve("hr2470ft")).toMatchObject({ level: "model", target: { modelSlugs: ["makita-hr2470"] } });
   });
 
-  it("does not list a single class separately from its group", () => {
-    expect(titles("штроб")).toEqual(["Штроборез"]);
+  it("several models of one class — class with a model filter", () => {
+    const r = resolve("puzzi");
+    expect(r).toMatchObject({ level: "model", target: { classSlug: "moyushchiy-pylesos" } });
+    expect(r.level === "model" && r.target.modelSlugs?.sort()).toEqual(["karcher-puzzi-10-1", "karcher-puzzi-8-1"]);
   });
 
-  it("shows a group without prices, but below groups with prices", () => {
-    const r = searchSuggestions(index, "штроб");
-    expect(r[0].subtitle).toContain("цены собираем");
+  it("brand + class", () => {
+    expect(resolve("макита перфоратор")).toMatchObject({
+      level: "brand", target: { groupSlug: "prokat-perforatora", brandSlug: "makita" },
+    });
+    expect(matchedBrand("керхер", data.brands)?.slug).toBe("karcher");
+    expect(matchedBrand("ьфлшеф", data.brands)?.slug).toBe("makita");
   });
 
-  it("returns nothing for gibberish", () => {
-    expect(titles("кувалдометр")).toEqual([]);
+  it("brand alone across groups asks which group", () => {
+    const r = resolve("керхер");
+    expect(r.level).toBe("ambiguous");
+    expect(r.level === "ambiguous" && r.chips.every((c) => c.target.brandSlug === "karcher")).toBe(true);
   });
 
-  it("empty query shows popular groups with prices", () => {
-    expect(titles("")).toEqual(["Перфоратор", "УШМ (болгарка)"]);
+  it("synonyms of groups", () => {
+    expect(resolve("болгарка")).toMatchObject({ level: "class", target: { groupSlug: "prokat-bolgarki" } });
+    expect(resolve("отбойник")).toMatchObject({ level: "class", target: { groupSlug: "prokat-otboynogo-molotka" } });
   });
 
-  it("subtitle of a group has shops and price from", () => {
-    expect(searchSuggestions(index, "перфоратор")[0].subtitle).toBe("Инструменты · 8 прокатов · от 380 ₽ в сутки");
+  it("a class-specific word picks the class", () => {
+    expect(resolve("перфоратор sds-max")).toMatchObject({ level: "class", target: { classSlug: "perforator-sds-max" } });
+  });
+});
+
+describe("regressions", () => {
+  it("service words and extra words do not turn a query into «not found»", () => {
+    for (const [q, group] of [
+      ["прокат перфоратора", "prokat-perforatora"],
+      ["аренда болгарки в краснодаре", "prokat-bolgarki"],
+      ["перфоратор на выходные", "prokat-perforatora"],
+      ["генератор 5 квт", "prokat-generatora"],
+      ["ушм 180", "prokat-bolgarki"],
+      ["строительные леса", "prokat-vyshki-tury"],
+      ["пылесос для химчистки", "prokat-moyushchego-pylesosa"],
+      ["makita болгарка", "prokat-bolgarki"],
+    ] as const) {
+      const r = resolve(q);
+      expect(r.level, q).not.toBe("none");
+      if (r.level !== "none" && r.level !== "ambiguous") expect(r.target.groupSlug, q).toBe(group);
+    }
+  });
+
+  it("models of one group across classes — the group with a model filter", () => {
+    const r = resolve("hr");
+    expect(r.level).toBe("model");
+    expect(r.level === "model" && r.target).toMatchObject({ groupSlug: "prokat-perforatora" });
+    expect(r.level === "model" && r.target.classSlug).toBeUndefined();
+    expect(r.level === "model" && r.target.modelSlugs?.length).toBeGreaterThan(2);
+  });
+
+  it("fuzzy matching does not jump to unrelated tools or brands", () => {
+    expect(resolve("бензорез").level === "class" && (resolve("бензорез") as { target: { groupSlug: string } }).target.groupSlug).not.toBe("prokat-generatora");
+    expect(searchSuggestions(index, "makita").models.map((m) => m.title).join()).not.toMatch(/Maikaolin/);
+    expect(searchSuggestions(index, "sds max").models.map((m) => m.target.classSlug)).not.toContain("perforator-sds-plus");
+  });
+
+  it("a single letter is not a query", () => {
+    expect(resolve("с").level).toBe("none");
+    expect(resolve("d").level).toBe("none");
+  });
+});
+
+describe("suggestions", () => {
+  it("models and classes, 5 each at most", () => {
+    const s = searchSuggestions(index, "перфо");
+    expect(s.classes[0]).toMatchObject({ kind: "group", title: "Перфоратор" });
+    expect(s.models).toEqual([]);
+    expect(s.classes.length).toBeLessThanOrEqual(5);
+  });
+
+  it("second word narrows to the brand", () => {
+    const s = searchSuggestions(index, "перфо maki");
+    expect(s.classes.map((x) => x.title)).toContain("Перфоратор SDS-plus Makita");
+    expect(s.models.map((x) => x.title)).toEqual(expect.arrayContaining(["Makita HR2470", "Makita HR2630"]));
+  });
+
+  it("model subtitle has shops and price", () => {
+    expect(searchSuggestions(index, "HR2470").models[0].subtitle).toBe("Перфоратор SDS-plus · 2 проката · от 500 ₽ в сутки");
+  });
+
+  it("empty query — popular groups", () => {
+    expect(searchSuggestions(index, "").classes.length).toBeGreaterThan(0);
   });
 });
 
 describe("highlight", () => {
-  it("marks matched word starts", () => {
-    expect(highlight("Перфоратор SDS-plus", "перфо sd")).toEqual([
-      { text: "Перфо", hit: true }, { text: "ратор", hit: false }, { text: " ", hit: false },
-      { text: "SD", hit: true }, { text: "S", hit: false }, { text: "-", hit: false }, { text: "plus", hit: false },
-    ]);
-  });
-});
-
-describe("highlight — converted forms", () => {
-  it("highlights a brand typed in Cyrillic or in the wrong layout", () => {
+  it("marks matched word starts, also for converted forms", () => {
+    expect(highlight("Перфоратор SDS-plus", "перфо")[0]).toEqual({ text: "Перфо", hit: true });
     expect(highlight("Makita HR2470", "макит")[0]).toEqual({ text: "Makit", hit: true });
-    expect(highlight("Перфоратор", "gthaj")[0]).toEqual({ text: "Перфо", hit: true });
-  });
-});
-
-describe("modelMatches", () => {
-  it("matches exact model or whole brand, case-insensitively", () => {
-    expect(modelMatches("Makita HR2470")("makita hr2470")).toBe(true);
-    expect(modelMatches("Makita")("Makita HR2630")).toBe(true);
-    expect(modelMatches("Makita")("Makitax 1")).toBe(false);
-    expect(modelMatches("Makita")(null)).toBe(false);
-    expect(modelMatches(null)(null)).toBe(true);
   });
 });

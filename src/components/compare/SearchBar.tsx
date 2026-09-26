@@ -1,50 +1,69 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { compareHref, defaultDates, type CompareParams } from "@/lib/compare/scenario";
+import {
+  emptyParams, patchParams, resultHref, targetHref, type ResultParams,
+} from "@/lib/compare/scenario";
 import { dateRangeLabel } from "@/lib/compare/format";
+import { buildSearchIndex, type SearchData } from "@/lib/compare/search";
+import { locationLabel, parseLocation, locationQuery, type CityGeo, type UserLocation } from "@/lib/compare/geo";
 import { Modal, ModalContent, ModalTitle } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/button";
-import { buildSearchIndex, type SearchGroupInput, type SearchModelInput, type Suggestion } from "@/lib/compare/search";
 import { DateRangeField } from "./DateRangeField";
-import { WhatField } from "./WhatField";
+import { WhatField, type WhatValue } from "./WhatField";
+import { WhereField } from "./WhereField";
 
-/** Что ищем в городе: группы с классами и синонимами, модели с предложениями. */
-export interface SearchData {
-  groups: SearchGroupInput[];
-  models: SearchModelInput[];
-}
+export type SearchBarData = SearchData & { seoWords: Record<string, string> };
 
-/** Выбор в строке поиска; пустые поля на главной — null. */
+/** Выбор в строке поиска; пустые поля на главной. */
 export interface SearchValue {
-  groupSlug: string | null;
-  classSlug: string | null;
-  /** Модель или бренд из подсказки — фильтр выдачи `m`. */
-  model?: string | null;
+  what: WhatValue;
   from: string | null;
   to: string | null;
-  /** Страница сравнения: сохранить «заберу сам» при новом поиске. */
-  pickup?: boolean;
+  loc: UserLocation;
 }
 
-// Классы пишем целиком: Tailwind собирает только то, что видит в исходниках.
+// Последнее выбранное «Где» — на устройстве (ТЗ, п. 3.3). Только удобство: нет
+// хранилища (приватный режим) — просто не помним.
+const LOC_KEY = "inr_loc";
+
+function readStoredLocation(geo: CityGeo): UserLocation | null {
+  try {
+    const raw = localStorage.getItem(LOC_KEY);
+    if (!raw) return null;
+    const loc = parseLocation(JSON.parse(raw) as Record<string, string>, geo);
+    return loc.kind === "city" ? null : loc;
+  } catch {
+    return null;
+  }
+}
+
+function storeLocation(loc: UserLocation) {
+  try {
+    if (loc.kind === "city") localStorage.removeItem(LOC_KEY);
+    else localStorage.setItem(LOC_KEY, JSON.stringify(locationQuery(loc)));
+  } catch { /* нет хранилища — не помним */ }
+}
+
 const MD_GROW: Record<string, string> = {
-  "flex-[1.6]": "md:flex-[1.6]",
+  "flex-[1.4]": "md:flex-[1.4]",
   "flex-1": "md:flex-1",
 };
 
-// Строка поиска «Что нужно · Когда» (DESIGN_SYSTEM → SearchBar). hero — большая
-// на главной, поля пустые с подсказками; compact — на странице сравнения с
-// текущим выбором, на телефоне сворачивается в строку-кнопку с карандашом.
-// Даты не выбраны — ищем на завтра, 1 сутки.
+// Строка поиска «Что · Когда · Где» (ТЗ, пп. 3, 6). hero — большая на главной;
+// compact — на выдаче с текущим выбором, на телефоне сворачивается в строку
+// «Puzzi 8/1 · 27–29 сен · ЮМР» с карандашом. Даты не выбраны — сегодня на 1 сутки.
 export function SearchBar({
-  citySlug, search, value, today, variant,
+  citySlug, cityName, search, geo, addressEnabled, value, today, variant,
 }: {
   citySlug: string;
-  search: SearchData;
+  cityName: string;
+  search: SearchBarData;
+  geo: CityGeo;
+  addressEnabled: boolean;
   value: SearchValue;
   today: string;
   variant: "hero" | "compact";
@@ -52,49 +71,50 @@ export function SearchBar({
   const router = useRouter();
   const [v, setV] = useState(value);
   const [sheet, setSheet] = useState(false);
+  const index = useMemo(() => buildSearchIndex(search), [search]);
+  const hero = variant === "hero";
 
-  const pending = useRef<Suggestion | null>(null);
-  const setPending = useMemo(() => (s: Suggestion | null) => { pending.current = s; }, []);
-  const index = useMemo(() => buildSearchIndex(search.groups, search.models), [search]);
-  const classes = useMemo(
-    () => search.groups.flatMap((g) => g.classes.map((cl) => ({ ...cl, group: g.slug }))),
-    [search],
-  );
-  const current = classes.find((c) => c.slug === v.classSlug && c.group === v.groupSlug);
-  // Текст поля — заголовок подсказки, которой соответствует выбор; ничего не выбрано — пусто.
-  const label = useMemo(() => {
-    if (!current) return "";
-    const model = v.model ?? null;
-    const hit = index.find(({ suggestion: s }) => s.model === model && s.classSlug === current.slug && s.kind !== "group")
-      ?? index.find(({ suggestion: s }) => !model && s.kind === "group" && s.groupSlug === current.group);
-    return hit?.suggestion.title ?? model ?? current.name;
-  }, [index, v.model, current]);
+  // Место может прийти позже клика «Найти» (адрес, геолокация): submit ждёт промис
+  // и берёт место из ref — состояние к этому моменту ещё не перерисовано.
+  const locRef = useRef<UserLocation>(value.loc);
+  const pendingLoc = useRef<Promise<void> | null>(null);
+  const track = (p: Promise<void>) => {
+    pendingLoc.current = p;
+    void p.finally(() => { if (pendingLoc.current === p) pendingLoc.current = null; });
+  };
+  const setLoc = (loc: UserLocation) => {
+    storeLocation(loc);
+    locRef.current = loc;
+    setV((x) => ({ ...x, loc }));
+  };
 
-  const submit = (form: HTMLFormElement) => {
-    const s = pending.current;
-    const next = s ? { ...v, groupSlug: s.groupSlug, classSlug: s.classSlug, model: s.model } : v;
-    const cls = classes.find((c) => c.slug === next.classSlug && c.group === next.groupSlug);
-    if (!cls) {
-      // Не выбрали, что нужно, — открываем подсказки вместо пустого поиска.
+  // На главной подставляем последнее место с этого устройства.
+  useEffect(() => {
+    if (!hero || value.loc.kind !== "city") return;
+    const stored = readStoredLocation(geo);
+    if (stored) { locRef.current = stored; setV((x) => ({ ...x, loc: stored })); }
+  }, [hero, value.loc.kind, geo]);
+
+  const submit = async (form: HTMLFormElement) => {
+    if (pendingLoc.current) await pendingLoc.current;
+    let p: ResultParams = { ...emptyParams(today), loc: locRef.current };
+    if (v.from && v.to) p = patchParams(p, { from: v.from, to: v.to });
+    if (v.what.target) {
+      setSheet(false);
+      router.push(targetHref(citySlug, v.what.target, search.seoWords, p) as never);
+      return;
+    }
+    const text = v.what.label.trim();
+    if (!text) {
+      // Не сказали, что нужно, — открываем подсказки вместо пустого поиска.
       form.querySelector<HTMLInputElement>("input[role=combobox]")?.focus();
       return;
     }
-    const dates = next.from && next.to ? { from: next.from, to: next.to } : defaultDates(today);
-    const params: CompareParams = {
-      classSlug: cls.slug,
-      model: next.model ?? null,
-      ...dates,
-      days: 0,
-      pickup: !!next.pickup,
-      tab: "cheapest",
-      filters: { noMoneyDeposit: false, sameDay: false, claimed: false, oneDay: false, areas: [] },
-    };
     setSheet(false);
-    router.push(compareHref(citySlug, cls.group, params) as never);
+    router.push(resultHref(`/${citySlug}/poisk?q=${encodeURIComponent(text)}`, p) as never);
   };
-  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); submit(e.currentTarget); };
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); void submit(e.currentTarget); };
 
-  const hero = variant === "hero";
   const labelCls = cn("text-muted-foreground", hero ? "text-xs" : "text-[11px]");
   const valueCls = hero ? "text-[17px] md:text-[19px]" : "text-base";
   const cell = cn("relative flex min-w-0 flex-col gap-0.5", hero ? "px-[18px] py-2.5" : "px-4 py-1.5");
@@ -111,25 +131,40 @@ export function SearchBar({
 
   const fields = (layout: "row" | "column" | "auto") => (
     <>
-      <div className={cn(cell, place(layout, "flex-[1.6]"))}>
+      <div className={cn(cell, place(layout, "flex-[1.4]"))}>
         <WhatField
+          id={`what-${variant}-${layout}`}
           index={index}
-          label={label}
+          value={v.what}
+          onChange={(what) => setV((x) => ({ ...x, what }))}
           list={layout === "column" ? "inline" : "popover"}
-          onSelect={(s) => setV({ ...v, groupSlug: s.groupSlug, classSlug: s.classSlug, model: s.model })}
-          onPending={setPending}
           labelClassName={labelCls}
           valueClassName={valueCls}
         />
       </div>
-      <div className={cn(cell, place(layout, "flex-1", true))}>
+      <div className={cn(cell, place(layout, "flex-1"))}>
         <DateRangeField
           from={v.from}
           to={v.to}
           today={today}
-          onChange={(from, to) => setV({ ...v, from, to })}
+          onChange={(from, to) => setV((x) => ({ ...x, from, to }))}
           labelClassName={labelCls}
           valueClassName={cn("font-semibold", valueCls)}
+        />
+      </div>
+      <div className={cn(cell, place(layout, "flex-1", true))}>
+        <WhereField
+          id={`where-${variant}-${layout}`}
+          citySlug={citySlug}
+          cityName={cityName}
+          geo={geo}
+          value={v.loc}
+          onChange={setLoc}
+          track={track}
+          addressEnabled={addressEnabled}
+          list={layout === "column" ? "inline" : "popover"}
+          labelClassName={labelCls}
+          valueClassName={valueCls}
         />
       </div>
     </>
@@ -161,6 +196,7 @@ export function SearchBar({
     );
   }
 
+  const where = v.loc.kind === "city" ? cityName : locationLabel(v.loc, geo, cityName);
   return (
     <>
       {/* Десктоп: одна плашка с полями. */}
@@ -169,24 +205,24 @@ export function SearchBar({
         {findBtn(false)}
       </form>
 
-      {/* Телефон: параметры одной строкой, по нажатию — форма в листе. */}
+      {/* Телефон: «Puzzi 8/1 · 27–29 сен · ЮМР», по нажатию — форма в листе. */}
       <Modal open={sheet} onOpenChange={setSheet}>
         <button
           type="button"
           onClick={() => setSheet(true)}
           className="flex w-full items-center gap-2.5 rounded-field bg-card px-3.5 py-2.5 text-left text-foreground md:hidden"
         >
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-[15px] font-semibold">{label || "Что нужно"}</span>
-            <span className="truncate text-[13px] text-muted-foreground">
-              {v.from && v.to ? dateRangeLabel(v.from, v.to) : "даты не выбраны"} · {v.pickup ? "заберу сам" : "с доставкой"}
+          <span className="min-w-0 flex-1 truncate text-[15px]">
+            <b className="font-semibold">{v.what.label || "Что нужно"}</b>
+            <span className="text-muted-foreground">
+              {" · "}{v.from && v.to ? dateRangeLabel(v.from, v.to) : "сегодня"}{" · "}{where}
             </span>
           </span>
           <Pencil className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className="sr-only">Изменить параметры</span>
         </button>
         <ModalContent className="md:max-w-md">
-          <ModalTitle className="mb-3 font-display text-lg font-semibold">Что и когда</ModalTitle>
+          <ModalTitle className="mb-3 font-display text-lg font-semibold">Что, когда, где</ModalTitle>
           <form onSubmit={onSubmit} className="flex flex-col gap-3">
             <div className="flex flex-col rounded-field border border-border">{fields("column")}</div>
             {findBtn(true)}
@@ -196,3 +232,4 @@ export function SearchBar({
     </>
   );
 }
+

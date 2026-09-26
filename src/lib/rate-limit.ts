@@ -4,7 +4,7 @@
 // Ключ — произвольная строка: для доменных действий это userId, для входа и
 // писем — почта, IP или их пара.
 
-export type LimitKind = "comment" | "post" | "booking" | "login" | "register" | "resend" | "reset" | "mail_ip" | "lead" | "lead_form";
+export type LimitKind = "comment" | "post" | "booking" | "login" | "register" | "resend" | "reset" | "mail_ip" | "lead" | "lead_form" | "lead_ip" | "lead_form_ip" | "geo";
 export type LimitResult =
   | { ok: true }
   | { ok: false; retryAfterSec: number; reason: "gap" | "window" };
@@ -29,6 +29,13 @@ const RULES: Record<LimitKind, Rule> = {
   lead:      { windowMs: 60 * 60 * 1000, maxInWindow: 40, gapMs: 0 },
   // Формы с контактом (заявка «нужен регулярно», «это ваш прокат?»).
   lead_form: { windowMs: 60 * 60 * 1000, maxInWindow: 5,  gapMs: 10_000 },
+  // Те же действия по IP: cookie сессии подделывается, IP — нет. Потолок выше:
+  // за одним IP (мобильный NAT, офис) сидит много людей.
+  lead_ip:      { windowMs: 60 * 60 * 1000, maxInWindow: 200, gapMs: 0 },
+  lead_form_ip: { windowMs: 60 * 60 * 1000, maxInWindow: 20,  gapMs: 0 },
+  // Подсказки адресов «Где»: запрос на каждое нажатие (с задержкой) — щедрый
+  // потолок для человека, но не для скрипта, выкачивающего платный геокодер.
+  geo:       { windowMs: 60 * 1000,      maxInWindow: 60, gapMs: 0 },
 };
 
 const MAX_KEYS = 10_000;
