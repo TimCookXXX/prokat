@@ -21,15 +21,30 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://app:${DB_PASSWORD}@db:5432/app
+      OSRM_URL: http://osrm:5000
     depends_on:
       db:
         condition: service_healthy
+      # Маршрутизатор не обязателен: без него расстояние считается по прямой.
+      osrm:
+        condition: service_started
+        required: false
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  # Маршруты по дорогам «до проката» (src/server/routing.ts). Граф готовит
+  # scripts/osrm/prepare.sh в data/osrm; без графа сайт считает по прямой.
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld --max-table-size 1000 /data/krasnodar.osrm
+    ports: ["127.0.0.1:5001:5000"]
+    volumes:
+      - ./data/osrm:/data:ro
 
   db:
     image: postgres:16-alpine

@@ -13,6 +13,7 @@ import { todayStr, addDaysStr } from "@/lib/catalog/dates";
 import { Breadcrumbs } from "@/components/catalog/Breadcrumbs";
 import { ListingCard } from "@/components/catalog/ListingCard";
 import { siteConfig } from "@/lib/site-config";
+import { isP2PEnabled, requireP2P } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ function memberSince(date: Date): string {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  if (!isP2PEnabled()) return {};
   const { username } = await params;
   const seller = await getSellerByUsername(username);
   if (!seller) return {};
@@ -35,6 +37,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function SellerProfilePage({ params }: Props) {
+  requireP2P();
   const { username } = await params;
   const seller = await getSellerByUsername(username);
   if (!seller) notFound();

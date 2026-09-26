@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Б: главная с поиском</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&amp;family=Unbounded:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;font-family:Onest,system-ui,sans-serif;background:#EEF3F1;color:#16201D}
+a{color:#16201D}a:hover{color:#C24A06}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1260px; box-sizing: border-box; background: #EEF3F1; font-family: Onest, system-ui, sans-serif; color: #16201D; display: flex; flex-direction: column;">
+
+<div style="background: #0F3D35; color: #FFFFFF; padding: 0 64px 56px; display: flex; flex-direction: column; gap: 40px;">
+<div style="height: 68px; display: flex; align-items: center; gap: 24px;">
+<a href="HomeB.dc.html" style="font-family: Unbounded, Onest, sans-serif; font-weight: 700; font-size: 21px; text-decoration: none; color: #FFFFFF;">inrenta<span style="color: #FF8A3D;">.</span></a>
+<button type="button" style="height: 34px; padding: 0 12px; border: 1px solid rgba(255,255,255,0.25); border-radius: 17px; background: transparent; color: #FFFFFF; font: 14px Onest, system-ui, sans-serif; cursor: pointer;">Краснодар</button>
+<div style="flex-grow: 1;"></div>
+<a href="#" style="font-size: 14px; color: #CFE3DD; text-decoration: none;">Как считаем цены</a>
+<a href="Cabinet.dc.html" style="font-size: 14px; color: #CFE3DD; text-decoration: none;">Для прокатов</a>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center;">
+<h1 style="margin: 0; font-family: Unbounded, Onest, sans-serif; font-size: 50px; font-weight: 600; line-height: 1.1; letter-spacing: -0.02em;">Возьмите напрокат дешевле</h1>
+<p style="margin: 0; font-size: 18px; color: #CFE3DD;">Сравниваем все прокаты Краснодара: итог за ваши даты, доставка и залог — сразу</p>
+</div>
+<form style="background: #FFFFFF; border-radius: 18px; padding: 8px; display: flex; align-items: stretch; gap: 0; color: #16201D; box-shadow: 0 20px 40px -24px rgba(0,0,0,0.5);">
+<label for="bWhat" style="flex-grow: 1.4; flex-basis: 0; padding: 10px 18px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #56645F; border-right: 1px solid #DDE5E2;">Что нужно<input id="bWhat" value="Перфоратор" style="border: 0; padding: 0; font: 600 19px Onest, system-ui, sans-serif; color: #16201D; background: transparent; outline-offset: 4px;"></label>
+<label for="bDates" style="flex-grow: 1.2; flex-basis: 0; padding: 10px 18px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #56645F; border-right: 1px solid #DDE5E2;">Когда<input id="bDates" value="сб 27 — пн 29 сен" style="border: 0; padding: 0; font: 600 19px Onest, system-ui, sans-serif; color: #16201D; background: transparent;"></label>
+<label for="bWhere" style="flex-grow: 1.2; flex-basis: 0; padding: 10px 18px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #56645F;">Куда привезти<input id="bWhere" value="ФМР" style="border: 0; padding: 0; font: 600 19px Onest, system-ui, sans-serif; color: #16201D; background: transparent;"></label>
+<a href="CompareB.dc.html" style="flex-shrink: 0; padding: 0 34px; border-radius: 12px; background: #C24A06; color: #FFFFFF; font-size: 18px; font-weight: 600; text-decoration: none; display: flex; align-items: center;">Найти</a>
+</form>
+<div style="display: flex; gap: 20px; justify-content: center; font-size: 14px; color: #CFE3DD;">
+<label for="bPickup" style="display: flex; align-items: center; gap: 8px;"><input id="bPickup" type="checkbox" style="width: 18px; height: 18px; accent-color: #FF8A3D;">Заберу сам</label>
+<label for="bNoDep" style="display: flex; align-items: center; gap: 8px;"><input id="bNoDep" type="checkbox" style="width: 18px; height: 18px; accent-color: #FF8A3D;">Без денежного залога</label>
+</div>
+</div>
+
+<div style="padding: 48px 64px 0; display: flex; flex-direction: column; gap: 20px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline;">
+<h2 style="margin: 0; font-family: Unbounded, Onest, sans-serif; font-size: 26px; font-weight: 600;">Что чаще берут в Краснодаре</h2>
+<a href="Category.dc.html" style="font-size: 15px; font-weight: 600; color: #C24A06;">Весь инструмент</a>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+
+<a href="CompareB.dc.html" style="background: #FFFFFF; border-radius: 16px; overflow: hidden; text-decoration: none; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(15,61,53,0.06), 0 8px 24px -16px rgba(15,61,53,0.25);">
+<div style="height: 150px; background: #DDE8E4; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #56645F;">[фото перфоратора]</div>
+<div style="padding: 16px 18px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 18px; font-weight: 600;">Перфоратор</span><span style="font-size: 13px; color: #56645F;">8 прокатов</span></div>
+<div style="display: flex; flex-direction: column; align-items: flex-end;"><span style="font-size: 12px; color: #56645F;">от</span><span style="font-family: Unbounded, Onest, sans-serif; font-size: 20px; font-weight: 600;">350 ₽</span><span style="font-size: 12px; color: #56645F;">в сутки</span></div>
+</div>
+</a>
+
+<a href="#" style="background: #FFFFFF; border-radius: 16px; overflow: hidden; text-decoration: none; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(15,61,53,0.06), 0 8px 24px -16px rgba(15,61,53,0.25);">
+<div style="height: 150px; background: #DDE8E4; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #56645F;">[фото бетономешалки]</div>
+<div style="padding: 16px 18px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 18px; font-weight: 600;">Бетономешалка</span><span style="font-size: 13px; color: #56645F;">7 прокатов</span></div>
+<div style="display: flex; flex-direction: column; align-items: flex-end;"><span style="font-size: 12px; color: #56645F;">от</span><span style="font-family: Unbounded, Onest, sans-serif; font-size: 20px; font-weight: 600;">500 ₽</span><span style="font-size: 12px; color: #56645F;">в сутки</span></div>
+</div>
+</a>
+
+<a href="#" style="background: #FFFFFF; border-radius: 16px; overflow: hidden; text-decoration: none; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(15,61,53,0.06), 0 8px 24px -16px rgba(15,61,53,0.25);">
+<div style="height: 150px; background: #DDE8E4; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #56645F;">[фото моющего пылесоса]</div>
+<div style="padding: 16px 18px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 18px; font-weight: 600;">Моющий пылесос</span><span style="font-size: 13px; color: #56645F;">6 прокатов</span></div>
+<div style="display: flex; flex-direction: column; align-items: flex-end;"><span style="font-size: 12px; color: #56645F;">от</span><span style="font-family: Unbounded, Onest, sans-serif; font-size: 20px; font-weight: 600;">800 ₽</span><span style="font-size: 12px; color: #56645F;">в сутки</span></div>
+</div>
+</a>
+
+<a href="#" style="background: #FFFFFF; border-radius: 16px; overflow: hidden; text-decoration: none; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(15,61,53,0.06), 0 8px 24px -16px rgba(15,61,53,0.25);">
+<div style="height: 150px; background: #DDE8E4; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #56645F;">[фото виброплиты]</div>
+<div style="padding: 16px 18px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 18px; font-weight: 600;">Виброплита</span><span style="font-size: 13px; color: #56645F;">5 прокатов</span></div>
+<div style="display: flex; flex-direction: column; align-items: flex-end;"><span style="font-size: 12px; color: #56645F;">от</span><span style="font-family: Unbounded, Onest, sans-serif; font-size: 20px; font-weight: 600;">900 ₽</span><span style="font-size: 12px; color: #56645F;">в сутки</span></div>
+</div>
+</a>
+
+<a href="#" style="background: #FFFFFF; border-radius: 16px; overflow: hidden; text-decoration: none; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(15,61,53,0.06), 0 8px 24px -16px rgba(15,61,53,0.25);">
+<div style="height: 150px; background: #DDE8E4; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #56645F;">[фото генератора]</div>
+<div style="padding: 16px 18px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 18px; font-weight: 600;">Генератор</span><span style="font-size: 13px; color: #56645F;">6 прокатов</span></div>
+<div style="display: flex; flex-direction: column; align-items: flex-end;"><span style="font-size: 12px; color: #56645F;">от</span><span style="font-family: Unbounded, Onest, sans-serif; font-size: 20px; font-weight: 600;">800 ₽</span><span style="font-size: 12px; color: #56645F;">в сутки</span></div>
+</div>
+</a>
+
+<a href="Courier.dc.html" style="background: #FFFFFF; border-radius: 16px; overflow: hidden; text-decoration: none; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(15,61,53,0.06), 0 8px 24px -16px rgba(15,61,53,0.25);">
+<div style="height: 150px; background: #DDE8E4; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #56645F;">[фото электровелосипеда]</div>
+<div style="padding: 16px 18px; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 18px; font-weight: 600;">Электровелосипед курьеру</span><span style="font-size: 13px; color: #56645F;">сравнение по моделям</span></div>
+<div style="display: flex; flex-direction: column; align-items: flex-end;"><span style="font-size: 12px; color: #56645F;">от</span><span style="font-family: Unbounded, Onest, sans-serif; font-size: 20px; font-weight: 600;">2 250 ₽</span><span style="font-size: 12px; color: #56645F;">в неделю</span></div>
+</div>
+</a>
+</div>
+</div>
+
+<div style="margin: 44px 64px 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+<div style="display: flex; gap: 14px; align-items: flex-start;">
+<div style="width: 44px; height: 44px; border-radius: 12px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F3D35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M6 12h12M10 18h4"/></svg></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 16px; font-weight: 600;">Все прокаты в одной выдаче</span><span style="font-size: 14px; line-height: 1.45; color: #56645F;">Даже те, кто с нами не работает. Мы не продвигаем никого за деньги в ущерб цене.</span></div>
+</div>
+<div style="display: flex; gap: 14px; align-items: flex-start;">
+<div style="width: 44px; height: 44px; border-radius: 12px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F3D35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 16px; font-weight: 600;">Цены проверяем звонком</span><span style="font-size: 14px; line-height: 1.45; color: #56645F;">У каждой цены дата проверки. Старые цены не участвуют в рейтинге.</span></div>
+</div>
+<div style="display: flex; gap: 14px; align-items: flex-start;">
+<div style="width: 44px; height: 44px; border-radius: 12px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F3D35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16v10H4z"/><path d="M8 11h8M8 14h5"/></svg></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 16px; font-weight: 600;">Итог, а не цена за сутки</span><span style="font-size: 14px; line-height: 1.45; color: #56645F;">Минимальный срок, недельный тариф и доставка — уже в сумме.</span></div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1260}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

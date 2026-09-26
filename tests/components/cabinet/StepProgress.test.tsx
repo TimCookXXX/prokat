@@ -11,8 +11,8 @@ describe("StepProgress", () => {
     expect(screen.getByText(/2\s*из\s*4/)).toBeInTheDocument();
   });
 
-  it("puts the title in brackets", () => {
+  it("shows the title", () => {
     render(<StepProgress title="Правим объявление" done={0} total={4} />);
-    expect(screen.getByLabelText("Правим объявление")).toBeInTheDocument();
+    expect(screen.getByText("Правим объявление")).toBeInTheDocument();
   });
 });

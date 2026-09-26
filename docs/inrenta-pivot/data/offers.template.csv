@@ -1,0 +1,4 @@
+city_slug,shop_name,microdistrict,address,lat,lon,hours,phone,telegram,website,class_slug,model,includes,price_day,price_week,min_days,deposit_rub,deposit_document,delivery_available,delivery_price,delivery_free_from,delivery_same_day,verified_at,verified_by,source_url
+krasnodar,ПРИМЕР Прокат 1,ЮМР,"ул. Рождественская набережная, 5",45.0280,38.9080,пн-пт 9-20; сб 10-16; вс выходной,+79001234567,,,perforator-sds-plus,Makita HR2470,2 бура,450,2400,1,3000,false,true,400,2000,false,2026-09-18,call,
+krasnodar,ПРИМЕР Прокат 2,ФМР,,,,ежедневно 8-21,,,,perforator-sds-plus,Bosch GBH 2-26,,500,,1,0,true,true,350,,false,2026-09-15,site,
+krasnodar,ПРИМЕР Прокат 3,Гидрострой,,,,,,@example_shop,,moyushchiy-pylesos,Karcher Puzzi 8/1 C,моющее средство,900,4500,1,2000,false,false,,,false,2026-09-20,listing,

@@ -54,10 +54,9 @@
 }
 
 :root {
-  /* Высота плавающего хедера — один ряд на всех ширинах: на мобайле «Разместить»
-   * и профиль ушли в таб-бар, поэтому второй ряд больше не нужен. Ею живёт
-   * геро-блок главной, уходящий фоном под хедер до верха экрана. */
-  --header-h: 72px;
+  /* Шапка варианта Б — сплошная полоса в потоке, а не парящая пилюля: старому
+   * геро P2P-главной больше не нужно уходить под неё. */
+  --header-h: 0px;
 
   /* Высота мобильного таб-бара вместе с отступом от нижней кромки. Ею живут
    * подвал (чтобы не уезжал под панель) и прилипшая полоса брони, которая
@@ -67,8 +66,24 @@
 @media (min-width: 768px) {
   :root { --tabbar-h: 0px; }
 }
+/* Таб-бар рендерится только с P2P-контуром (FEATURE_P2P) — без него места
+ * под панель не резервируем. */
+:root:not(:has([data-tabbar])) { --tabbar-h: 0px; }
 
 @layer components {
+  /* Поля страницы по дизайн-системе: 16 на телефоне, 64 на десктопе. */
+  .page {
+    @apply mx-auto w-full max-w-[1280px] px-4 md:px-8 xl:px-16;
+  }
+
+  /* Суммы: Unbounded, цифры одной ширины — колонки итогов не пляшут. */
+  .price {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Парящая стеклянная пилюля хедера: полупрозрачный фон размывает контент под
    * собой (backdrop-filter), хайлайт-бордер и мягкая тень дают эффект «парения».
    * Все значения — из токенов (--glass-*), тема переключается автоматически. */
@@ -141,46 +156,6 @@
   .brackets-react > span:last-child {
     animation: brackets-react-r 1400ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
-  /* Знак под курсором чуть раскрывается — скобки подаются в стороны, слово
-   * стоит на месте. Правило висит на ссылке, а не на самом знаке: шевелится
-   * только там, где по знаку можно кликнуть (шапка, подвал), и не трогает
-   * заголовок формы или таб-бар. Тач-устройства исключены — там ховер залипает. */
-  @media (hover: hover) {
-    a:hover .logo-brk-l,
-    .logo-live:hover .logo-brk-l {
-      transform: translateX(calc(-1 * var(--logo-shift)));
-    }
-    a:hover .logo-brk-r,
-    .logo-live:hover .logo-brk-r {
-      transform: translateX(var(--logo-shift));
-    }
-  }
-
-  /* .logo-live — явная опт-ин точка для знака вне ссылки (карточка входа):
-   * там по нему не кликают, но живой отклик на курсор уместен.
-   *
-   * .logo-greet — то же движение, но один раз при появлении: скобки приходят
-   * раскрытыми и сходятся к слову. Нужно потому, что ховер живёт под
-   * @media (hover: hover) и на телефоне не случается никогда, а карточку входа
-   * чаще открывают именно там. fill-mode намеренно нет: после проигрывания
-   * элемент возвращается к базовому состоянию, и ховер снова работает. */
-  @keyframes logo-greet-l {
-    from { transform: translateX(calc(-5 * var(--logo-shift))); opacity: 0; }
-    to   { transform: translateX(0); opacity: 1; }
-  }
-  @keyframes logo-greet-r {
-    from { transform: translateX(calc(5 * var(--logo-shift))); opacity: 0; }
-    to   { transform: translateX(0); opacity: 1; }
-  }
-  /* Ход в пять раз больше ховерного: там сдвиг держится и виден по сравнению
-   * «до/после», а однократное движение на пару пикселей глаз не ловит. */
-  .logo-greet .logo-brk-l {
-    animation: logo-greet-l 820ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-  .logo-greet .logo-brk-r {
-    animation: logo-greet-r 820ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-
   /* «Выдача вещи»: слово покидает скобки вправо и гаснет, следующее влетает
    * слева. Ход берётся из --fly, он привязан к кеглю. */
   .handoff-out {
@@ -199,14 +174,6 @@
     .handoff-out,
     .handoff-in {
       animation-duration: 1ms;
-    }
-    .logo-brk-l,
-    .logo-brk-r {
-      transition: none;
-    }
-    .logo-greet .logo-brk-l,
-    .logo-greet .logo-brk-r {
-      animation: none;
     }
   }
 

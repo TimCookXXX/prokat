@@ -5,6 +5,16 @@ import {
   getListingCountsByCategory, rollupToRoots,
 } from "@/server/catalog";
 import { listingPath } from "@/lib/catalog/listing-path";
+import { isP2PEnabled } from "@/lib/features";
+import { getGroupsWithOffers, getModelsWithOffers } from "@/server/compare";
+import { addDaysStr } from "@/lib/catalog/dates";
+import { STALE_AFTER_DAYS } from "@/lib/compare/config";
+import { localToday } from "@/lib/compare/scenario";
+import { getCityShops } from "@/server/shops";
+import { SHOPS_SEGMENT } from "@/lib/compare/catalog-data";
+import { getDb } from "@/lib/db";
+import { categories, itemGroups } from "@db/schema";
+import { eq } from "drizzle-orm";
 
 // Sitemap читает БД в рантайме; force-dynamic — иначе Next prerender'ит
 // во время build без БД и падает.
@@ -14,13 +24,45 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteConfig.url;
   const out: MetadataRoute.Sitemap = [
     { url: `${base}/`, changeFrequency: "daily", priority: 1.0 },
+    { url: `${base}/kak-schitaem-ceny`, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${base}/dlya-prokatov`, changeFrequency: "monthly", priority: 0.4 },
   ];
+
+  // Сравнение: города, категории и группы с ценами, прокаты. Пустые группы
+  // («цены собираем») в индекс не отдаём.
+  const [groups, models] = await Promise.all([
+    getGroupsWithOffers(),
+    getModelsWithOffers(addDaysStr(localToday(), -STALE_AFTER_DAYS)),
+  ]);
+  const groupCategory = new Map((await getDb()
+    .select({ group: itemGroups.slug, category: categories.slug })
+    .from(itemGroups).innerJoin(categories, eq(categories.id, itemGroups.categoryId)))
+    .map((r) => [r.group, r.category]));
+  for (const city of await getActiveCities()) {
+    const cityGroups = groups.filter((g) => g.citySlug === city.slug);
+    if (cityGroups.length === 0) continue;
+    out.push({ url: `${base}/${city.slug}`, changeFrequency: "daily", priority: 0.9 });
+    for (const cat of new Set(cityGroups.map((g) => groupCategory.get(g.groupSlug)).filter(Boolean))) {
+      out.push({ url: `${base}/${city.slug}/${cat}`, changeFrequency: "weekly", priority: 0.7 });
+    }
+    for (const g of cityGroups) {
+      out.push({ url: `${base}/${city.slug}/${g.groupSlug}`, changeFrequency: "daily", priority: 0.9 });
+    }
+    for (const m of models.filter((x) => x.citySlug === city.slug)) {
+      out.push({ url: `${base}/${city.slug}/${m.seoWord}-${m.modelSlug}`, changeFrequency: "weekly", priority: 0.7 });
+    }
+    out.push({ url: `${base}/${city.slug}/${SHOPS_SEGMENT}`, changeFrequency: "weekly", priority: 0.5 });
+    for (const shop of await getCityShops(city.id)) {
+      if (shop.offers > 0) out.push({ url: `${base}/${city.slug}/${SHOPS_SEGMENT}/${shop.slug}`, changeFrequency: "weekly", priority: 0.5 });
+    }
+  }
+
+  // Ниже — выдача объявлений P2P-контура.
+  if (!isP2PEnabled()) return out;
 
   const [citiesList, cats] = await Promise.all([getActiveCities(), getAllCategories()]);
 
   for (const city of citiesList) {
-    out.push({ url: `${base}/${city.slug}`, changeFrequency: "daily", priority: 0.9 });
-
     const direct = await getListingCountsByCategory(city.id);
     const rootCounts = rollupToRoots(cats, direct);
 

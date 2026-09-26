@@ -222,14 +222,24 @@ chmod 600 .env
 
 ### 7.2. Первый запуск
 
+Сначала — граф дорог для расстояний «до проката» (OSRM, ~2 минуты, данные
+OpenStreetMap по Краснодару и Адыгее в `data/osrm/`):
+
 ```bash
+bash scripts/osrm/prepare.sh
 docker compose up -d --build
 ```
+
+Без графа сайт работает, но считает расстояние по прямой × 1,3 — через Кубань
+(Яблоновский, Новая Адыгея) это в разы меньше реального. Карту обновлять раз в
+месяц: `bash scripts/osrm/prepare.sh && docker compose restart osrm`.
 
 Первый билд на 1GB VPS — 10–15 минут. Дальше по кешу быстрее (~3–5 мин).
 
 Миграции БД применяются **автоматически** при старте app-контейнера
-(`scripts/entrypoint.sh`: сначала `node migrate.cjs`, потом `node server.js`).
+(`scripts/entrypoint.sh`: `node migrate.cjs` → `node sync-catalog.cjs` → `node server.js`).
+`sync-catalog.cjs` приводит справочник сравнения (Краснодар, категории, группы и классы)
+к `src/lib/compare/catalog-data.ts` — идемпотентно, ничего не удаляет.
 Запускать вручную ничего не нужно. В runner-образе нет pnpm/tsx —
 `docker compose exec app pnpm ...` не сработает.
 
@@ -306,6 +316,21 @@ docker compose build app && docker compose up -d app
 ```
 
 Миграции применятся сами при старте контейнера.
+
+### Импорт цен прокатов (CSV)
+
+Формат — `docs/inrenta-pivot/data/offers.template.csv`. Файл проверяется целиком:
+при любой ошибке в базу не пишется ничего, ошибки печатаются со строкой файла.
+
+```bash
+docker compose cp offers.csv app:/tmp/offers.csv
+docker compose exec app node import-offers.cjs /tmp/offers.csv --dry-run   # только счётчики
+docker compose exec app node import-offers.cjs /tmp/offers.csv
+```
+
+Повторный импорт того же файла безопасен: прокат находится по названию и телефону,
+предложение — по (прокат, класс, модель); цена с более старой датой проверки
+не затирает более свежую.
 
 ### Изменение `.env`
 

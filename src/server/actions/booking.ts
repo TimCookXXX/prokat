@@ -24,6 +24,7 @@ import { parseBookingParams } from "@/lib/booking/params";
 import { unavailableDates, type AvailabilityMap } from "@/lib/catalog/availability";
 import { canTransition, availabilityDelta } from "@/lib/catalog/booking-status";
 import { todayStr } from "@/lib/catalog/dates";
+import { isP2PEnabled, P2P_DISABLED } from "@/lib/features";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
@@ -34,6 +35,7 @@ const EXPIRES_HOURS = 24;
 export async function createBookingRequest(
   input: unknown,
 ): Promise<ActionResult<{ requestId: string }>> {
+  if (!isP2PEnabled()) return { ok: false, error: P2P_DISABLED };
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "auth_required" };
   if (session.user.bannedAt) return { ok: false, error: "banned" };
@@ -109,6 +111,7 @@ export async function createBookingRequest(
 }
 
 export async function cancelBookingRequest(requestId: string): Promise<ActionResult> {
+  if (!isP2PEnabled()) return { ok: false, error: P2P_DISABLED };
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "auth_required" };
 

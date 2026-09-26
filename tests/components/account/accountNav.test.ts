@@ -32,3 +32,11 @@ describe("buildAccountNav", () => {
     expect(items.some((i) => i.href === "/cabinet/stats")).toBe(false);
   });
 });
+
+describe("buildAccountNav without the P2P flow", () => {
+  it("keeps only the account section", () => {
+    const groups = buildAccountNav({ newRequestsCount: 3, p2p: false });
+    expect(groups.map((g) => g.title)).toEqual(["аккаунт"]);
+    expect(groups.flatMap((g) => g.items).map((i) => i.href)).toEqual(["/profile"]);
+  });
+});

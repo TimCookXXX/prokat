@@ -1,0 +1,1 @@
+ALTER TABLE "item_groups" ADD COLUMN "search_keywords" text[] DEFAULT '{}'::text[] NOT NULL;

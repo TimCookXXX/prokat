@@ -43,6 +43,22 @@ const schema = z.object({
 
   INDEXNOW_KEY: z.string().regex(/^[a-f0-9]{8,128}$/, "INDEXNOW_KEY must be hex").optional(),
   YANDEX_METRIKA_ID: z.string().regex(/^\d+$/, "YANDEX_METRIKA_ID must be digits").optional(),
+
+  // Геокодер Яндекса для «Где» и импорта адресов прокатов (src/server/geocoder.ts).
+  // Без ключей работают микрорайоны, округа и геолокация, но не ввод адреса.
+  YANDEX_GEOCODER_API_KEY: z.string().min(1).optional(),
+  YANDEX_SUGGEST_API_KEY: z.string().min(1).optional(),
+
+  // Маршрутизатор OSRM (сервис osrm в docker-compose) — расстояние до проката по
+  // дорогам. Без него — по прямой × коэффициент (ошибается через Кубань).
+  OSRM_URL: z.string().url().optional(),
+  // Яндекс Матрица расстояний: путь и время с пробками, как на Яндекс Картах.
+  // Опрашивается первой; без ключа или при сбое — OSRM, затем по прямой.
+  YANDEX_ROUTING_API_KEY: z.string().min(1).optional(),
+
+  // Старый P2P-контур: объявления юзеров, календарь занятости, заявки на бронь.
+  // Продукт — сравнение цен прокатов, поэтому контур выключен, но не удалён.
+  FEATURE_P2P: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
 }).superRefine((v, ctx) => {
   for (const p of ["YANDEX", "VK"] as const) {
     const id = (v as Record<string, unknown>)[`${p}_CLIENT_ID`];

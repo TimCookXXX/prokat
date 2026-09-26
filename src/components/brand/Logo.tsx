@@ -1,67 +1,28 @@
 import { cn } from "@/lib/utils";
 
-/* Знак inrenta: слово между двумя нарисованными скобками. Скобки — не глиф
- * шрифта, а два бокса с бордером, поэтому пропорции жёстко привязаны к кеглю:
- * толщина 0,08 · высота 0,95 · вылет 0,26 · зазор 0,14 от размера. Ниже 14 px
- * толщина фиксируется на 1,5 px, а зазор растёт — иначе знак слипается.
- *
- * Скобки охряные (--color-accent): по закону цвета они держат предмет, а не
- * зовут нажать. Переопределяются там, где знак работает иконкой навигации. */
+/* Знак inrenta (вариант Б): слово Unbounded 700 и точка. Точка — единственный
+ * яркий оранжевый: на тёмной шапке --color-cta-bright, на светлом фоне
+ * --color-mark-dot (у яркого на белом не хватает контраста). */
 export function Logo({
   size = 20,
   word = "inrenta",
-  showWord = true,
+  onDark = false,
   className,
-  bracketClassName = "border-accent",
 }: {
   size?: number;
   word?: string;
-  showWord?: boolean;
+  /** Знак стоит на бренд-цвете (шапка). */
+  onDark?: boolean;
   className?: string;
-  /** Цвет скобок. Переопределяется там, где скобки работают иконкой и должны
-   *  гаснуть вместе с остальной навигацией (таб-бар). */
-  bracketClassName?: string;
 }) {
-  const stroke = Math.max(1.5, +(size * 0.08).toFixed(2));
-  const height = Math.round(size * 0.95);
-  const flare = Math.max(4, Math.round(size * 0.26));
-  const gap = Math.round(size * (size < 14 ? 0.18 : 0.14));
-  const tracking = size >= 40 ? "-0.035em" : size >= 24 ? "-0.03em" : "-0.02em";
-
-  const bracket = (side: "left" | "right") => (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "block shrink-0 transition-transform duration-200 ease-out",
-        side === "left" ? "logo-brk-l" : "logo-brk-r",
-        bracketClassName,
-      )}
-      style={{
-        width: flare,
-        height,
-        borderWidth: stroke,
-        [side === "left" ? "borderRightWidth" : "borderLeftWidth"]: 0,
-      }}
-    />
-  );
-
   return (
     <span
-      className={cn("inline-flex items-center leading-none", className)}
-      // Ход скобок под курсором — от кегля: знак 20 px разводит на 2 px.
-      style={{ gap, ["--logo-shift" as string]: `${Math.max(1.5, size * 0.1).toFixed(1)}px` }}
+      className={cn("inline-flex items-baseline font-display font-bold leading-none", className)}
+      style={{ fontSize: size, letterSpacing: "-0.01em" }}
       aria-label={word}
     >
-      {bracket("left")}
-      {showWord && (
-        <span
-          className="font-mark font-bold"
-          style={{ fontSize: size, lineHeight: 1, letterSpacing: tracking }}
-        >
-          {word}
-        </span>
-      )}
-      {bracket("right")}
+      <span aria-hidden="true">{word}</span>
+      <span aria-hidden="true" className={onDark ? "text-cta-bright" : "text-mark-dot"}>.</span>
     </span>
   );
 }

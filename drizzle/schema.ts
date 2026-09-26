@@ -1,7 +1,9 @@
 import {
   pgTable, text, varchar, integer, bigint, timestamp, pgEnum, jsonb,
-  boolean, date, doublePrecision, index, primaryKey,
+  boolean, date, doublePrecision, index, primaryKey, unique, check,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const userRole = pgEnum("user_role", ["user", "moderator", "admin"]);
 
@@ -103,6 +105,9 @@ export const uploads = pgTable("uploads", {
 export const cities = pgTable("cities", {
   id: text("id").primaryKey(),                        // ULID, newId()
   name: varchar("name", { length: 100 }).notNull(),
+  // Предложный падеж для заголовков: «Прокат перфоратора в Краснодаре».
+  // NULL — падеж не задан, заголовки берут name.
+  namePrepositional: varchar("name_prepositional", { length: 100 }),
   slug: varchar("slug", { length: 80 }).notNull().unique(),
   region: varchar("region", { length: 100 }),
   lat: doublePrecision("lat"),
@@ -206,3 +211,260 @@ export const events = pgTable("events", {
 }, (t) => ({
   entityIdx: index("events_entity_idx").on(t.entityType, t.entityId, t.createdAt),
 }));
+
+// ========================== Сравнение прокатов ==========================
+// Новое ядро продукта (docs/inrenta-pivot/DATA_MODEL.md). Живёт рядом с P2P-таблицами
+// и не пересекается с ними: предложение проката существует без владельца-юзера —
+// его заводим мы сами из открытых данных, а прокат может подтвердить карточку позже.
+// Суммы — целые рубли. Итог за даты не хранится: считается на лету (lib/compare/pricing).
+
+// Слово в заголовке страницы — по спросу в Wordstat: «прокат перфоратора»,
+// но «аренда электровелосипеда».
+export const seoWord = pgEnum("seo_word", ["prokat", "arenda"]);
+
+// Группа — страница сравнения /{city}/{slug} (/krasnodar/prokat-perforatora).
+// Собирает классы, между которыми человек выбирает на одной странице
+// (перфоратор SDS-plus / SDS-max). Для электровелосипедов группа = модель.
+// slug делит пространство /{city}/{seg} с категориями — резолвер проверяет группы первыми.
+export const itemGroups = pgTable("item_groups", {
+  id: text("id").primaryKey(),
+  categoryId: text("category_id").notNull().references(() => categories.id),
+  slug: varchar("slug", { length: 80 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),                        // Перфоратор
+  nameGenitive: varchar("name_genitive", { length: 120 }).notNull(),       // перфоратора
+  seoWord: seoWord("seo_word").notNull().default("prokat"),
+  guide: text("guide"),                                                    // справка «какой класс выбрать»
+  // Синонимы для поиска: «болгарка», «ушм», «отбойник». Имя группы и классов искать и так.
+  searchKeywords: text("search_keywords").array().notNull().default(sql`'{}'::text[]`),
+  sort: integer("sort").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+}, (t) => ({
+  categoryIdx: index("item_groups_category_idx").on(t.categoryId, t.sort),
+}));
+
+// Класс — единица сравнения: предложения разных прокатов ранжируются внутри класса.
+// slug уникален глобально — по нему CSV-импорт находит класс.
+export const itemClasses = pgTable("item_classes", {
+  id: text("id").primaryKey(),
+  groupId: text("group_id").notNull().references(() => itemGroups.id),
+  slug: varchar("slug", { length: 80 }).notNull().unique(),                // perforator-sds-plus
+  name: varchar("name", { length: 120 }).notNull(),                        // Перфоратор SDS-plus
+  shortHint: varchar("short_hint", { length: 160 }),                       // 2–4 Дж · дюбели, штробы
+  // Синонимы класса для поиска: «sds+», «моющий пылесос для химчистки».
+  searchKeywords: text("search_keywords").array().notNull().default(sql`'{}'::text[]`),
+  sort: integer("sort").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+}, (t) => ({
+  groupIdx: index("item_classes_group_idx").on(t.groupId, t.sort),
+}));
+
+// Места для поля «Где» (ТЗ, п. 2.1): округа и микрорайоны. Микрорайон — основная
+// единица местоположения, если нет точного адреса; округ — родитель микрорайона.
+// Справочник — код (lib/compare/geo-data.ts), sync приводит таблицу к нему.
+export const districtKind = pgEnum("district_kind", ["okrug", "microdistrict"]);
+
+export const districts = pgTable("districts", {
+  id: text("id").primaryKey(),
+  cityId: text("city_id").notNull().references(() => cities.id),
+  kind: districtKind("kind").notNull(),
+  slug: varchar("slug", { length: 80 }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  aliases: text("aliases").array().notNull().default(sql`'{}'::text[]`),   // ФМР, Фестивалка
+  lat: doublePrecision("lat").notNull(),                                   // центр
+  lon: doublePrecision("lon").notNull(),
+  parentId: text("parent_id").references((): AnyPgColumn => districts.id),  // округ микрорайона
+  sort: integer("sort").notNull().default(0),
+}, (t) => ({
+  citySlugUq: unique("districts_city_slug_uq").on(t.cityId, t.slug),
+  cityKindIdx: index("districts_city_kind_idx").on(t.cityId, t.kind),
+}));
+
+// Бренд и модель (ТЗ, п. 2.1). Модель — конкретное изделие; варианты одного
+// семейства (HR2470 / HR2470FT) — одна модель. Справочник — lib/compare/models-data.ts.
+export const brands = pgTable("brands", {
+  id: text("id").primaryKey(),
+  slug: varchar("slug", { length: 80 }).notNull().unique(),
+  name: varchar("name", { length: 80 }).notNull(),
+  aliases: text("aliases").array().notNull().default(sql`'{}'::text[]`),   // Макита
+});
+
+export const productModels = pgTable("product_models", {
+  id: text("id").primaryKey(),
+  brandId: text("brand_id").notNull().references(() => brands.id),
+  itemClassId: text("item_class_id").notNull().references(() => itemClasses.id),
+  name: varchar("name", { length: 120 }).notNull(),                        // HR2470 (без бренда)
+  slug: varchar("slug", { length: 120 }).notNull().unique(),               // makita-hr2470
+  family: varchar("family", { length: 120 }),
+  // Характеристики по классу: патрон, энергия удара, мощность, вес, питание…
+  specs: jsonb("specs").$type<Record<string, string | number>>().notNull().default({}),
+  specsSourceUrl: text("specs_source_url"),
+  photoUrl: text("photo_url"),
+  photoLicense: varchar("photo_license", { length: 200 }),
+  isActive: boolean("is_active").notNull().default(true),
+}, (t) => ({
+  classIdx: index("product_models_class_idx").on(t.itemClassId),
+}));
+
+// Написания модели: нормализованный ключ (lib/compare/models → modelKey) → модель.
+// Пополняется справочником и при импорте.
+export const modelAliases = pgTable("model_aliases", {
+  alias: varchar("alias", { length: 160 }).primaryKey(),
+  modelId: text("model_id").notNull().references(() => productModels.id, { onDelete: "cascade" }),
+}, (t) => ({
+  modelIdx: index("model_aliases_model_idx").on(t.modelId),
+}));
+
+/** Часы работы по дням: mon…sun → интервалы ["09:00","20:00"]; нет дня — закрыто. */
+export type WeekHours = Partial<Record<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun", [string, string][]>>;
+
+export const shopStatus = pgEnum("shop_status", ["unclaimed", "claimed", "hidden"]);
+
+// Прокат. Существует без владельца: owner_user_id появляется, когда прокат
+// подтвердил карточку (status=claimed). slug — для будущей страницы проката.
+export const rentalShops = pgTable("rental_shops", {
+  id: text("id").primaryKey(),
+  cityId: text("city_id").notNull().references(() => cities.id),
+  slug: varchar("slug", { length: 80 }).notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  address: text("address"),
+  // Где прокат (ТЗ, п. 4.2): координаты адреса → центр микрорайона (≈) → неизвестно.
+  lat: doublePrecision("lat"),
+  lon: doublePrecision("lon"),
+  microdistrictId: text("microdistrict_id").references(() => districts.id, { onDelete: "set null" }),
+  okrugId: text("okrug_id").references(() => districts.id, { onDelete: "set null" }),
+  hours: jsonb("hours").$type<WeekHours>(),                                // NULL — неизвестны
+  phone: varchar("phone", { length: 20 }),                                 // +7XXXXXXXXXX
+  telegram: varchar("telegram", { length: 100 }),
+  website: text("website"),
+  sourceUrls: jsonb("source_urls").$type<string[]>().notNull().default([]),
+  status: shopStatus("status").notNull().default("unclaimed"),
+  ownerUserId: text("owner_user_id").references(() => users.id, { onDelete: "set null" }),
+  claimedAt: timestamp("claimed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  citySlugUq: unique("rental_shops_city_slug_uq").on(t.cityId, t.slug),
+  cityStatusIdx: index("rental_shops_city_status_idx").on(t.cityId, t.status),
+  ownerIdx: index("rental_shops_owner_idx").on(t.ownerUserId),
+}));
+
+// Кто проверил цену: звонком, по сайту проката, по объявлению (Авито) или сам прокат.
+export const claimStatus = pgEnum("claim_status", ["new", "approved", "rejected"]);
+
+// Заявка «Это мой прокат»: человек вошёл и просит отдать ему карточку. Админ
+// проверяет звонком по телефону проката и одобряет — тогда rental_shops получает
+// owner_user_id и status=claimed. shop_id NULL — проката ещё нет в базе,
+// тогда название — в shop_name.
+export const shopClaims = pgTable("shop_claims", {
+  id: text("id").primaryKey(),
+  shopId: text("shop_id").references(() => rentalShops.id, { onDelete: "cascade" }),
+  shopName: varchar("shop_name", { length: 200 }),
+  cityId: text("city_id").notNull().references(() => cities.id),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  contactName: varchar("contact_name", { length: 100 }).notNull(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  comment: text("comment"),
+  status: claimStatus("status").notNull().default("new"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  decidedAt: timestamp("decided_at"),
+  decidedBy: text("decided_by").references(() => users.id, { onDelete: "set null" }),
+}, (t) => ({
+  statusIdx: index("shop_claims_status_idx").on(t.status, t.createdAt),
+  userIdx: index("shop_claims_user_idx").on(t.userId),
+}));
+
+export const verifiedBy = pgEnum("verified_by", ["call", "site", "listing", "shop"]);
+
+// Предложение: цена и условия проката по классу. Одна строка на (прокат, класс, модель);
+// модель NULL — «модель не указана», и она тоже уникальна (NULLS NOT DISTINCT).
+export const offers = pgTable("offers", {
+  id: text("id").primaryKey(),
+  shopId: text("shop_id").notNull().references(() => rentalShops.id, { onDelete: "cascade" }),
+  itemClassId: text("item_class_id").notNull().references(() => itemClasses.id),
+  // Модель из справочника; NULL — не указана или не распознана (тогда предложение
+  // относится к классу и не показывается при поиске по модели).
+  modelId: text("model_id").references(() => productModels.id, { onDelete: "set null" }),
+  model: varchar("model", { length: 120 }),                                // как написал прокат
+  // Ключ уникальности модели внутри (прокат, класс): m:<modelId>, r:<ключ написания>
+  // или '' — модель не указана. Разные написания одной модели — одно предложение.
+  modelKey: varchar("model_key", { length: 200 }).notNull().default(""),
+  includes: text("includes"),                                              // «моющее средство», «2 бура»
+  // Срок пользователь выбирает датами; без суточной цены оплачиваются целые недели
+  // (понедельные прокаты электровелосипедов). Хотя бы одна из цен есть всегда.
+  priceDay: integer("price_day"),
+  priceWeek: integer("price_week"),                                        // за 7 суток, если есть тариф
+  minDays: integer("min_days").notNull().default(1),                       // минимальный оплачиваемый срок
+  // NULL — залог неизвестен («уточняется»), 0 — денежного залога нет.
+  depositRub: integer("deposit_rub"),
+  depositDocument: boolean("deposit_document").notNull().default(false),   // паспорт в залог
+  deliveryAvailable: boolean("delivery_available").notNull().default(false),
+  deliveryPrice: integer("delivery_price").notNull().default(0),
+  deliveryFreeFrom: integer("delivery_free_from"),                         // бесплатно от суммы аренды
+  deliverySameDay: boolean("delivery_same_day").notNull().default(false),
+  // Дата проверки цены. Старше 30 дней — предложение уходит из рейтинга
+  // в блок «на перепроверке».
+  verifiedAt: date("verified_at").notNull(),
+  verifiedBy: verifiedBy("verified_by").notNull().default("call"),
+  sourceUrl: text("source_url"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  shopClassModelUq: unique("offers_shop_class_model_key_uq").on(t.shopId, t.itemClassId, t.modelKey),
+  hasPrice: check("offers_has_price", sql`${t.priceDay} IS NOT NULL OR ${t.priceWeek} IS NOT NULL`),
+  classIdx: index("offers_class_idx").on(t.itemClassId, t.isActive),
+  shopIdx: index("offers_shop_idx").on(t.shopId),
+  modelIdx: index("offers_model_idx").on(t.modelId),
+}));
+
+export interface LeadScenario {
+  days: number;
+  loc: "city" | "okrug" | "microdistrict" | "point";
+  microdistrict?: string;
+  okrug?: string;
+}
+
+export const leadType = pgEnum("lead_type", [
+  "show_phone", "call", "request", "regular_request", "price_outdated", "claim_click", "map_open",
+]);
+
+// Обращения и сигналы: из них — метрика «доля кликов на контакт» и отчёты прокатам.
+// session_id — анонимный id посетителя из cookie; вкладка и место в выдаче —
+// чтобы понимать, что именно человек сравнивал.
+export const leadEvents = pgTable("lead_events", {
+  id: text("id").primaryKey(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  type: leadType("type").notNull(),
+  offerId: text("offer_id").references(() => offers.id, { onDelete: "set null" }),
+  shopId: text("shop_id").references(() => rentalShops.id, { onDelete: "set null" }),
+  itemClassId: text("item_class_id").references(() => itemClasses.id, { onDelete: "set null" }),
+  modelId: text("model_id").references(() => productModels.id, { onDelete: "set null" }),
+  sessionId: varchar("session_id", { length: 64 }),
+  tab: varchar("tab", { length: 20 }),                                     // optimal | cheapest | nearest | okrug
+  rankPosition: integer("rank_position"),
+  // Параметры поиска: сутки и где пользователь (тип, микрорайон или округ).
+  scenario: jsonb("scenario").$type<LeadScenario>(),
+  utm: jsonb("utm").$type<Record<string, string>>(),
+}, (t) => ({
+  shopIdx: index("lead_events_shop_idx").on(t.shopId, t.createdAt),
+  classIdx: index("lead_events_class_idx").on(t.itemClassId, t.createdAt),
+  typeIdx: index("lead_events_type_idx").on(t.type, t.createdAt),
+}));
+
+export const regularRequestStatus = pgEnum("regular_request_status", ["new", "sent", "closed"]);
+
+// Заявки: «нужен регулярно» (проверка гипотезы о повторных арендаторах) и
+// «не нашли — найдём за 30 минут» с пустой выдачи (ТЗ, пп. 5.9–5.10).
+export const requestKind = pgEnum("request_kind", ["regular", "not_found"]);
+
+export const regularRequests = pgTable("regular_requests", {
+  id: text("id").primaryKey(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  cityId: text("city_id").notNull().references(() => cities.id),
+  kind: requestKind("kind").notNull().default("regular"),
+  what: text("what").notNull(),
+  frequency: varchar("frequency", { length: 60 }),
+  period: varchar("period", { length: 60 }),                               // «27–29 сен» — для «не нашли»
+  contact: varchar("contact", { length: 120 }).notNull(),
+  status: regularRequestStatus("status").notNull().default("new"),
+});

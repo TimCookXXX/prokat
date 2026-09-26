@@ -15,7 +15,11 @@ export default {
       colors: {
         background: c("--color-background"),
         foreground: c("--color-foreground"),
-        header: c("--color-header"),
+        header: {
+          DEFAULT: c("--color-header"),
+          foreground: c("--color-header-fg"),
+          muted: c("--color-header-muted"),
+        },
         primary: {
           DEFAULT:    c("--color-primary"),
           foreground: c("--color-primary-fg"),
@@ -24,6 +28,24 @@ export default {
           DEFAULT:    c("--color-accent"),
           foreground: c("--color-accent-fg"),
         },
+        // Главная кнопка и победитель вкладки — единственный оранжевый.
+        cta: {
+          DEFAULT:    c("--color-cta"),
+          foreground: c("--color-cta-fg"),
+          bright:     c("--color-cta-bright"),
+          soft:       c("--color-cta-soft"),
+        },
+        "mark-dot": c("--color-mark-dot"),
+        ok: {
+          DEFAULT: c("--color-ok"),
+          soft:    c("--color-ok-soft"),
+        },
+        warn: {
+          DEFAULT: c("--color-warn"),
+          soft:    c("--color-warn-soft"),
+          line:    c("--color-warn-line"),
+        },
+        photo: c("--color-photo"),
         card: {
           DEFAULT:    c("--color-card"),
           foreground: c("--color-card-fg"),
@@ -32,15 +54,26 @@ export default {
           DEFAULT:    c("--color-muted"),
           foreground: c("--color-muted-fg"),
         },
-        border: c("--color-border"),
+        border: {
+          DEFAULT: c("--color-border"),
+          strong:  c("--color-border-strong"),
+        },
         ring:   c("--color-ring"),
         destructive: c("--color-danger"),
       },
       borderRadius: {
         sm: "var(--radius-sm)",
+        chip: "var(--radius-chip)",
         md: "var(--radius-md)",
+        field: "var(--radius-field)",
+        tabs: "var(--radius-tabs)",
         lg: "var(--radius-lg)",
+        hero: "var(--radius-hero)",
         pill: "var(--radius-pill)",
+      },
+      boxShadow: {
+        card: "var(--card-shadow)",
+        "hero-search": "var(--hero-search-shadow)",
       },
       fontFamily: {
         display: "var(--font-display)",

@@ -1,9 +1,11 @@
 export const seo = {
   siteName: "inrenta",
-  titleTemplate: (pageTitle: string) => `${pageTitle} — inrenta`,
-  defaultTitle: "inrenta — аренда вещей у людей рядом",
+  // Абсолютный заголовок: шаблон корневого layout («%s — inrenta») его не дописывает
+  // второй раз. Для metadata.title страниц.
+  titleTemplate: (pageTitle: string) => ({ absolute: `${pageTitle} — inrenta` }),
+  defaultTitle: "inrenta — сравнение цен прокатов",
   defaultDescription:
-    "Аренда вещей между людьми: инструмент, спорт, туризм, платья, фототехника. Найдите вещь в своём городе и оставьте заявку на бронь.",
+    "Сравните цены прокатов своего города: итог за ваши даты, дорога до проката, залог и дата проверки каждой цены.",
   themeColor: "#ffffff",
   locale: "ru_RU",
   ogDefault: "/og-default.png",

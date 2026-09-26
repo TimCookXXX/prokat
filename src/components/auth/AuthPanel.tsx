@@ -40,7 +40,7 @@ export function AuthPanel({
   const header = (back: React.ReactNode) => (
     <div className="relative flex items-center justify-center">
       {back}
-      <Logo size={22} className="logo-live logo-greet" />
+      <Logo size={22} />
     </div>
   );
 

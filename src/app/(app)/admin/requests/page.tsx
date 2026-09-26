@@ -3,11 +3,13 @@ import { adminListRequests } from "@/server/admin";
 import { STATUS_BADGE_CLASSES, STATUS_LABELS } from "@/lib/booking/status-labels";
 import type { BookingStatus } from "@/lib/catalog/booking-status";
 import { formatDayMonth } from "@/lib/catalog/dates";
+import { requireP2P } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Заявки — админка", robots: { index: false } };
 
 export default async function AdminRequestsPage() {
+  requireP2P();
   const rows = await adminListRequests();
 
   return (

@@ -35,6 +35,10 @@ import { getUserPhone } from "@/server/booking";
 import { getDb } from "@/lib/db";
 import { events } from "@db/schema";
 import { newId } from "@/lib/id";
+import { isP2PEnabled, requireP2P } from "@/lib/features";
+import { SHOPS_SEGMENT } from "@/lib/compare/catalog-data";
+import { getShopBySlug } from "@/server/compare";
+import { ShopPage } from "@/components/compare/ShopPage";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +79,16 @@ async function resolve(citySlug: string, seg: string, sub: string): Promise<Reso
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { city: citySlug, seg, sub } = await params;
+  const shop = await resolveShop(citySlug, seg, sub);
+  if (shop) {
+    const cityIn = `в ${shop.city.namePrepositional ?? shop.city.name}`;
+    return {
+      title: seo.titleTemplate(`${shop.shop.name} — цены проката ${cityIn}`),
+      description: `Цены и условия проката «${shop.shop.name}» ${cityIn}: залог, доставка, минимальный срок и место в сравнении inrenta.`,
+      alternates: { canonical: `${siteConfig.url}/${shop.city.slug}/${SHOPS_SEGMENT}/${shop.shop.slug}` },
+    };
+  }
+  if (!isP2PEnabled()) return {};
   const r = await resolve(citySlug, seg, sub);
   if (!r) return {};
   if (r.kind === "subcategory") {
@@ -93,8 +107,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+// /{city}/prokaty/{slug} — страница проката (сравнение прокатов, не P2P).
+async function resolveShop(citySlug: string, seg: string, sub: string) {
+  if (seg !== SHOPS_SEGMENT) return null;
+  const city = await getCityBySlug(citySlug);
+  const shop = city ? await getShopBySlug(city.id, sub) : null;
+  return city && shop ? { city, shop } : null;
+}
+
 export default async function CitySubPage({ params, searchParams }: Props) {
   const { city: citySlug, seg, sub } = await params;
+  const shop = await resolveShop(citySlug, seg, sub);
+  if (shop) return <ShopPage city={shop.city} shop={shop.shop} />;
+  requireP2P();
   const r = await resolve(citySlug, seg, sub);
   if (!r) notFound();
 

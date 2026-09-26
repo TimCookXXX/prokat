@@ -12,16 +12,20 @@ export function Hero({
   citySlug,
   cityName,
   categories = [],
+  search = true,
 }: {
   citySlug?: string;
   cityName?: string;
   categories?: HeroChip[];
+  /** Поиск по объявлениям — часть P2P-контура (FEATURE_P2P). */
+  search?: boolean;
 }) {
+  const hasCategories = Boolean(citySlug) && categories.length > 0;
   return (
     // Отрицательный отступ на высоту хедера: блок уходит под плавающий хедер
     // до верхнего края экрана. Контент внутри опущен паддингом (см. photo/panel).
     <section className="w-full" style={{ marginTop: "calc(-1 * var(--header-h))" }}>
-      <div className="grid lg:grid-cols-[2.45fr_1fr]">
+      <div className={hasCategories ? "grid lg:grid-cols-[2.45fr_1fr]" : "grid"}>
         {/* Фото-герой: прижат к краям экрана (флаш слева/сверху под хедером),
          * скруглён только нижний-правый угол. Картинка — public/hero.webp. */}
         <div className="hero-photo relative flex min-h-[610px] flex-col justify-center overflow-hidden rounded-br-[48px] px-6 pb-16 pt-[calc(var(--header-h)+2rem)] sm:px-10 lg:px-12">
@@ -37,9 +41,11 @@ export function Hero({
               {content.home.heroSubtitle}
             </p>
 
-            <div className="mt-8">
-              <HeroSearch />
-            </div>
+            {search && (
+              <div className="mt-8">
+                <HeroSearch />
+              </div>
+            )}
 
             {citySlug && (
               <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium text-white">
@@ -57,7 +63,7 @@ export function Hero({
               </div>
             )}
 
-            {citySlug && categories.length > 0 && (
+            {hasCategories && (
               <div className="mt-6 text-left">
                 <p className="mb-2 text-sm font-medium text-white/80">Популярное</p>
                 <div className="flex flex-wrap gap-2">
@@ -78,34 +84,30 @@ export function Hero({
 
         {/* Панель популярных категорий — прямо на фоне страницы, без карточки.
          * На десктопе верх опущен под хедер (стоит рядом с фото). */}
-        <aside className="flex flex-col px-6 pb-2 pt-8 sm:px-8 lg:pb-10 lg:pt-[calc(var(--header-h)+1.5rem)]">
-          <h2 className="mb-4 text-xl font-semibold text-foreground">
-            {content.home.categoriesHeading}
-          </h2>
-          {citySlug && categories.length > 0 ? (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {categories.map((c) => (
-                  <Link
-                    key={c.slug}
-                    href={`/${citySlug}/${c.slug}` as never}
-                    className="rounded-pill border border-primary/40 px-3 py-1.5 text-sm text-primary transition-colors hover:bg-primary/10"
-                  >
-                    {c.name}
-                  </Link>
-                ))}
-              </div>
-              <Link
-                href={`/${citySlug}` as never}
-                className="mt-5 inline-flex w-fit items-center rounded-pill border border-primary/40 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
-              >
-                Все категории →
-              </Link>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Категории появятся после выбора города.</p>
-          )}
-        </aside>
+        {hasCategories && (
+          <aside className="flex flex-col px-6 pb-2 pt-8 sm:px-8 lg:pb-10 lg:pt-[calc(var(--header-h)+1.5rem)]">
+            <h2 className="mb-4 text-xl font-semibold text-foreground">
+              {content.home.categoriesHeading}
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((c) => (
+                <Link
+                  key={c.slug}
+                  href={`/${citySlug}/${c.slug}` as never}
+                  className="rounded-pill border border-primary/40 px-3 py-1.5 text-sm text-primary transition-colors hover:bg-primary/10"
+                >
+                  {c.name}
+                </Link>
+              ))}
+            </div>
+            <Link
+              href={`/${citySlug}` as never}
+              className="mt-5 inline-flex w-fit items-center rounded-pill border border-primary/40 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+            >
+              Все категории →
+            </Link>
+          </aside>
+        )}
       </div>
     </section>
   );

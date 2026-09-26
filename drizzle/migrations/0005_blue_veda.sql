@@ -1,0 +1,1 @@
+ALTER TABLE "rental_shops" DROP COLUMN IF EXISTS "district";

@@ -2,7 +2,7 @@
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { Package, ClipboardList, CalendarDays, Settings, ShieldCheck, LogOut, Palette } from "lucide-react";
+import { Package, ClipboardList, CalendarDays, Settings, ShieldCheck, LogOut, Palette, Store } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger, DropdownMenuSeparator,
@@ -17,6 +17,10 @@ type Props = {
   name: string | null;
   image: string | null;
   isAdmin?: boolean;
+  /** P2P-контур включён (FEATURE_P2P): ссылки на вещи, заявки, календарь. */
+  p2p?: boolean;
+  /** Владелец подтверждённого проката — ссылка в кабинет проката. */
+  shopOwner?: boolean;
 };
 
 // Курсор успевает пройти зазор между аватаром и меню — закрываем с задержкой.
@@ -24,14 +28,19 @@ const CLOSE_DELAY_MS = 160;
 
 // Иконки нейтральные: скобки остаются пиктограммой только в таб-баре, чтобы
 // бренд не спорил с навигацией.
-const LINKS = [
+const P2P_LINKS = [
   { href: "/cabinet/listings", label: "Мои товары", Icon: Package },
   { href: "/requests", label: "Мои заявки", Icon: ClipboardList },
   { href: "/cabinet/calendar", label: "Календарь", Icon: CalendarDays },
-  { href: "/profile", label: "Настройки", Icon: Settings },
 ] as const;
+const SETTINGS_LINK = { href: "/profile", label: "Настройки", Icon: Settings } as const;
+const SHOP_LINK = { href: "/moy-prokat", label: "Мой прокат", Icon: Store } as const;
 
-export function UserMenu({ username, name, image, isAdmin = false }: Props) {
+export function UserMenu({ username, name, image, isAdmin = false, p2p = true, shopOwner = false }: Props) {
+  const links = [...(shopOwner ? [SHOP_LINK] : []), ...(p2p ? P2P_LINKS : []), SETTINGS_LINK];
+  // Без P2P кабинета нет — аватар ведёт в профиль.
+  const homeHref = p2p ? "/cabinet" : "/profile";
+
   // signOut делает XHR + redirect, без feedback'а пункт меню «зависает».
   // useTransition держит pending до окончания навигации.
   const [isSigningOut, startSignOut] = useTransition();
@@ -58,8 +67,8 @@ export function UserMenu({ username, name, image, isAdmin = false }: Props) {
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Link
-          href={"/cabinet" as never}
-          aria-label="Кабинет"
+          href={homeHref as never}
+          aria-label={p2p ? "Кабинет" : "Профиль"}
           className="inline-flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-ring"
           onMouseEnter={openNow}
           onMouseLeave={closeSoon}
@@ -83,7 +92,7 @@ export function UserMenu({ username, name, image, isAdmin = false }: Props) {
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <DropdownMenuItem asChild className="gap-2.5 px-2 py-2">
-          <Link href={"/cabinet" as never}>
+          <Link href={homeHref as never}>
             <Avatar src={image} name={name} username={username} size={32} />
             <span className="min-w-0">
               <span className="block truncate font-medium">{name ?? `@${username}`}</span>
@@ -94,7 +103,7 @@ export function UserMenu({ username, name, image, isAdmin = false }: Props) {
 
         <DropdownMenuSeparator />
 
-        {LINKS.map(({ href, label, Icon }) => (
+        {links.map(({ href, label, Icon }) => (
           <DropdownMenuItem key={href} asChild className="gap-2.5">
             <Link href={href as never}>
               <span className="flex w-6 shrink-0 justify-center">

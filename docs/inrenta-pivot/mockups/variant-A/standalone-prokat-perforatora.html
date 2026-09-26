@@ -1,0 +1,489 @@
+<title>Прокат перфоратора — inrenta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@500;600;700&display=swap">
+<style>
+:root{
+  --bg:#F4F6F4;
+  --surface:#FFFFFF;
+  --surface-2:#EDF1EE;
+  --ink:#18211E;
+  --muted:#5B6863;
+  --faint:#8A9690;
+  --line:#DCE2DE;
+  --accent:#E0560B;
+  --accent-ink:#FFFFFF;
+  --accent-soft:#FCE9DD;
+  --ok:#0E6B5F;
+  --ok-soft:#DDF0EC;
+  --warn:#9A6200;
+  --warn-soft:#FBF0D6;
+  --focus:#1E6FD9;
+  --shadow:0 1px 2px rgba(24,33,30,.06),0 6px 20px -12px rgba(24,33,30,.18);
+  --r:10px;
+  --display:"Unbounded","Onest",system-ui,sans-serif;
+  --text:"Onest",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#111614;--surface:#181F1C;--surface-2:#1F2824;--ink:#E6ECE9;--muted:#9DAAA4;--faint:#74817B;
+    --line:#2A3430;--accent:#FF7A33;--accent-ink:#1A0E06;--accent-soft:#3A2416;--ok:#4CC7B4;--ok-soft:#173430;
+    --warn:#E8B04A;--warn-soft:#352A14;--focus:#6FA8FF;--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#111614;--surface:#181F1C;--surface-2:#1F2824;--ink:#E6ECE9;--muted:#9DAAA4;--faint:#74817B;
+  --line:#2A3430;--accent:#FF7A33;--accent-ink:#1A0E06;--accent-soft:#3A2416;--ok:#4CC7B4;--ok-soft:#173430;
+  --warn:#E8B04A;--warn-soft:#352A14;--focus:#6FA8FF;--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -14px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--text);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1160px;margin:0 auto;padding-inline:20px}
+a{color:inherit}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:6px}
+.num{font-variant-numeric:tabular-nums}
+
+/* demo strip */
+.demo{background:var(--surface-2);border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.demo .wrap{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding-block:8px}
+.switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;color:var(--ink)}
+.switch input{appearance:none;width:34px;height:20px;border-radius:20px;background:var(--line);position:relative;cursor:pointer;transition:background .15s}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--surface);transition:transform .15s}
+.switch input:checked{background:var(--accent)}
+.switch input:checked::after{transform:translateX(14px)}
+
+/* header */
+header.top{border-bottom:1px solid var(--line);background:var(--surface)}
+header.top .wrap{display:flex;align-items:center;gap:20px;padding-block:14px;flex-wrap:wrap}
+.logo{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:-.01em;text-decoration:none}
+.logo span{color:var(--accent)}
+.city{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:14px}
+.city b{color:var(--ink);font-weight:600}
+nav.main{margin-left:auto;display:flex;gap:18px;font-size:14px;color:var(--muted)}
+nav.main a{text-decoration:none}
+nav.main a:hover{color:var(--ink)}
+
+/* hero */
+.crumbs{font-size:13px;color:var(--faint);padding-top:22px;display:flex;flex-wrap:wrap;gap:6px}
+.crumbs a{text-decoration:none;color:var(--muted)}
+.crumbs a:hover{color:var(--ink)}
+h1{font-family:var(--display);font-weight:600;font-size:clamp(24px,3.4vw,36px);line-height:1.15;letter-spacing:-.015em;margin:10px 0 8px;text-wrap:balance}
+.lede{color:var(--muted);margin:0;max-width:62ch}
+.lede b{color:var(--ink);font-weight:600}
+
+/* range strip */
+.range{margin:22px 0 6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 18px 12px}
+.range-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.range-head strong{color:var(--ink);font-weight:600}
+.track{position:relative;height:38px;margin:10px 6px 0}
+.track::before{content:"";position:absolute;left:0;right:0;top:15px;height:4px;border-radius:4px;background:linear-gradient(90deg,var(--ok-soft),var(--surface-2) 50%,var(--accent-soft))}
+.dot{position:absolute;top:10px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--surface);border:2px solid var(--muted)}
+.dot.best{border-color:var(--accent);background:var(--accent)}
+.tick{position:absolute;top:28px;font-size:12px;color:var(--faint);transform:translateX(-50%);white-space:nowrap}
+.tick.l{transform:none}.tick.r{transform:translateX(-100%)}
+
+/* layout */
+.grid{display:grid;grid-template-columns:300px minmax(0,1fr);gap:24px;align-items:start;padding-block:18px 40px}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+
+/* calculator */
+.calc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:grid;gap:18px;box-shadow:var(--shadow)}
+@media (max-width:860px){.calc{position:static}}
+.calc h2{font-size:15px;margin:0;font-weight:600}
+.field{display:grid;gap:8px}
+.label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface-2);border-radius:8px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;border-radius:6px;padding:8px 6px;cursor:pointer;font-size:13px;line-height:1.25;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.seg small{display:block;font-size:11px;color:var(--faint);font-weight:400}
+.stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.stepper button{width:44px;height:42px;border:0;background:var(--surface-2);cursor:pointer;font-size:18px}
+.stepper button:hover{background:var(--line)}
+.stepper output{flex:1;text-align:center;font-weight:600;font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:20px;padding:4px 11px;font-size:13px;cursor:pointer;color:var(--muted)}
+.chip[aria-pressed="true"]{border-color:var(--ink);color:var(--ink);font-weight:600}
+.row-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px}
+select{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 12px}
+.calc-note{font-size:12.5px;color:var(--muted);margin:0;border-top:1px dashed var(--line);padding-top:14px}
+
+/* results */
+.res-head{display:flex;justify-content:space-between;align-items:end;gap:10px 16px;flex-wrap:wrap;margin-bottom:12px}
+.res-head h2{font-size:17px;margin:0;font-weight:600}
+.res-head p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+.sort{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.sort select{width:auto;padding:7px 10px}
+.list{display:grid;gap:10px;list-style:none;margin:0;padding:0}
+.offer{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"who act" "facts act" "foot foot";gap:12px 24px;align-items:start}
+.offer .who{grid-area:who}.offer .facts{grid-area:facts}.offer .act{grid-area:act;align-self:center}.offer .foot{grid-area:foot}
+.offer.top{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.offer.off{opacity:.62}
+@media (max-width:760px){.offer{grid-template-columns:1fr;grid-template-areas:"who" "facts" "act" "foot"}}
+.who{display:grid;gap:4px;min-width:0}
+.who h3{margin:0;font-size:16px;font-weight:600;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.who .meta{font-size:13px;color:var(--muted)}
+.badge{font-size:11.5px;font-weight:600;border-radius:5px;padding:2px 7px;letter-spacing:.01em;white-space:nowrap}
+.badge.best{background:var(--accent);color:var(--accent-ink)}
+.badge.claimed{background:var(--ok-soft);color:var(--ok)}
+.facts{display:grid;grid-template-columns:repeat(5,minmax(0,auto));justify-content:start;gap:4px 26px;margin:0}
+@media (max-width:1000px){.facts{grid-template-columns:repeat(3,minmax(0,auto))}}
+@media (max-width:520px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.facts div{min-width:0}
+.facts dt{font-size:11.5px;color:var(--faint)}
+.facts dd{margin:0;font-size:14px;font-weight:500}
+.facts dd.warn{color:var(--warn)}
+.act{display:grid;gap:8px;justify-items:end;text-align:right;min-width:170px}
+@media (max-width:760px){.act{justify-items:start;text-align:left;min-width:0;grid-template-columns:auto auto;align-items:center;justify-content:space-between}}
+.total{font-family:var(--display);font-weight:600;font-size:22px;letter-spacing:-.01em;line-height:1.1}
+.total small{display:block;font-family:var(--text);font-weight:400;font-size:12px;color:var(--muted);letter-spacing:0;margin-top:3px}
+.btn{border:0;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;background:var(--ink);color:var(--bg);white-space:nowrap}
+.offer.top .btn{background:var(--accent);color:var(--accent-ink)}
+.btn:hover{filter:brightness(1.08)}
+.phone{font-size:14px;display:grid;gap:2px}
+.phone b{font-size:16px;user-select:all}
+.phone span{font-size:12px;color:var(--muted)}
+.foot{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px;font-size:12.5px;color:var(--faint)}
+.foot .stale{color:var(--warn);background:var(--warn-soft);border-radius:5px;padding:1px 7px}
+.linkbtn{border:0;background:none;padding:0;cursor:pointer;color:var(--muted);text-decoration:underline;text-underline-offset:2px;font-size:12.5px}
+.linkbtn:hover{color:var(--ink)}
+.save{color:var(--ok);font-weight:600}
+
+/* regular block */
+.regular{margin-top:22px;background:var(--surface-2);border-radius:var(--r);padding:20px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:18px 28px}
+@media (max-width:760px){.regular{grid-template-columns:1fr}}
+.regular h2{font-size:17px;margin:0 0 6px;font-weight:600}
+.regular p{margin:0;color:var(--muted);font-size:14px}
+.regular form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.regular form .full{grid-column:1/-1}
+@media (max-width:520px){.regular form{grid-template-columns:1fr}}
+.regular input,.regular select{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 12px}
+.regular label{display:grid;gap:5px;font-size:12.5px;color:var(--muted)}
+.ok-msg{grid-column:1/-1;background:var(--ok-soft);color:var(--ok);border-radius:8px;padding:10px 12px;font-size:14px;font-weight:500}
+
+/* guide */
+.guide{margin-top:34px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}
+@media (max-width:760px){.guide{grid-template-columns:1fr}}
+.guide h2{font-family:var(--display);font-weight:600;font-size:19px;margin:0 0 10px;letter-spacing:-.01em}
+.guide p{margin:0 0 10px;color:var(--ink);max-width:62ch}
+.classes{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0 12px}
+.classes th,.classes td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.classes th{font-size:12px;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+details{border-bottom:1px solid var(--line);padding:12px 0}
+summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:10px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--faint);font-weight:400;font-size:18px;line-height:1}
+details[open] summary::after{content:"−"}
+details p{margin:8px 0 0;color:var(--muted);max-width:62ch}
+.related{margin-top:30px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.related span{font-size:13px;color:var(--faint);margin-right:4px}
+.related a{border:1px solid var(--line);border-radius:20px;padding:6px 12px;font-size:13.5px;text-decoration:none;background:var(--surface)}
+.related a:hover{border-color:var(--ink)}
+
+footer.bottom{border-top:1px solid var(--line);margin-top:40px;background:var(--surface)}
+footer.bottom .wrap{display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:space-between;padding-block:20px;font-size:13px;color:var(--muted)}
+footer.bottom a{color:var(--ink)}
+
+/* metrics overlay */
+body.goals [data-goal]{outline:2px dashed var(--accent);outline-offset:3px;position:relative}
+body.goals [data-goal]::after{content:"цель: " attr(data-goal);position:absolute;right:-3px;top:-12px;transform:translateY(-100%);background:var(--accent);color:var(--accent-ink);font:600 10.5px/1 var(--text);padding:3px 6px;border-radius:4px;white-space:nowrap;z-index:2;pointer-events:none;letter-spacing:.02em;text-transform:none}
+.goal-log{font-size:12px;color:var(--muted)}
+.goal-log b{color:var(--accent)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+
+<div class="demo">
+  <div class="wrap">
+    <span>Пример страницы сравнения. Прокаты, телефоны и цены вымышлены.</span>
+    <span style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <span class="goal-log" id="goalLog" hidden></span>
+      <label class="switch" for="goalsToggle"><input type="checkbox" id="goalsToggle"> Показать цели Метрики</label>
+    </span>
+  </div>
+</div>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#">inrenta<span>.</span></a>
+    <span class="city">Город: <b>Краснодар</b></span>
+    <nav class="main" aria-label="Основное меню">
+      <a href="#">Все категории</a>
+      <a href="#">Как считаем цены</a>
+      <a href="#">Для прокатов</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="crumbs" aria-label="Хлебные крошки">
+    <a href="#">Краснодар</a><span>/</span><a href="#">Инструмент</a><span>/</span><span>Перфораторы</span>
+  </nav>
+  <h1 id="h1">Прокат перфоратора в Краснодаре</h1>
+  <p class="lede" id="lede"></p>
+
+  <section class="range" aria-label="Разброс цен за сутки">
+    <div class="range-head">
+      <span>Цена за сутки у разных прокатов: <strong id="rangeTxt"></strong></span>
+      <span id="spreadTxt"></span>
+    </div>
+    <div class="track" id="track"></div>
+  </section>
+
+  <div class="grid">
+    <aside class="calc" aria-labelledby="calcTitle">
+      <h2 id="calcTitle">Посчитать под свою задачу</h2>
+
+      <div class="field">
+        <span class="label" id="clsLabel">Какой нужен</span>
+        <div class="seg" role="group" aria-labelledby="clsLabel" id="clsSeg">
+          <button type="button" id="cls-plus" data-cls="plus" aria-pressed="true">SDS-plus<small>до 4 Дж · дюбели, штробы</small></button>
+          <button type="button" id="cls-max" data-cls="max" aria-pressed="false">SDS-max<small>от 5 Дж · бетон, демонтаж</small></button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label" id="daysLabel">На сколько дней</span>
+        <div class="stepper" role="group" aria-labelledby="daysLabel">
+          <button type="button" id="daysMinus" aria-label="Меньше дней">−</button>
+          <output id="daysOut" class="num" aria-live="polite">2 дня</output>
+          <button type="button" id="daysPlus" aria-label="Больше дней">+</button>
+        </div>
+        <div class="chips" id="dayChips">
+          <button type="button" class="chip" id="d1" data-d="1">1 день</button>
+          <button type="button" class="chip" id="d2" data-d="2">2 дня</button>
+          <button type="button" class="chip" id="d3" data-d="3">выходные</button>
+          <button type="button" class="chip" id="d7" data-d="7">неделя</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="row-toggle">
+          <span class="label" style="margin:0">Доставка</span>
+          <label class="switch" for="deliv"><input type="checkbox" id="deliv" checked><span class="sr">Нужна доставка</span></label>
+        </div>
+        <label for="district" class="sr">Район доставки</label>
+        <select id="district">
+          <option>ФМР</option><option>ЮМР</option><option>ЧМР</option><option>КМР</option>
+          <option>Центр</option><option>Гидрострой</option><option>Музыкальный</option><option>Пашковский</option>
+          <option>Фестивальный</option><option>Энка</option>
+        </select>
+      </div>
+
+      <p class="calc-note">Итог = аренда за ваш срок с учётом минимального срока и недельных тарифов + доставка, если она нужна. Залог не входит в итог — его возвращают.</p>
+    </aside>
+
+    <section aria-labelledby="resTitle">
+      <div class="res-head">
+        <div>
+          <h2 id="resTitle"></h2>
+          <p id="resSub"></p>
+        </div>
+        <label class="sort" for="sortSel">Сортировка
+          <select id="sortSel">
+            <option value="total">по итоговой сумме</option>
+            <option value="day">по цене за сутки</option>
+            <option value="deposit">по залогу</option>
+          </select>
+        </label>
+      </div>
+      <ol class="list" id="list"></ol>
+
+      <section class="regular" aria-labelledby="regTitle">
+        <div>
+          <h2 id="regTitle">Инструмент нужен регулярно?</h2>
+          <p>Для бригад и мастеров соберём предложения от 3 прокатов с ценой за месяц и пришлём в течение дня.</p>
+        </div>
+        <form id="regForm" novalidate data-goal="regular_request">
+          <label class="full" for="regWhat">Что нужно
+            <input id="regWhat" placeholder="Перфоратор SDS-max, штроборез" value="Перфоратор SDS-max, штроборез">
+          </label>
+          <label for="regFreq">Как часто
+            <select id="regFreq"><option>Каждую неделю</option><option>2–3 раза в месяц</option><option>На объект 1–3 месяца</option></select>
+          </label>
+          <label for="regPhone">Телефон или Telegram
+            <input id="regPhone" placeholder="+7 или @username">
+          </label>
+          <button class="btn full" type="submit">Собрать предложения</button>
+        </form>
+      </section>
+
+      <div class="guide">
+        <div>
+          <h2>Какой перфоратор брать</h2>
+          <p>Главное — энергия удара в джоулях. От неё зависит, возьмёт ли инструмент ваш материал, а заодно и цена аренды.</p>
+          <div style="overflow-x:auto">
+          <table class="classes">
+            <thead><tr><th>Класс</th><th>Энергия</th><th>Для чего</th></tr></thead>
+            <tbody>
+              <tr><td>SDS-plus</td><td class="num">2–4 Дж</td><td>Отверстия под дюбели до 12 мм, штробы в кирпиче и газобетоне, лёгкий демонтаж плитки</td></tr>
+              <tr><td>SDS-max</td><td class="num">5–12 Дж</td><td>Отверстия в монолите, проёмы, снятие стяжки, демонтаж перегородок</td></tr>
+            </tbody>
+          </table>
+          </div>
+          <p>Для ремонта квартиры почти всегда хватает SDS-plus. Если нужно сносить стены или сверлить монолит под трубы — берите SDS-max, это сэкономит день работы.</p>
+        </div>
+        <div>
+          <h2>Частые вопросы</h2>
+          <details open><summary>Почему у прокатов такие разные цены?</summary><p>Разный инструмент (Hilti и Makita стоят по-разному), разные условия: у одних доставка бесплатная от суммы, у других минимальный срок 2–3 дня. Поэтому сравниваем итог под ваш срок, а не цену за сутки.</p></details>
+          <details><summary>Что такое минимальный срок?</summary><p>Некоторые прокаты не сдают меньше чем на 2–3 суток. Если вам нужен один день, заплатите всё равно за минимальный срок — калькулятор это учитывает.</p></details>
+          <details><summary>Нужен ли залог?</summary><p>Чаще всего да: деньгами, паспортом или тем и другим. Залог возвращают при сдаче исправного инструмента, в итоговую сумму он не входит.</p></details>
+          <details><summary>Цена на сайте не совпала с ценой по телефону</summary><p>Мы проверяем цены вручную, дата проверки стоит у каждого предложения. Нажмите «Цена устарела?» у нужного проката — перепроверим.</p></details>
+        </div>
+      </div>
+
+      <nav class="related" aria-label="Другой инструмент">
+        <span>Ещё в Краснодаре:</span>
+        <a href="#">Отбойный молоток</a><a href="#">Штроборез</a><a href="#">Бетономешалка</a><a href="#">Виброплита</a><a href="#">Генератор</a><a href="#">Моющий пылесос</a>
+      </nav>
+    </section>
+  </div>
+</main>
+
+<footer class="bottom">
+  <div class="wrap">
+    <span>inrenta — сравнение цен прокатов Краснодара</span>
+    <span>Прокат? <a href="#" data-goal="claim_card">Подтвердите карточку</a> и обновляйте цены сами</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var TODAY = new Date(2026,8,23);
+  var DATA = {
+    plus: [
+      {id:"a",name:"Инструмент у дома",area:"ЮМР",model:"Makita HR2470",day:450,week:2400,min:1,dep:"3 000 ₽",depN:3000,del:{p:400,free:2000},chk:"2026-09-18",claimed:true},
+      {id:"b",name:"Бур и Молот",area:"ФМР",model:"Bosch GBH 2-26",day:500,min:1,dep:"паспорт",depN:0,del:{p:350},chk:"2026-09-15"},
+      {id:"c",name:"РемПрокат-23",area:"Гидрострой",model:"Интерскол П-26",day:350,min:2,dep:"2 000 ₽",depN:2000,del:null,chk:"2026-09-20"},
+      {id:"d",name:"Склад на Уральской",area:"Энка",model:"DeWalt D25133",day:600,week:3000,min:1,dep:"5 000 ₽",depN:5000,del:{p:500,free:3000},chk:"2026-09-12",claimed:true},
+      {id:"e",name:"Мастерская Фёдорова",area:"ЧМР",model:"Makita HR2470",day:400,min:1,dep:"паспорт + 2 000 ₽",depN:2000,del:{p:300},chk:"2026-08-02"},
+      {id:"f",name:"Точка инструмента",area:"Центр",model:"Hilti TE 2",day:900,min:1,dep:"10 000 ₽",depN:10000,del:{p:0},chk:"2026-09-19"},
+      {id:"g",name:"Дрель и Ко",area:"Музыкальный",model:"Metabo KHE 2660",day:550,week:2800,min:1,dep:"3 000 ₽",depN:3000,del:{p:450},chk:"2026-09-17"},
+      {id:"h",name:"Прокат «Кран-Балка»",area:"Фестивальный",model:"Зубр ЗП-26",day:380,min:3,dep:"1 500 ₽",depN:1500,del:{p:350},chk:"2026-09-16"}
+    ],
+    max: [
+      {id:"i",name:"Бур и Молот",area:"ФМР",model:"Bosch GBH 8-45",day:1200,min:1,dep:"7 000 ₽",depN:7000,del:{p:350},chk:"2026-09-15"},
+      {id:"j",name:"Склад на Уральской",area:"Энка",model:"Makita HR4013",day:1100,week:5500,min:1,dep:"8 000 ₽",depN:8000,del:{p:500,free:3000},chk:"2026-09-12",claimed:true},
+      {id:"k",name:"Точка инструмента",area:"Центр",model:"Hilti TE 60",day:1800,min:1,dep:"15 000 ₽",depN:15000,del:{p:0},chk:"2026-09-19"},
+      {id:"l",name:"РемПрокат-23",area:"Гидрострой",model:"Интерскол П-45",day:900,min:2,dep:"5 000 ₽",depN:5000,del:null,chk:"2026-09-20"},
+      {id:"m",name:"Мастерская Фёдорова",area:"ЧМР",model:"Makita HR4511",day:1000,min:1,dep:"паспорт + 5 000 ₽",depN:5000,del:{p:300},chk:"2026-08-02"}
+    ]
+  };
+  var state = {cls:"plus",days:2,deliv:true,district:"ФМР",sort:"total",shown:{},flagged:{}};
+  var $ = function(id){return document.getElementById(id)};
+  var fmt = function(n){return n.toLocaleString("ru-RU").replace(/,/g," ")+" ₽"};
+  var months=["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
+  function parse(s){var p=s.split("-");return new Date(+p[0],+p[1]-1,+p[2])}
+  function dstr(s){var d=parse(s);return d.getDate()+" "+months[d.getMonth()]}
+  function plural(n,a,b,c){var m10=n%10,m100=n%100;if(m10==1&&m100!=11)return a;if(m10>=2&&m10<=4&&(m100<10||m100>=20))return b;return c}
+  function daysWord(n){return n+" "+plural(n,"день","дня","дней")}
+
+  function calc(o){
+    var d=Math.max(state.days,o.min), rent;
+    if(o.week && d>=7){rent=Math.floor(d/7)*o.week+(d%7)*o.day}else{rent=d*o.day}
+    var deliv=0, noDel=false;
+    if(state.deliv){ if(!o.del){noDel=true} else { deliv=(o.del.free && rent>=o.del.free)?0:o.del.p } }
+    return {billed:d,rent:rent,deliv:deliv,total:rent+deliv,noDel:noDel};
+  }
+
+  var log=[];
+  function goal(name){
+    log.unshift(name); log=log.slice(0,3);
+    var el=$("goalLog"); el.hidden=!document.body.classList.contains("goals");
+    el.innerHTML="Отправлено: "+log.map(function(x){return "<b>"+x+"</b>"}).join(", ");
+  }
+
+  function render(){
+    var items=DATA[state.cls].map(function(o){return Object.assign({},o,{c:calc(o)})});
+    var days=items.map(function(o){return o.day}), lo=Math.min.apply(null,days), hi=Math.max.apply(null,days);
+    var dates=DATA[state.cls].map(function(o){return parse(o.chk)}).sort(function(a,b){return a-b});
+    var clsName=state.cls==="plus"?"перфоратора SDS-plus":"перфоратора SDS-max";
+    $("lede").innerHTML="<b>"+items.length+" "+plural(items.length,"прокат","проката","прокатов")+"</b> · от "+fmt(lo)+" до "+fmt(hi)+" в сутки · цены проверены "+dates[0].getDate()+" "+months[dates[0].getMonth()]+" — "+dates[dates.length-1].getDate()+" "+months[dates[dates.length-1].getMonth()];
+    $("rangeTxt").textContent=fmt(lo)+" — "+fmt(hi);
+    $("spreadTxt").textContent="Самый дорогой в "+(hi/lo).toFixed(1).replace(".",",")+" раза дороже самого дешёвого";
+
+    // track
+    var tr=$("track"); tr.innerHTML="";
+    var ok=items.filter(function(o){return !o.c.noDel});
+    var bestId=(ok.length?ok:items).slice().sort(function(a,b){return a.c.total-b.c.total})[0].id;
+    items.forEach(function(o){
+      var x=hi===lo?50:(o.day-lo)/(hi-lo)*100, s=document.createElement("span");
+      s.className="dot"+(o.id===bestId?" best":""); s.style.left=x+"%"; s.title=o.name+": "+fmt(o.day)+" / сут";
+      tr.appendChild(s);
+    });
+    [["l",0,fmt(lo)],["r",100,fmt(hi)]].forEach(function(t){var e=document.createElement("span");e.className="tick "+t[0];e.style.left=t[1]+"%";e.textContent=t[2];tr.appendChild(e)});
+
+    // heading
+    $("resTitle").textContent="Итог под ваш срок: "+daysWord(state.days)+(state.deliv?", с доставкой":", самовывоз");
+    var cheapest=(ok.length?ok:items).reduce(function(a,b){return a.c.total<b.c.total?a:b});
+    var dearest=(ok.length?ok:items).reduce(function(a,b){return a.c.total>b.c.total?a:b});
+    $("resSub").textContent=(state.deliv?"Доставка в "+state.district+". ":"")+"Разница между самым дешёвым и самым дорогим вариантом — "+fmt(dearest.c.total-cheapest.c.total)+".";
+
+    // sort
+    var key={total:function(o){return o.c.total},day:function(o){return o.day},deposit:function(o){return o.depN}}[state.sort];
+    items.sort(function(a,b){ if(a.c.noDel!==b.c.noDel) return a.c.noDel?1:-1; return key(a)-key(b)});
+
+    var list=$("list"); list.innerHTML="";
+    items.forEach(function(o){
+      var c=o.c, li=document.createElement("li");
+      var isBest=o.id===bestId;
+      li.className="offer"+(isBest?" top":"")+(c.noDel?" off":"");
+      var age=Math.round((TODAY-parse(o.chk))/864e5), stale=age>30;
+      var delTxt=!o.del?"только самовывоз":(o.del.p===0?"бесплатно":fmt(o.del.p)+(o.del.free?", от "+fmt(o.del.free)+" — 0 ₽":""));
+      var minTxt=o.min>1?"от "+daysWord(o.min):"от 1 дня";
+      var sub;
+      if(c.noDel) sub="не везут — только самовывоз";
+      else sub="аренда "+fmt(c.rent)+(c.billed>state.days?" за "+daysWord(c.billed):"")+(state.deliv?" + доставка "+(c.deliv?fmt(c.deliv):"0 ₽"):"");
+      var saving=(!isBest||c.noDel)?"":(dearest.c.total-c.total>0?'<span class="save">на '+fmt(dearest.c.total-c.total)+' дешевле самого дорогого</span>':"");
+      li.innerHTML=
+        '<div class="who"><h3>'+o.name+(isBest?' <span class="badge best">Дешевле всего под ваш срок</span>':'')+(o.claimed?' <span class="badge claimed">Прокат подтвердил цены</span>':'')+'</h3>'+
+        '<div class="meta">'+o.area+' · '+o.model+'</div></div>'+
+        '<dl class="facts"><div><dt>За сутки</dt><dd class="num">'+fmt(o.day)+'</dd></div>'+
+        '<div><dt>Неделя</dt><dd class="num">'+(o.week?fmt(o.week):"—")+'</dd></div>'+
+        '<div><dt>Срок</dt><dd'+(o.min>1?' class="warn"':'')+'>'+minTxt+'</dd></div>'+
+        '<div><dt>Залог</dt><dd>'+o.dep+'</dd></div>'+
+        '<div><dt>Доставка</dt><dd'+(!o.del?' class="warn"':'')+'>'+delTxt+'</dd></div></dl>'+
+        '<div class="act"><div class="total num">'+fmt(c.total)+'<small>'+sub+'</small></div>'+
+        '<div id="ph-'+o.id+'">'+(state.shown[o.id]?phoneHtml(o):'<button type="button" class="btn" data-show="'+o.id+'" data-goal="show_phone">Показать телефон</button>')+'</div></div>'+
+        '<div class="foot"><span>'+(stale?'<span class="stale">Цена проверена '+dstr(o.chk)+' — могла измениться</span>':'Цена проверена '+dstr(o.chk))+'</span>'+
+        (state.flagged[o.id]?'<span>Спасибо, перепроверим в течение дня</span>':'<button type="button" class="linkbtn" data-flag="'+o.id+'" data-goal="price_outdated">Цена устарела?</button>')+'</div>';
+      list.appendChild(li);
+    });
+  }
+  function phoneHtml(o){
+    var n="+7 900 000-00-"+String(10+o.id.charCodeAt(0)%90).padStart(2,"0");
+    return '<div class="phone"><b class="num">'+n+'</b><span>Скажите, что нашли цену на inrenta</span></div>';
+  }
+
+  $("list").addEventListener("click",function(e){
+    var s=e.target.closest("[data-show]"), f=e.target.closest("[data-flag]");
+    if(s){state.shown[s.dataset.show]=true;goal("show_phone");render()}
+    if(f){state.flagged[f.dataset.flag]=true;goal("price_outdated");render()}
+  });
+  $("clsSeg").addEventListener("click",function(e){
+    var b=e.target.closest("button[data-cls]"); if(!b)return;
+    state.cls=b.dataset.cls;
+    document.querySelectorAll("#clsSeg button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false")});
+    goal("calc_class"); render();
+  });
+  function setDays(n){state.days=Math.max(1,Math.min(30,n));$("daysOut").textContent=daysWord(state.days);
+    document.querySelectorAll("#dayChips .chip").forEach(function(c){c.setAttribute("aria-pressed",+c.dataset.d===state.days?"true":"false")});render()}
+  $("daysMinus").onclick=function(){setDays(state.days-1);goal("calc_days")};
+  $("daysPlus").onclick=function(){setDays(state.days+1);goal("calc_days")};
+  $("dayChips").addEventListener("click",function(e){var c=e.target.closest(".chip");if(c){setDays(+c.dataset.d);goal("calc_days")}});
+  $("deliv").onchange=function(){state.deliv=this.checked;$("district").disabled=!this.checked;goal("calc_delivery");render()};
+  $("district").onchange=function(){state.district=this.value;render()};
+  $("sortSel").onchange=function(){state.sort=this.value;render()};
+  $("regForm").addEventListener("submit",function(e){
+    e.preventDefault(); goal("regular_request");
+    var f=this; if(f.querySelector(".ok-msg"))return;
+    var m=document.createElement("div"); m.className="ok-msg";
+    m.textContent="Заявка принята. Соберём 3 предложения и пришлём в течение дня.";
+    f.appendChild(m);
+  });
+  $("goalsToggle").onchange=function(){document.body.classList.toggle("goals",this.checked);$("goalLog").hidden=!this.checked||!log.length};
+  setDays(2);
+})();
+</script>
