@@ -16,6 +16,11 @@
 - --color-border
 - --color-ring
 - --color-danger
+- --color-header-fg, --color-header-muted (текст на шапке)
+- --color-cta, --color-cta-fg (главная кнопка, победитель вкладки), --color-cta-bright (декор на тёмном), --color-cta-soft (подсказка)
+- --color-mark-dot (точка знака на светлом)
+- --color-ok, --color-ok-soft, --color-warn, --color-warn-soft, --color-warn-line (статусы)
+- --color-border-strong, --color-photo
 
 ## Радиусы
 - --radius-sm

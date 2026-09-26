@@ -1,8 +1,5 @@
-import { Logo } from "@/components/brand/Logo";
-
 /* Прогресс формы выкладки. Это индикатор объёма работы, а не визард: блоки
- * заполняются в любом порядке, отрезки просто показывают, сколько уже собрано.
- * Заголовок живёт в скобках — то же место, где обычно стоит знак. */
+ * заполняются в любом порядке, отрезки просто показывают, сколько уже собрано. */
 export function StepProgress({
   title,
   done,
@@ -14,7 +11,7 @@ export function StepProgress({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <Logo size={18} word={title} />
+      <span className="font-display text-lg font-semibold">{title}</span>
       <div
         className="flex min-w-32 flex-1 items-center gap-2"
         role="progressbar"

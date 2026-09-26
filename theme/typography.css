@@ -20,7 +20,7 @@
   --leading-body:  1.5;
 
   /* Крупные заголовки и знак сжаты трекингом; моно-капсы, наоборот, разрежены. */
-  --tracking-display: -0.03em;
-  --tracking-mark:    -0.035em;
+  --tracking-display: -0.01em;  /* Unbounded широкий: H1 главной — -0.02em в разметке */
+  --tracking-mark:    -0.01em;
   --tracking-mono:     0.14em;
 }

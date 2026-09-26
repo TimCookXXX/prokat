@@ -15,14 +15,20 @@ describe("theme tokens", () => {
     expect(validateTokensCss(css).ok).toBe(true);
   });
 
-  it("uses a green accent in both themes", () => {
-    // primary/accent/ring share the green; assert hue by exact configured hex
-    expect(block(":root")).toMatch(/--color-primary:\s*#34C759/i);
-    expect(block(".dark")).toMatch(/--color-primary:\s*#30D158/i);
+  // Вариант Б: бренд — тёмно-зелёный (шапка, вторичные кнопки), оранжевый —
+  // только главная кнопка и победитель вкладки.
+  it("uses the variant B brand and a single orange CTA", () => {
+    expect(block(":root")).toMatch(/--color-primary:\s*#0F3D35/i);
+    expect(block(":root")).toMatch(/--color-header:\s*#0F3D35/i);
+    expect(block(":root")).toMatch(/--color-cta:\s*#C24A06/i);
+    expect(block(".dark")).toMatch(/--color-cta:\s*#FF7A33/i);
   });
 
-  it("keeps header equal to background", () => {
-    expect(block(":root")).toMatch(/--color-header:\s*#EDF0EE/i);
-    expect(block(".dark")).toMatch(/--color-header:\s*#191919/i);
+  it("defines the status colors in both themes", () => {
+    for (const sel of [":root", ".dark"]) {
+      for (const t of ["--color-ok", "--color-ok-soft", "--color-warn", "--color-warn-soft", "--color-cta-soft"]) {
+        expect(block(sel)).toContain(`${t}:`);
+      }
+    }
   });
 });

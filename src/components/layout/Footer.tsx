@@ -2,8 +2,12 @@ import Link from "next/link";
 import { content } from "@theme/content";
 import { Logo } from "@/components/brand/Logo";
 import { ThemeSegmented } from "@/components/providers/ThemeSegmented";
+import { isP2PEnabled } from "@/lib/features";
 
 export function Footer() {
+  const columns = isP2PEnabled()
+    ? [...content.footer.p2pColumns, ...content.footer.columns]
+    : content.footer.columns;
   return (
     <footer className="mx-auto mt-10 w-full max-w-[1200px] px-4 pb-6">
       <div className="surface p-6 sm:p-8">
@@ -19,7 +23,7 @@ export function Footer() {
             </p>
           </div>
 
-          {content.footer.columns.map((col) => (
+          {columns.map((col) => (
             <nav key={col.title} className="flex flex-col gap-3">
               <span className="font-mono text-2xs uppercase tracking-mono text-muted-foreground">
                 {col.title}

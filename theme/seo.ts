@@ -1,9 +1,9 @@
 export const seo = {
   siteName: "inrenta",
   titleTemplate: (pageTitle: string) => `${pageTitle} — inrenta`,
-  defaultTitle: "inrenta — аренда вещей у людей рядом",
+  defaultTitle: "inrenta — сравнение цен прокатов",
   defaultDescription:
-    "Аренда вещей между людьми: инструмент, спорт, туризм, платья, фототехника. Найдите вещь в своём городе и оставьте заявку на бронь.",
+    "Сравните цены прокатов своего города: итог за ваши даты с доставкой, залог и дата проверки каждой цены.",
   themeColor: "#ffffff",
   locale: "ru_RU",
   ogDefault: "/og-default.png",

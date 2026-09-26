@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import NextTopLoader from "nextjs-toploader";
-import { fontDisplay, fontText, fontMark, fontMono } from "@theme/fonts";
+import { fontDisplay, fontText } from "@theme/fonts";
 import { seo } from "@theme/seo";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Header } from "@/components/layout/Header";
@@ -22,17 +22,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="ru"
       suppressHydrationWarning
-      className={`${fontDisplay.variable} ${fontText.variable} ${fontMark.variable} ${fontMono.variable}`}
+      className={`${fontDisplay.variable} ${fontText.variable}`}
     >
       <body className="bg-background text-foreground font-sans antialiased min-h-screen flex flex-col">
         {process.env.NODE_ENV === "production" && process.env.YANDEX_METRIKA_ID && (
           <YandexMetrika counterId={process.env.YANDEX_METRIKA_ID} />
         )}
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {/* Глобальный progress-bar поверх <html>: даёт моментальный visual
            * feedback на любой client-side навигации (Link/router.push), пока
-           * RSC грузит новую страницу. Цвет — токен --color-primary. */}
-          <NextTopLoader color="#34C759" height={3} showSpinner={false} />
+           * RSC грузит новую страницу. Цвет — токен --color-cta. */}
+          <NextTopLoader color="var(--color-cta)" height={3} showSpinner={false} shadow={false} />
           <Header />
           <div className="flex-1">{children}</div>
           {/* Отступ под парящий таб-бар: на десктопе --tabbar-h равна нулю. */}
