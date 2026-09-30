@@ -10,7 +10,9 @@ import {
 import {
   TAB_LABELS, defaultTab, explainFirst, place, sortForTab, tabsFor, type Placed, type TabId,
 } from "@/lib/compare/ranking";
-import { pointKey, shopPoint, userOkrug, userPoint, type CityGeo, type GeoPoint, type RoadRoute, type UserLocation } from "@/lib/compare/geo";
+import {
+  pointKey, shopPoint, trafficFactor, userOkrug, userPoint, type CityGeo, type GeoPoint, type RoadRoute, type UserLocation,
+} from "@/lib/compare/geo";
 import { openState, type WeekHours } from "@/lib/compare/hours";
 import type { ResultFilters, ResultParams } from "@/lib/compare/scenario";
 import type { VerifiedBy } from "@/lib/compare/offers-csv";
@@ -125,6 +127,7 @@ export function buildResultView(offers: CompareOffer[], p: ResultParams, ctx: Vi
     shopOkrug: (o: OfferInput) => (o as CompareOffer).place?.okrug ?? null,
     today,
     road: (pt: GeoPoint) => ctx.roads?.get(pointKey(pt)) ?? null,
+    traffic: (km: number) => trafficFactor(ctx.now, km),
   };
   const all = place(priced.fresh, placeCtx);
   const recheck = place(priced.recheck, placeCtx);

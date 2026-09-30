@@ -6,7 +6,7 @@
 // телефон не мешает совпадению, если у одной из сторон он не указан. У найденного
 // проката дополняются только пустые поля — данные подтверждённой карточки не
 // затираются. Микрорайон сверяется со справочником мест, адрес без координат
-// геокодируется (если передан геокодер).
+// геокодируется своим геокодером (src/server/geocoder.ts, строго: только до дома).
 //
 // Модель ищется через нормализацию и model_aliases; не нашлась — предложение
 // относится к классу, исходное написание сохраняется, строка — в отчёт.
@@ -22,10 +22,11 @@ import { newId } from "@/lib/id";
 import { slugify } from "@/lib/slugify";
 import type { OfferRow, RowError } from "@/lib/compare/offers-csv";
 import { brandWordSet, compactWord, modelKey, offerModelKey, stopWordSet, type ModelKeyOptions } from "@/lib/compare/models";
-import { okrugOfPoint, type GeoPoint } from "@/lib/compare/geo";
+import { haversineKm, okrugOfPoint, type GeoPoint } from "@/lib/compare/geo";
+import type { ShopGeocode } from "@/server/geocoder";
 
-/** Адрес → координаты; null — не нашёлся. */
-export type Geocode = (address: string, cityName: string) => Promise<GeoPoint | null>;
+/** Адрес проката в городе → точка или причина, почему её нет (geocodeShopAddress). */
+export type Geocode = (address: string, city: { slug: string; name: string }) => Promise<ShopGeocode>;
 
 export interface ImportReport {
   shopsCreated: number;
@@ -37,8 +38,10 @@ export interface ImportReport {
   errors: RowError[];
   /** Написания, которых нет в справочнике моделей: предложение привязано к классу. */
   unrecognizedModels: { line: number; model: string }[];
-  /** Прокаты с адресом, у которых не получилось координат. */
-  addressesWithoutCoords: { line: number; shop: string; address: string }[];
+  /** Прокаты с адресом, у которых не получилось координат, и почему. */
+  addressesWithoutCoords: { line: number; shop: string; address: string; reason: string }[];
+  /** Координаты записаны, но стоит проверить: дом между соседними номерами, пункт не город проката. */
+  addressesToCheck: { line: number; shop: string; address: string; found: string; check: string }[];
   /** Микрорайоны, которых нет в справочнике мест. */
   unknownMicrodistricts: { line: number; value: string }[];
   dryRun: boolean;
@@ -73,7 +76,7 @@ export async function importOffers(
 ): Promise<ImportReport> {
   const report: ImportReport = {
     shopsCreated: 0, shopsMatched: 0, offersCreated: 0, offersUpdated: 0, offersSkippedStale: 0,
-    errors: [], unrecognizedModels: [], addressesWithoutCoords: [], unknownMicrodistricts: [], dryRun,
+    errors: [], unrecognizedModels: [], addressesWithoutCoords: [], addressesToCheck: [], unknownMicrodistricts: [], dryRun,
   };
   if (rows.length === 0) return report;
 
@@ -136,6 +139,18 @@ export async function loadModelLookup(tx: Tx | NodePgDatabase): Promise<ModelLoo
   };
 }
 
+/** Ближайший центр микрорайона не дальше 2,5 км — как для точки пользователя (geo.ts). */
+function nearestMicrodistrictId(p: GeoPoint, list: Pick<District, "id" | "kind" | "lat" | "lon">[]): string | null {
+  let best: string | null = null;
+  let bestKm = 2.5;
+  for (const d of list) {
+    if (d.kind !== "microdistrict") continue;
+    const km = haversineKm(p, d);
+    if (km <= bestKm) { best = d.id; bestKm = km; }
+  }
+  return best;
+}
+
 /** Микрорайон из файла → строка справочника: по названию, сокращению или slug. */
 export function findMicrodistrict<D extends Pick<District, "kind" | "slug" | "name" | "aliases">>(value: string, list: D[]): D | null {
   // \b в JS не видит границ кириллических слов — отрезаем «мкр» по пробелам.
@@ -145,7 +160,7 @@ export function findMicrodistrict<D extends Pick<District, "kind" | "slug" | "na
 }
 
 async function findOrCreateShop(
-  ctx: Context, cityShops: Shop[], cityDistricts: District[], city: { id: string; name: string }, r: OfferRow,
+  ctx: Context, cityShops: Shop[], cityDistricts: District[], city: { id: string; slug: string; name: string }, r: OfferRow,
 ): Promise<Shop> {
   const key = shopNameKey(r.shopName);
   const found = cityShops.find((s) =>
@@ -159,10 +174,17 @@ async function findOrCreateShop(
   if (!point && found?.lat != null && found.lon != null) point = { lat: found.lat, lon: found.lon };
   const address = r.address ?? found?.address ?? null;
   if (!point && address) {
-    point = ctx.geocode ? await ctx.geocode(address, city.name).catch(() => null) : null;
-    if (!point) ctx.report.addressesWithoutCoords.push({ line: r.line, shop: r.shopName, address });
+    const g: ShopGeocode = ctx.geocode
+      ? await ctx.geocode(address, city).catch((e: Error) => ({ point: null, reason: `ошибка геокодера: ${e.message}` }))
+      : { point: null, reason: "адресов нет в базе — запустите scripts/geocoder/prepare.sh" };
+    if (g.point) {
+      point = g.point;
+      if (g.check) ctx.report.addressesToCheck.push({ line: r.line, shop: r.shopName, address, found: g.found, check: g.check });
+    } else ctx.report.addressesWithoutCoords.push({ line: r.line, shop: r.shopName, address, reason: g.reason });
   }
   const okrugSlug = point ? okrugOfPoint(point) : null;
+  // Микрорайон не указан — ближайший к точке (подпись «Юбилейный, ул. …» в карточке).
+  const microId = micro?.id ?? (point ? nearestMicrodistrictId(point, cityDistricts) : null);
   const okrugId = micro?.parentId
     ?? (okrugSlug ? cityDistricts.find((d) => d.kind === "okrug" && d.slug === okrugSlug)?.id ?? null : null);
 
@@ -172,7 +194,7 @@ async function findOrCreateShop(
     const patch: Partial<Shop> = {};
     if (!found.phone && r.phone) patch.phone = r.phone;
     if (!found.telegram && r.telegram) patch.telegram = r.telegram;
-    if (!found.microdistrictId && micro) patch.microdistrictId = micro.id;
+    if (!found.microdistrictId && microId) patch.microdistrictId = microId;
     if (!found.okrugId && okrugId) patch.okrugId = okrugId;
     if (!found.address && r.address) patch.address = r.address;
     if (found.lat == null && point) { patch.lat = point.lat; patch.lon = point.lon; }
@@ -194,7 +216,7 @@ async function findOrCreateShop(
     address: r.address,
     lat: point?.lat ?? null,
     lon: point?.lon ?? null,
-    microdistrictId: micro?.id ?? null,
+    microdistrictId: microId,
     okrugId,
     hours: r.hours,
     phone: r.phone,

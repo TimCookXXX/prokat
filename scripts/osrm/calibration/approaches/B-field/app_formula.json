@@ -1,0 +1,10 @@
+{
+ "approach": "B-field",
+ "label": "day (будний день 13:00)",
+ "km": "distance_m / 1000",
+ "f": 1.0,
+ "beta_s": 48.75,
+ "minutes": "(f * duration_s + beta_s) / 60",
+ "source": "OSRM /table (annotations=distance,duration), граф из profile/ (build.sh)",
+ "notes": "поле скоростей и выбор маршрута — внутри графа; приложению нужны только f и beta"
+}

@@ -1,7 +1,9 @@
 // «Где» пользователя и местоположение проката: расстояние, время в пути, округ
 // точки. Чистые функции — без БД и внешних сервисов (ТЗ, пп. 3.3, 4.2, 4.3).
 
-import { CITY_SPEED_KMH, ROUTE_FACTOR } from "@/lib/compare/config";
+import {
+  CITY_SPEED_KMH, ROUTE_FACTOR, TRAFFIC, TRAFFIC_LONG_KM, TRAFFIC_SHORT_KM, TRIP_BASE_MIN,
+} from "@/lib/compare/config";
 import { OKRUG_BOUNDS } from "@/lib/compare/okrug-bounds";
 import type { GeoPoint } from "@/lib/compare/geo-data";
 import { normalize, switchLayout } from "@/lib/compare/search";
@@ -27,15 +29,22 @@ export interface CityGeo {
 }
 
 /**
+ * Насколько точна точка адреса: `street` — дом не найден, точка на улице; `place` — только
+ * населённый пункт (центр). Нет поля — точка дома или геолокация (расстояние точное).
+ */
+export type PointPrecision = "street" | "place";
+
+/**
  * Где пользователь. Город — без точки; округ — без точки, выдача делится на свой
  * и остальные; микрорайон — центр микрорайона (расстояние с «≈»); точка — адрес
- * или геолокация (расстояние точное), округ и микрорайон определены по точке.
+ * или геолокация (расстояние точное, адрес не до дома — с «≈»), округ и микрорайон
+ * определены по точке.
  */
 export type UserLocation =
   | { kind: "city" }
   | { kind: "okrug"; okrug: string }
   | { kind: "microdistrict"; microdistrict: string }
-  | { kind: "point"; point: GeoPoint; label: string | null; source: "address" | "geo" };
+  | { kind: "point"; point: GeoPoint; label: string | null; source: "address" | "geo"; precision?: PointPrecision };
 
 export const CITY_LOCATION: UserLocation = { kind: "city" };
 
@@ -53,10 +62,12 @@ export function haversineKm(a: GeoPoint, b: GeoPoint): number {
 }
 
 export interface Trip {
-  /** По дорогам ≈ по прямой × ROUTE_FACTOR, км. */
+  /** По дорогам (маршрутизатор) или прямая × ROUTE_FACTOR, км. */
   km: number;
-  /** В одну сторону, минут (целое). */
+  /** В одну сторону, минут, типичное дневное время: по нему оценка и порядок выдачи. */
   minutes: number;
+  /** То же с пробками текущего часа — его показывает карточка. */
+  nowMinutes: number;
   /** Хотя бы одна точка — центр микрорайона. */
   approx: boolean;
 }
@@ -64,18 +75,31 @@ export interface Trip {
 /** Путь по дорогам от маршрутизатора (src/server/routing.ts). */
 export interface RoadRoute {
   km: number;
-  /** Время с пробками (Яндекс); null — по средней скорости города. */
-  minutes: number | null;
+  /** Типичное дневное время, мин. */
+  minutes: number;
 }
 
 /**
- * Путь между точками. `road` — от маршрутизатора; нет его — по прямой ×
- * ROUTE_FACTOR (ТЗ, п. 4.3), что ошибается через реку. Время — маршрутизатора
- * (Яндекс, с пробками) или по средней скорости города, в которой заложены пробки.
+ * Поправка на пробки к дневному времени: день недели (пн = 0) и «ЧЧ:ММ» по Москве, длина поездки.
+ * Короткие поездки ночью ускоряются меньше длинных: светофоры и парковка остаются.
  */
-export function tripBetween(a: GeoPoint, b: GeoPoint, approx: boolean, road?: RoadRoute | null): Trip {
+export function trafficFactor(now: { weekday: number; time: string }, km: number): number {
+  const hour = Math.min(23, Math.max(0, Number(now.time.slice(0, 2)) || 0));
+  const table = now.weekday === 5 ? TRAFFIC.saturday : now.weekday === 6 ? TRAFFIC.sunday : TRAFFIC.weekday;
+  const w = Math.min(1, Math.max(0, (km - TRAFFIC_SHORT_KM) / (TRAFFIC_LONG_KM - TRAFFIC_SHORT_KM)));
+  return table.short[hour] * (1 - w) + table.long[hour] * w;
+}
+
+/**
+ * Путь между точками. `road` — от маршрутизатора; нет его — запасной расчёт по прямой
+ * (ошибается через реку и железную дорогу). `traffic` — поправка текущего часа по длине пути, для показа.
+ */
+export function tripBetween(
+  a: GeoPoint, b: GeoPoint, approx: boolean, road?: RoadRoute | null, traffic?: (km: number) => number,
+): Trip {
   const km = road?.km ?? haversineKm(a, b) * ROUTE_FACTOR;
-  return { km, minutes: road?.minutes ?? Math.round((km / CITY_SPEED_KMH) * 60), approx };
+  const minutes = road?.minutes ?? Math.round((km / CITY_SPEED_KMH) * 60 + TRIP_BASE_MIN);
+  return { km, minutes, nowMinutes: Math.max(1, Math.round(minutes * (traffic?.(km) ?? 1))), approx };
 }
 
 /** Ключ точки для карты расстояний (~1 м точности). */
@@ -88,14 +112,14 @@ export function tripLabel(t: Trip): string {
   const km = t.approx
     ? `≈ ${Math.max(1, Math.round(t.km))} км`
     : `${(Math.round(t.km * 10) / 10).toLocaleString("ru-RU")} км`;
-  return `${km} · ~${Math.max(1, t.minutes)} мин`;
+  return `${km} · ~${Math.max(1, t.nowMinutes)} мин`;
 }
 
 // ------------------------------------------------------------ точки
 
 /** Точка, от которой считаем путь пользователя; null — город или округ. */
 export function userPoint(loc: UserLocation, geo: CityGeo): { point: GeoPoint; approx: boolean } | null {
-  if (loc.kind === "point") return { point: loc.point, approx: false };
+  if (loc.kind === "point") return { point: loc.point, approx: !!loc.precision };
   if (loc.kind === "microdistrict") {
     const m = geo.microdistricts.find((x) => x.slug === loc.microdistrict);
     return m ? { point: m, approx: true } : null;
@@ -154,14 +178,18 @@ export function okrugName(slug: string | null, geo: CityGeo): string | null {
   return slug ? geo.okrugs.find((o) => o.slug === slug)?.name ?? null : null;
 }
 
-/** Текст поля «Где» после выбора: «ЮМР ≈», «ул. Северная, 15», «Прикубанский округ». */
+/**
+ * Текст поля «Где» после выбора: «Юбилейный», «ул. Северная, 15», «Прикубанский округ».
+ * Что расстояния от микрорайона приблизительные, говорят «≈ 3 км» в карточках и
+ * сводка выдачи — голый «≈» после названия в поле читается как сбой.
+ */
 export function locationLabel(loc: UserLocation, geo: CityGeo, cityName: string): string {
   switch (loc.kind) {
     case "city": return cityName;
     case "okrug": return okrugName(loc.okrug, geo) ?? cityName;
     case "microdistrict": {
       const m = geo.microdistricts.find((x) => x.slug === loc.microdistrict);
-      return m ? `${m.name} ≈` : cityName;
+      return m?.name ?? cityName;
     }
     case "point": return loc.label ?? (loc.source === "geo" ? "Моё местоположение" : "Точка на карте");
   }
@@ -170,12 +198,13 @@ export function locationLabel(loc: UserLocation, geo: CityGeo, cityName: string)
 // ------------------------------------------------------------ URL
 //   loc=d:festivalnyy        микрорайон
 //   loc=o:prikubanskiy       округ
-//   loc=p:45.06210,38.95200  точка (адрес или геолокация), la — подпись, src=geo
+//   loc=p:45.06210,38.95200  точка (адрес или геолокация), la — подпись, src=geo,
+//                            lp=s | t — адрес найден до улицы | до населённого пункта (нет — дом)
 
 const SLUG_RE = /^[a-z0-9-]{1,80}$/;
 
 export function parseLocation(
-  raw: { loc?: string; la?: string; src?: string },
+  raw: { loc?: string; la?: string; src?: string; lp?: string },
   geo: CityGeo,
 ): UserLocation {
   const v = raw.loc?.trim() ?? "";
@@ -193,7 +222,11 @@ export function parseLocation(
     const lon = m ? Number(m[2]) : NaN;
     if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
       const label = raw.la?.trim().slice(0, 120) || null;
-      return { kind: "point", point: { lat, lon }, label, source: raw.src === "geo" ? "geo" : "address" };
+      const loc: UserLocation = { kind: "point", point: { lat, lon }, label, source: raw.src === "geo" ? "geo" : "address" };
+      // Старые ссылки и inr_loc без lp — дом, как раньше.
+      if (raw.lp === "s") loc.precision = "street";
+      else if (raw.lp === "t") loc.precision = "place";
+      return loc;
     }
   }
   return CITY_LOCATION;
@@ -209,6 +242,7 @@ export function locationQuery(loc: UserLocation): Record<string, string> {
       const q: Record<string, string> = { loc: `p:${loc.point.lat.toFixed(5)},${loc.point.lon.toFixed(5)}` };
       if (loc.label) q.la = loc.label;
       if (loc.source === "geo") q.src = "geo";
+      if (loc.precision) q.lp = loc.precision === "street" ? "s" : "t";
       return q;
     }
   }

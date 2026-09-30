@@ -2,7 +2,7 @@ import Link from "next/link";
 import { content } from "@theme/content";
 import type { City } from "@/server/catalog";
 import { getCityGeo, getCompareCatalog, getSearchData, type NavCategory } from "@/server/compare";
-import { suggestEnabled } from "@/server/geocoder";
+import { addressIndexToken } from "@/server/geocoder";
 import { addDaysStr } from "@/lib/catalog/dates";
 import { STALE_AFTER_DAYS } from "@/lib/compare/pricing";
 import { CITY_LOCATION } from "@/lib/compare/geo";
@@ -28,7 +28,9 @@ export async function CityHome({ city }: { city: City }) {
   const today = localToday();
   const freshSince = addDaysStr(today, -STALE_AFTER_DAYS);
   const catalog = await getCompareCatalog(city.id, freshSince);
-  const [search, geo] = await Promise.all([getSearchData(city.id, freshSince, catalog), getCityGeo(city.id)]);
+  const [search, geo, addressIndex] = await Promise.all([
+    getSearchData(city.id, freshSince, catalog), getCityGeo(city.id), addressIndexToken(city.slug),
+  ]);
   const brandNames = new Map(search.brands.map((b) => [b.slug, b.name]));
   const popularModels = search.models.filter((m) => m.shops > 0)
     .sort((a, b) => b.shops - a.shops || (a.fromDay ?? Infinity) - (b.fromDay ?? Infinity))
@@ -54,7 +56,7 @@ export async function CityHome({ city }: { city: City }) {
               cityName={city.name}
               search={search}
               geo={geo}
-              addressEnabled={suggestEnabled()}
+              addressIndex={addressIndex}
               today={today}
               value={{ what: { label: "", target: null }, from: null, to: null, loc: CITY_LOCATION }}
             />

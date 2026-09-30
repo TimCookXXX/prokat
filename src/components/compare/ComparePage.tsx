@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { City } from "@/server/catalog";
 import { getSearchData } from "@/server/compare";
-import { suggestEnabled } from "@/server/geocoder";
+import { addressIndexToken } from "@/server/geocoder";
 import { addDaysStr } from "@/lib/catalog/dates";
 import { STALE_AFTER_DAYS, formatRub, isStale } from "@/lib/compare/pricing";
 import {
@@ -62,12 +62,19 @@ export interface ResultScope {
   similar?: { label: string; href: string }[];
 }
 
-/** Сводка о месте пользователя: «Юбилейный ≈», «ул. Северная, 15 · Западный округ, Юбилейный». */
+/**
+ * Сводка о месте пользователя: «Юбилейный, расстояния от центра микрорайона»,
+ * «ул. Северная, 15 · Западный округ, Юбилейный»; адрес не до дома — «…, расстояния от улицы ≈».
+ */
 function whereText(p: ResultParams, geo: CityGeo, cityName: string): string {
-  if (p.loc.kind !== "point") return p.loc.kind === "city" ? `${cityName}, весь город` : locationLabel(p.loc, geo, cityName);
+  if (p.loc.kind === "city") return `${cityName}, весь город`;
+  if (p.loc.kind === "microdistrict") return `${locationLabel(p.loc, geo, cityName)}, расстояния от центра микрорайона`;
+  if (p.loc.kind !== "point") return locationLabel(p.loc, geo, cityName);
   const okrug = okrugName(userOkrug(p.loc, geo), geo);
   const micro = nearestMicrodistrict(p.loc.point, geo)?.name;
-  return [locationLabel(p.loc, geo, cityName), [okrug, micro].filter(Boolean).join(", ")].filter(Boolean).join(" · ");
+  const approx = p.loc.precision === "street" ? "расстояния от улицы ≈"
+    : p.loc.precision === "place" ? "расстояния от центра населённого пункта ≈" : null;
+  return [locationLabel(p.loc, geo, cityName), [okrug, micro].filter(Boolean).join(", "), approx].filter(Boolean).join(" · ");
 }
 
 // Страница выдачи (ТЗ, раздел 5): итог за даты у каждого проката, расстояние и
@@ -86,7 +93,9 @@ export async function ResultPage({
   const today = localToday();
   const now = cityNow();
   const p = parseResultParams(searchParams, today, geo);
-  const search = await getSearchData(city.id, addDaysStr(today, -STALE_AFTER_DAYS));
+  const [search, addressIndex] = await Promise.all([
+    getSearchData(city.id, addDaysStr(today, -STALE_AFTER_DAYS)), addressIndexToken(city.slug),
+  ]);
   const classSlug = scope.classes?.some((c) => c.slug === p.classSlug) ? p.classSlug : null;
   // Неизвестный бренд в ссылке не должен давать пустую страницу без выхода — игнорируем его.
   const brandSlug = p.brandSlug && search.brands.some((b) => b.slug === p.brandSlug) ? p.brandSlug : null;
@@ -154,7 +163,7 @@ export async function ResultPage({
             cityName={city.name}
             search={search}
             geo={geo}
-            addressEnabled={suggestEnabled()}
+            addressIndex={addressIndex}
             today={today}
             value={{
               what: { label: scope.what, target: scope.searchTarget },

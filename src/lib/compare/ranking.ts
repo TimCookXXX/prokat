@@ -31,13 +31,15 @@ export interface PlaceInput {
   today: string;
   /** Путь по дорогам от пользователя до точки проката; нет — по прямой. */
   road?: (shop: GeoPoint) => RoadRoute | null;
+  /** Поправка на пробки текущего часа по длине пути — только для показа времени. */
+  traffic?: (km: number) => number;
 }
 
 export function place(quotes: Quote[], ctx: PlaceInput): Placed[] {
   return quotes.map((q) => {
     const sp = ctx.user ? ctx.shopPoint(q.offer) : null;
     const trip = ctx.user && sp
-      ? tripBetween(ctx.user.point, sp.point, ctx.user.approx || sp.approx, ctx.road?.(sp.point))
+      ? tripBetween(ctx.user.point, sp.point, ctx.user.approx || sp.approx, ctx.road?.(sp.point), ctx.traffic)
       : null;
     return {
       ...q,
@@ -142,7 +144,7 @@ export function explainFirst(sorted: Placed[], tab: TabId, userOkrug: string | n
   const first = sorted[0];
   if (!first) return null;
   const cheapest = sorted.reduce((m, p) => (p.total < m.total || (p.total === m.total && dist(p) < dist(m)) ? p : m), first);
-  const way = first.trip ? `${first.trip.approx ? "≈ " : ""}${Math.max(1, first.trip.minutes)} мин в одну сторону` : null;
+  const way = first.trip ? `${first.trip.approx ? "≈ " : ""}${first.trip.nowMinutes} мин в одну сторону` : null;
 
   if (tab === "okrug" && first.okrug === userOkrug) {
     const diff = first.total - cheapest.total;

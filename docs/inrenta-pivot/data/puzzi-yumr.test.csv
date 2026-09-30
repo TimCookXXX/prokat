@@ -1,0 +1,6 @@
+city_slug,shop_name,microdistrict,address,lat,lon,hours,phone,telegram,website,class_slug,model,includes,price_day,price_week,min_days,deposit_rub,deposit_document,delivery_available,delivery_price,delivery_free_from,delivery_same_day,verified_at,verified_by,source_url
+krasnodar,Тест Прокат Альфа,ЮМР,"ул. Рождественская набережная, 1",,,ежедневно 9-21,+79990000001,,,moyushchiy-pylesos,Karcher Puzzi 8/1 C,моющее средство,1000,,1,2000,false,false,,,false,2026-09-26,call,
+krasnodar,Тест Прокат Бета,ЮМР,"ул. Рождественская набережная, 3",,,ежедневно 9-21,+79990000002,,,moyushchiy-pylesos,Karcher Puzzi 8/1 C,моющее средство,1000,,1,2000,false,false,,,false,2026-09-26,call,
+krasnodar,Тест Прокат Гамма,ЮМР,"ул. Рождественская набережная, 5",,,ежедневно 9-21,+79990000003,,,moyushchiy-pylesos,Karcher Puzzi 8/1 C,моющее средство,1000,,1,2000,false,false,,,false,2026-09-26,call,
+krasnodar,Тест Прокат Дельта,ЮМР,"ул. Рождественская набережная, 7",,,ежедневно 9-21,+79990000004,,,moyushchiy-pylesos,Karcher Puzzi 8/1 C,моющее средство,1000,,1,2000,false,false,,,false,2026-09-26,call,
+krasnodar,Тест Прокат Омега,ЮМР,"ул. Рождественская набережная, 9",,,ежедневно 9-21,+79990000005,,,moyushchiy-pylesos,Karcher Puzzi 8/1 C,моющее средство,1000,,1,2000,false,false,,,false,2026-09-26,call,

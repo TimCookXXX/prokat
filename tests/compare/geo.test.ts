@@ -15,14 +15,15 @@ describe("distance and travel time", () => {
     expect(haversineKm(ymr, fmr)).toBeLessThan(5);
   });
 
-  it("route = straight × 1.3, time at 25 km/h", () => {
+  it("fallback without a router: straight × 1.67, 28.5 km/h plus 5.7 min (calibrated by 2GIS)", () => {
     const a = { lat: 45, lon: 39 };
     const b = { lat: 45.09, lon: 39 }; // ≈ 10 км по прямой
     const t = tripBetween(a, b, false);
-    expect(t.km).toBeCloseTo(13, 0);
-    expect(t.minutes).toBe(Math.round((t.km / 25) * 60));
-    expect(tripLabel(t)).toMatch(/^13(,\d)? км · ~\d+ мин$/);
-    expect(tripLabel({ ...t, approx: true })).toBe(`≈ 13 км · ~${t.minutes} мин`);
+    expect(t.km).toBeCloseTo(16.7, 0);
+    expect(t.minutes).toBe(Math.round((t.km / 28.5) * 60 + 5.7));
+    expect(tripLabel(t)).toMatch(/^16(,\d)? км · ~\d+ мин$/);
+    expect(tripLabel({ ...t, approx: true })).toBe(`≈ 17 км · ~${t.minutes} мин`);
+    expect(tripLabel({ ...t, nowMinutes: 50 })).toMatch(/~50 мин$/); // карточка — время текущего часа
   });
 });
 
@@ -79,7 +80,7 @@ describe("location in the URL", () => {
   });
 
   it("labels: microdistrict with ≈, okrug by name, city by default", () => {
-    expect(locationLabel({ kind: "microdistrict", microdistrict: "yubileynyy" }, geo, "Краснодар")).toBe("Юбилейный ≈");
+    expect(locationLabel({ kind: "microdistrict", microdistrict: "yubileynyy" }, geo, "Краснодар")).toBe("Юбилейный");
     expect(locationLabel({ kind: "okrug", okrug: "zapadnyy" }, geo, "Краснодар")).toBe("Западный округ");
     expect(locationLabel({ kind: "city" }, geo, "Краснодар")).toBe("Краснодар");
   });

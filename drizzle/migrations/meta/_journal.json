@@ -50,6 +50,20 @@
       "when": 1790416068176,
       "tag": "0006_lame_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790715941217,
+      "tag": "0007_chemical_domino",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790720159768,
+      "tag": "0008_quiet_scalphunter",
+      "breakpoints": true
     }
   ]
 }

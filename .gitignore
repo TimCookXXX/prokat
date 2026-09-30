@@ -34,3 +34,8 @@ caddy_config/
 
 # OSRM: граф дорог (scripts/osrm/prepare.sh)
 data/osrm/
+
+# Калибровка OSRM: эталон 2ГИС (условия использования — у владельца ключа) и промежуточные файлы
+data/calibration/
+# Свой геокодер: сырые выгрузки (ГАР, OSM), исследования и эталоны
+data/geocoder/

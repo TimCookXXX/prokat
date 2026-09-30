@@ -10,4 +10,12 @@ describe("<Footer>", () => {
     const link = getByText(content.footer.privacyLink) as HTMLAnchorElement;
     expect(link.getAttribute("href")).toBe("/privacy");
   });
+
+  it("атрибуция открытых данных: ссылка на условия OpenStreetMap и ГАР ФНС", () => {
+    const { container, getByText } = render(<Footer />);
+    const osm = getByText(content.footer.dataCredits.osm) as HTMLAnchorElement;
+    expect(osm.getAttribute("href")).toBe("https://www.openstreetmap.org/copyright");
+    expect(container.textContent).toContain("ODbL");
+    expect(container.textContent).toContain("ГАР ФНС России");
+  });
 });

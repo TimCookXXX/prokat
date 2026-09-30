@@ -112,7 +112,7 @@ export function parseResultParams(sp: RawParams, today: string, geo: CityGeo): R
     to,
     days: rentalDays(from, to),
     datesGiven,
-    loc: parseLocation({ loc: one(sp.loc), la: one(sp.la), src: one(sp.src) }, geo),
+    loc: parseLocation({ loc: one(sp.loc), la: one(sp.la), src: one(sp.src), lp: one(sp.lp) }, geo),
     tab: TAB_IDS.includes(tab as TabId) ? (tab as TabId) : null,
     filters: {
       noMoneyDeposit: flag(sp.nodep),

@@ -1,0 +1,117 @@
+{
+ "prefix": "B-field",
+ "final_graph": "data/osrm/builds/B-field-final",
+ "recipe": "scripts/osrm/calibration/approaches/B-field",
+ "app_formula": {
+  "km": "distance_m/1000",
+  "minutes": "(f*duration_s+beta_s)/60",
+  "f": 1.0,
+  "beta_s": 48.75
+ },
+ "val_day": {
+  "n": 1009,
+  "missing": 0,
+  "min_mean": 0.15396681195782003,
+  "min_median": 0.11605392029485419,
+  "min_p90": 0.3293280638937835,
+  "min_within10": 0.4370664023785927,
+  "min_within20": 0.7165510406342914,
+  "km_median": 0.058970945976958705,
+  "km_p90": 0.2750734106076573,
+  "km_within5": 0.45986124876114964,
+  "buckets": {
+   "0-3": {
+    "n": 170,
+    "min_mean": 0.17151521279289358,
+    "min_median": 0.12769511200697659,
+    "km_median": 0.09604708726105644
+   },
+   "3-7": {
+    "n": 296,
+    "min_mean": 0.17371860285279414,
+    "min_median": 0.12263933007794746,
+    "km_median": 0.0462149416832683
+   },
+   "7-15": {
+    "n": 334,
+    "min_mean": 0.14641336462281576,
+    "min_median": 0.11826864546509594,
+    "km_median": 0.056179468091643994
+   },
+   "15-": {
+    "n": 209,
+    "min_mean": 0.12379022422105716,
+    "min_median": 0.09340877014102315,
+    "km_median": 0.06292338457692798
+   }
+  },
+  "min_balanced": 0.15385935112239016
+ },
+ "train_day": {
+  "n": 1472,
+  "missing": 0,
+  "min_mean": 0.11175556489133376,
+  "min_median": 0.0807003266361776,
+  "min_p90": 0.25700525672081415,
+  "min_within10": 0.5930706521739131,
+  "min_within20": 0.8383152173913043,
+  "km_median": 0.0365577205268614,
+  "km_p90": 0.21105878972532358,
+  "km_within5": 0.5740489130434783,
+  "buckets": {
+   "0-3": {
+    "n": 236,
+    "min_mean": 0.12882869972848984,
+    "min_median": 0.09200848391795184,
+    "km_median": 0.035515414103756124
+   },
+   "3-7": {
+    "n": 455,
+    "min_mean": 0.12249621943743774,
+    "min_median": 0.08549020968644955,
+    "km_median": 0.03793103448275856
+   },
+   "7-15": {
+    "n": 496,
+    "min_mean": 0.0995365166168066,
+    "min_median": 0.07302950021527427,
+    "km_median": 0.03171219697373327
+   },
+   "15-": {
+    "n": 285,
+    "min_mean": 0.10173588174789282,
+    "min_median": 0.07914311204949924,
+    "km_median": 0.03877969896753328
+   }
+  },
+  "min_balanced": 0.11314932938265676
+ },
+ "cv_train_min_balanced": 0.1346,
+ "val_comparisons": [
+  {
+   "variant": "M3: snap_to_service, route_speeds, одно поле 3 км",
+   "val_min_balanced": 0.172
+  },
+  {
+   "variant": "T2: два поля 2 км",
+   "val_min_balanced": 0.155
+  },
+  {
+   "variant": "V2: + route service 3, fast 48, λs=0.03",
+   "val_min_balanced": 0.154
+  },
+  {
+   "variant": "R1: те же маршруты, класс × 3 кольца (для сравнения)",
+   "val_min_balanced": 0.195
+  },
+  {
+   "variant": "W2: V2 + поле после surface",
+   "val_min_balanced": 0.154
+  },
+  {
+   "variant": "X2 (итог): W2 с λs=0.1, λr=0.03",
+   "val_min_balanced": 0.1539
+  }
+ ],
+ "baseline_val_min_balanced": 0.208
+}

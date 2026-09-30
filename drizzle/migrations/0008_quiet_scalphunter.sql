@@ -1,0 +1,1 @@
+ALTER TABLE "geo_streets" ADD COLUMN "line" jsonb;

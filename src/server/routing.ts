@@ -2,25 +2,26 @@
 // реку и мосты: из Яблоновского до ЮМР по прямой 3 км, по дорогам — 9–10.
 //
 // Маршрутизаторы — реализации Router, опрашиваются по цепочке:
-//   1. Яндекс Матрица расстояний (YANDEX_ROUTING_API_KEY) — расстояние и время с
-//      пробками, как на Яндекс Картах: цифры в карточке совпадут с картой;
-//   2. свой OSRM (OSRM_URL; сервис osrm в docker-compose, граф — scripts/osrm/prepare.sh)
-//      — расстояние по дорогам OpenStreetMap, время — по средней скорости города;
-//   3. нет ни того, ни другого, сбой или лимит — по прямой, как раньше (в выдаче).
+//   1. свой OSRM (OSRM_URL; сервис osrm в docker-compose, граф — scripts/osrm/prepare.sh)
+//      с профилем scripts/osrm/profile: скорости дорог и поле скоростей по агломерации
+//      подобраны по эталонным маршрутам 2ГИС, поэтому время OSRM — уже типичное дневное
+//      (+ OSRM_TIME_BASE_S на выезд и парковку);
+//   2. нет OSRM, сбой — по прямой (в выдаче, geo.ts).
 // Точки, которые не посчитал первый, досчитывает следующий.
 
 import { getEnv } from "@/lib/env";
 import { pointKey, type GeoPoint } from "@/lib/compare/geo";
+import { OSRM_TIME_BASE_S, OSRM_TIME_FACTOR } from "@/lib/compare/config";
 
 export interface Route {
   km: number;
-  /** Время в пути, мин (Яндекс — с пробками); null — посчитать по средней скорости. */
-  minutes: number | null;
+  /** Типичное дневное время в пути, мин. */
+  minutes: number;
 }
 
 export interface Router {
   name: string;
-  /** Сколько держать ответ в кэше: время с пробками устаревает быстрее, чем дороги. */
+  /** Сколько держать ответ в кэше. */
   ttlMs: number;
   /** Путь от `from` до каждой точки; null — маршрута нет. Сбой — исключение. */
   routes(from: GeoPoint, to: GeoPoint[]): Promise<(Route | null)[]>;
@@ -45,51 +46,24 @@ export function osrmRouter(baseUrl: string): Router {
     // --max-table-size в compose — 1000 точек за запрос.
     routes: (from, to) => inChunks(to, 500, async (part) => {
       const coords = [from, ...part].map(coord).join(";");
-      const res = await fetch(`${base}/table/v1/driving/${coords}?sources=0&annotations=distance`, {
+      const res = await fetch(`${base}/table/v1/driving/${coords}?sources=0&annotations=distance,duration`, {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!res.ok) throw new Error(`osrm ${res.status}`);
-      const data = (await res.json()) as { code?: string; distances?: (number | null)[][] };
-      if (data.code !== "Ok" || !data.distances?.[0]) throw new Error(`osrm ${data.code}`);
-      return data.distances[0].slice(1).map((m) => (m == null ? null : { km: m / 1000, minutes: null }));
-    }),
-  };
-}
-
-const YANDEX_MATRIX_URL = "https://api.routing.yandex.net/v2/distancematrix";
-
-interface YandexMatrix {
-  rows?: { elements?: { status?: string; distance?: { value?: number }; duration?: { value?: number } }[] }[];
-  errors?: string[];
-}
-
-/**
- * Яндекс Матрица расстояний: одна точка отправления, до 100 назначений за запрос
- * (лимит матрицы — 100 элементов). Время — с пробками на момент запроса.
- */
-export function yandexRouter(apiKey: string): Router {
-  const coord = (p: GeoPoint) => `${p.lat.toFixed(6)},${p.lon.toFixed(6)}`; // широта,долгота
-  return {
-    name: "yandex",
-    ttlMs: 10 * 60 * 1000,
-    routes: (from, to) => inChunks(to, 100, async (part) => {
-      const params = new URLSearchParams({
-        apikey: apiKey,
-        origins: coord(from),
-        destinations: part.map(coord).join("|"),
-        mode: "driving",
-        departure_time: String(Math.floor(Date.now() / 1000)),
+      const data = (await res.json()) as { code?: string; distances?: (number | null)[][]; durations?: (number | null)[][] };
+      if (data.code !== "Ok" || !data.distances?.[0] || !data.durations?.[0]) throw new Error(`osrm ${data.code}`);
+      const dur = data.durations[0];
+      return data.distances[0].slice(1).map((m, i) => {
+        const s = dur[i + 1];
+        return m == null || s == null ? null : { km: m / 1000, minutes: osrmMinutes(s) };
       });
-      const res = await fetch(`${YANDEX_MATRIX_URL}?${params}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-      const data = (await res.json().catch(() => ({}))) as YandexMatrix;
-      if (!res.ok) throw new Error(`yandex ${res.status}${data.errors?.length ? `: ${data.errors.join("; ")}` : ""}`);
-      const elements = data.rows?.[0]?.elements;
-      if (!elements || elements.length !== part.length) throw new Error("yandex: неожиданный ответ");
-      return elements.map((e) => (e.status === "OK" && e.distance?.value != null
-        ? { km: e.distance.value / 1000, minutes: e.duration?.value != null ? Math.round(e.duration.value / 60) : null }
-        : null));
     }),
   };
+}
+
+/** Секунды OSRM → типичные дневные минуты (config.ts, калибровка по 2ГИС). */
+export function osrmMinutes(seconds: number): number {
+  return Math.max(1, Math.round((OSRM_TIME_FACTOR * seconds + OSRM_TIME_BASE_S) / 60));
 }
 
 let routers: Router[] | undefined;
@@ -98,10 +72,7 @@ let routers: Router[] | undefined;
 export function getRouters(): Router[] {
   if (routers) return routers;
   const env = getEnv();
-  routers = [
-    ...(env.YANDEX_ROUTING_API_KEY ? [yandexRouter(env.YANDEX_ROUTING_API_KEY)] : []),
-    ...(env.OSRM_URL ? [osrmRouter(env.OSRM_URL)] : []),
-  ];
+  routers = env.OSRM_URL ? [osrmRouter(env.OSRM_URL)] : [];
   return routers;
 }
 

@@ -77,10 +77,20 @@ export interface CsvRecord {
 }
 
 /**
- * RFC 4180: запятая-разделитель, кавычки с удвоением внутри, переводы строк
- * внутри кавычек, CRLF/LF, BOM в начале. Пустые строки пропускаются.
+ * Разделитель по строке заголовка: запятая, точка с запятой (Excel и Numbers с
+ * русскими настройками) или табуляция — какого вне кавычек больше.
  */
-export function parseCsv(text: string): CsvRecord[] {
+export function detectDelimiter(text: string): string {
+  const head = text.replace(/^\uFEFF/, "").split("\n", 1)[0].replace(/"[^"]*"/g, "");
+  const counts = [",", ";", "\t"].map((d) => [d, head.split(d).length - 1] as const);
+  return counts.reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+}
+
+/**
+ * RFC 4180: кавычки с удвоением внутри, переводы строк внутри кавычек, CRLF/LF,
+ * BOM в начале. Пустые строки пропускаются. Разделитель — запятая или заданный.
+ */
+export function parseCsv(text: string, delimiter = ","): CsvRecord[] {
   const src = text.replace(/^﻿/, "");
   const records: CsvRecord[] = [];
   let cells: string[] = [];
@@ -108,7 +118,7 @@ export function parseCsv(text: string): CsvRecord[] {
       continue;
     }
     if (ch === '"') inQuotes = true;
-    else if (ch === ",") { cells.push(cell); cell = ""; }
+    else if (ch === delimiter) { cells.push(cell); cell = ""; }
     else if (ch === "\r") { /* CRLF: запись закроет \n */ }
     else if (ch === "\n") { endRecord(); line++; recordLine = line; }
     else cell += ch;
@@ -199,7 +209,7 @@ export interface ParseResult {
 export function parseOffersCsv(csv: string, today: string): ParseResult {
   let records: CsvRecord[];
   try {
-    records = parseCsv(csv);
+    records = parseCsv(csv, detectDelimiter(csv));
   } catch (e) {
     return { rows: [], errors: [{ line: 0, message: (e as Error).message }] };
   }

@@ -126,7 +126,7 @@ describe("tabs and explanation", () => {
 
   it("sortForTab: недоминируемое выходит вперёд", () => {
     const mk = (id: string, total: number, km: number | null): Placed => ({
-      ...quote(O({ id, priceDay: total }), 1), trip: km === null ? null : { km, minutes: km * 2, approx: false },
+      ...quote(O({ id, priceDay: total }), 1), trip: km === null ? null : { km, minutes: km * 2, nowMinutes: km * 2, approx: false },
       okrug: null, score: total, age: 0,
     });
     // «b» дешевле «a» и не дальше — «a» не может быть первым даже при меньшей оценке.
@@ -227,9 +227,9 @@ describe("road distances", () => {
     const sameBank = O({ id: "same", priceDay: 1000, place: { microdistrict: null, okrug: null, lat: 45.04, lon: 38.976, address: "y" } });
     const straight = buildResultView([across, sameBank], withLoc(user, { tab: "nearest" }), ctx);
     expect(ids(straight)[0]).toBe("across"); // по прямой ближе
-    const roads = new Map([["45.02800,38.90800", { km: 8.7, minutes: null }], ["45.04000,38.97600", { km: 6, minutes: 17 }]]);
+    const roads = new Map([["45.02800,38.90800", { km: 8.7, minutes: 21 }], ["45.04000,38.97600", { km: 6, minutes: 17 }]]);
     const byRoad = buildResultView([across, sameBank], withLoc(user, { tab: "nearest" }), { ...ctx, roads });
     expect(ids(byRoad)[0]).toBe("same");
-    expect(byRoad.sections[0].items[0].trip).toMatchObject({ km: 6, minutes: 17 }); // время — маршрутизатора (Яндекс)
+    expect(byRoad.sections[0].items[0].trip).toMatchObject({ km: 6, minutes: 17 }); // время — маршрутизатора
   });
 });

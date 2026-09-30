@@ -1,13 +1,17 @@
-// Импорт цен прокатов из CSV (шаблон — docs/inrenta-pivot/data/offers.template.csv).
+// Импорт цен прокатов из CSV. Шаблоны (docs/inrenta-pivot/data/): простой —
+// prokaty.template.csv (колонки по-русски), полный — offers.template.csv.
 // Файл проверяется целиком: при любой ошибке в базу не пишется ничего.
 // Запуск: pnpm db:import-offers <file.csv> [--dry-run]
 
 import { readFile } from "node:fs/promises";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { parseOffersCsv, type RowError } from "../src/lib/compare/offers-csv";
-import { importOffers } from "../src/server/compare/import-offers";
-import { geocodeAddress, geocoderEnabled } from "../src/server/geocoder";
+import type { RowError } from "../src/lib/compare/offers-csv";
+import { parseOffersFile } from "../src/lib/compare/offers-simple";
+import { importOffers, type Geocode } from "../src/server/compare/import-offers";
+import { geocodeShopAddress } from "../src/server/geocoder";
+import { loadGeoIndexFromDb } from "../src/server/geocoder-index";
+import { createGeocoder, type Geocoder } from "../src/lib/geocoder";
 import { addDaysStr, todayStr } from "../src/lib/catalog/dates";
 
 function printErrors(errors: RowError[]) {
@@ -30,7 +34,7 @@ async function main() {
 
   // todayStr() — дата по UTC, а цены проверяют по местному времени (UTC+3 и восточнее):
   // сутки запаса, чтобы проверка «сегодня» ночью не считалась датой из будущего.
-  const parsed = parseOffersCsv(await readFile(file, "utf8"), addDaysStr(todayStr(), 1));
+  const parsed = parseOffersFile(await readFile(file, "utf8"), addDaysStr(todayStr(), 1));
   if (parsed.errors.length) {
     console.error(`Файл не импортирован — ошибок: ${parsed.errors.length}`);
     printErrors(parsed.errors);
@@ -38,8 +42,27 @@ async function main() {
   }
 
   const pool = new Pool({ connectionString: url });
-  const geocode = geocoderEnabled() ? geocodeAddress : null;
-  if (!geocode) console.warn("YANDEX_GEOCODER_API_KEY не задан — адреса без lat/lon останутся без координат.");
+  // Адреса без lat/lon — своим геокодером по адресам города из БД (geo_*; импорт — scripts/geocoder).
+  const engines = new Map<string, Promise<Geocoder | null>>();
+  const engine = (citySlug: string) => {
+    let e = engines.get(citySlug);
+    if (!e) {
+      e = loadGeoIndexFromDb(pool, citySlug).then((data) => {
+        if (!data) console.warn(`Адресов города «${citySlug}» нет в базе (scripts/geocoder/prepare.sh) — адреса без lat/lon останутся без координат.`);
+        return data ? createGeocoder(data) : null;
+      });
+      engines.set(citySlug, e);
+    }
+    return e;
+  };
+  const geocode: Geocode = async (address, city) => {
+    const g = await engine(city.slug);
+    return g ? geocodeShopAddress(g, address, city.name) : { point: null, reason: "адресов города нет в базе" };
+  };
+  // Индексы — до транзакции импорта: загрузка идёт по отдельному соединению.
+  for (const slug of new Set(parsed.rows.filter((row) => row.address && (row.lat == null || row.lon == null)).map((row) => row.citySlug))) {
+    await engine(slug);
+  }
   const r = await importOffers(drizzle(pool), parsed.rows, { dryRun, geocode });
   await pool.end();
 
@@ -59,8 +82,12 @@ async function main() {
     for (const m of r.unrecognizedModels) console.warn(`  строка ${m.line}: ${m.model}`);
   }
   if (r.addressesWithoutCoords.length) {
-    console.warn(`\nАдреса без координат (${r.addressesWithoutCoords.length}) — укажите lat/lon или уточните адрес:`);
-    for (const a of r.addressesWithoutCoords) console.warn(`  строка ${a.line}: ${a.shop} — ${a.address}`);
+    console.warn(`\nАдреса без координат (${r.addressesWithoutCoords.length}) — прокат покажется от центра микрорайона (≈); уточните адрес или укажите lat/lon:`);
+    for (const a of r.addressesWithoutCoords) console.warn(`  строка ${a.line}: ${a.shop} — ${a.address}: ${a.reason}`);
+  }
+  if (r.addressesToCheck.length) {
+    console.warn(`\nАдреса с координатами, которые стоит проверить (${r.addressesToCheck.length}):`);
+    for (const a of r.addressesToCheck) console.warn(`  строка ${a.line}: ${a.shop} — ${a.address} → ${a.found}: ${a.check}`);
   }
   if (r.unknownMicrodistricts.length) {
     console.warn(`\nМикрорайоны не из справочника (${r.unknownMicrodistricts.length}) — src/lib/compare/geo-data.ts:`);

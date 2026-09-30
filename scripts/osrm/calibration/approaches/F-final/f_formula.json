@@ -1,0 +1,10 @@
+{
+ "mode": "simple",
+ "graph": "data/osrm/builds/F-final (профиль scripts/osrm/calibration/approaches/F-final/profile = B-field, версия X2)",
+ "osrm_request": "GET {OSRM_URL}/table/v1/driving/{user};{shop1};...?sources=0&annotations=distance,duration",
+ "osrm_extra": "",
+ "km": "distance_m / 1000",
+ "minutes": "(f * duration_s + beta_s) / 60",
+ "f": 1.0,
+ "beta_s": 48.75
+}
