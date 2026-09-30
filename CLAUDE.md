@@ -40,7 +40,7 @@ commit-сообщения — на английском.
 - **Стили:** Tailwind + CSS-токены `theme/tokens.css` (дизайн-система «вариант Б»), шрифты Unbounded + Onest (`theme/fonts.ts`), светлая тема по умолчанию + тёмная (`next-themes`).
 - **ID:** ULID (`newId()` в `src/lib/id.ts`). **Цены:** целые рубли. **Даты:** строки `YYYY-MM-DD`. **Слаги:** `slugify()`.
 - **Аналитика:** Яндекс Метрика (цели через `reachGoal()` в `src/lib/analytics.ts`) + серверные `lead_events`.
-- **Тесты:** Vitest (490 тестов, только в `tests/**`, импорт через `@/`).
+- **Тесты:** Vitest (696 тестов, только в `tests/**`, импорт через `@/`).
 - **Деплой:** docker-compose (Caddy + app + Postgres + backup), HTTPS via Let's Encrypt. См. `docs/DEPLOY.md`, `docs/RECOVERY.md`.
 
 ## Команды
@@ -56,6 +56,8 @@ pnpm db:migrate     # применить миграции (.env → DATABASE_URL
 pnpm db:seed        # тестовые данные (идемпотентно)
 pnpm db:sync-catalog    # справочник сравнения → БД (в проде — сам при старте контейнера)
 pnpm db:import-offers <file.csv> [--dry-run]   # прокаты и цены из CSV
+bash scripts/geocoder/prepare.sh   # адреса «Где» (OSM + ГАР ФНС) → таблицы geo_*; раз в месяц
+pnpm db:export-geo  # индекс адресов из БД → data/geocoder/build/index.<город>.json (замер, запасной путь)
 pnpm db:studio      # drizzle studio
 ```
 
@@ -79,13 +81,16 @@ pnpm db:studio      # drizzle studio
 | **lead_events** | обращения: `show_phone`, `request`, `regular_request`, `price_outdated`, `claim_click`, `map_open` | `offerId`, `shopId`, `itemClassId`, `modelId`, `sessionId` (cookie `inr_sid`), `tab`, `rankPosition`, `scenario` (`LeadScenario`: сутки, тип места, микрорайон/округ), `utm` |
 | **regular_requests** | заявки `kind`: `regular` («нужен регулярно») и `not_found` («не нашли — найдём за 30 минут») | `what`, `period`, `frequency`, `contact`, `status` |
 | **shop_claims** | заявки «Это мой прокат» | `shopId` (NULL — проката нет в базе, тогда `shopName`), `userId`, `phone`, `status` |
+| **geo_places**, **geo_streets**, **geo_houses**, **geo_pois**, **geo_imports** | адреса своего геокодера (OSM + ГАР ФНС), целиком пересобирает `scripts/geocoder/prepare.sh`; сервер держит поисковый индекс в памяти | дом: `number`, `lat`/`lon`, `precision` (`house`/`interpolated`/`street`/`place`), `source`; версия — последняя строка `geo_imports` города |
 
-- Справочники — **код**; `syncCatalog()` (`db:sync-catalog`, в проде — при старте контейнера) приводит к ним БД upsert по slug: группы и классы — `src/lib/compare/catalog-data.ts`; места — `geo-data.ts` (OpenStreetMap, ODbL — источник указан в подвале и на `/kak-schitaem-ceny`); бренды и модели — `models-data.ts` (ключи написаний → `model_aliases`, ранее нераспознанные предложения привязываются к моделям). Границы округов — `okrug-bounds.ts`: округ точки без внешних сервисов. Города и категории правятся в админке — синхронизация их только создаёт. Слаги `prokaty` и `poisk` зарезервированы.
-- Прокаты и цены — CSV-импорт (`offers-csv.ts` → `import-offers.ts`, шаблон `docs/inrenta-pivot/data/offers.template.csv`):
+- Справочники — **код**; `syncCatalog()` (`db:sync-catalog`, в проде — при старте контейнера) приводит к ним БД upsert по slug: группы и классы — `src/lib/compare/catalog-data.ts`; места — `geo-data.ts` (OpenStreetMap, ODbL; атрибуция «© участники OpenStreetMap» со ссылкой и «ГАР ФНС России» — в подвале и на `/kak-schitaem-ceny`); бренды и модели — `models-data.ts` (ключи написаний → `model_aliases`, ранее нераспознанные предложения привязываются к моделям). Границы округов — `okrug-bounds.ts`: округ точки без внешних сервисов. Города и категории правятся в админке — синхронизация их только создаёт. Слаги `prokaty` и `poisk` зарезервированы.
+- Прокаты и цены — CSV-импорт (`parseOffersFile` → `import-offers.ts`), два шаблона в `docs/inrenta-pivot/data/` (памятка — `README.md` там же); разделитель `,`/`;`/табуляция определяется сам:
+  - простой `prokaty.template.csv` (`offers-simple.ts`): колонки по-русски, значения как пишет человек («1 000 ₽», «3000 + паспорт», «26.09»); пустой «Прокат» — ещё одна вещь проката из строки выше; «Что сдают» → класс через `resolveQuery` по справочнику (модель из справочника сама задаёт класс, неоднозначное слово — ошибка «уточните»); без ссылки `verifiedBy=call`, Авито — `listing`, иначе `site`; дата по умолчанию — сегодня;
+  - полный `offers.template.csv` (`offers-csv.ts`): все поля, включая доставку и координаты;
   - файл целиком или ничего; строки-примеры отклоняются;
   - прокат ищется по (город, название, телефон);
   - модель — через `modelKey()` и `model_aliases`; не нашлась — предложение класса и отчёт «нераспознанные модели»;
-  - микрорайон — по справочнику мест; адрес без `lat`/`lon` геокодируется (Яндекс, если есть ключ), иначе — отчёт «адреса без координат»;
+  - микрорайон — по справочнику мест, не указан — ближайший к координатам (до 2,5 км); адрес без `lat`/`lon` — свой геокодер строго (`geocodeShopAddress`: только однозначный дом; пункт не назван, а адрес есть в нескольких — ищется в городе проката; улица без дома или пункт — без координат), иначе — отчёт «адреса без координат» с причиной и «стоит проверить» (дом между соседними номерами, найден не в городе);
   - часы — «пн-пт 9-20; сб 10-16; вс выходной» (`hours.ts`);
   - более старая `verifiedAt` не затирает свежую.
 - `cities.namePrepositional` — «в Краснодаре» для заголовков.
@@ -94,7 +99,9 @@ pnpm db:studio      # drizzle studio
 
 - Итог считается **только** в `pricing.ts` и не хранится. Оплачиваемые сутки = max(сутки, `minDays`); без `priceDay` — целые недели. Недельный тариф: недели × `priceWeek` + min(остаток × `priceDay`, `priceWeek`). Месячного тарифа нет. **Доставка в итог не входит** (версия 1 — самовывоз).
 - Срок — **датами** (сб 27 → пн 29 = 2 суток, минимум 1). Дат нет — сегодня на 1 сутки и пометка «укажите даты». Календарь — свой (`DateRangeField`, `calendar.ts`): два клика в любом порядке (`pickRangeDay`).
-- Место проката: координаты адреса → центр микрорайона (≈) → неизвестно. Путь — **по дорогам** (`src/server/routing.ts`, цепочка `Router`, одна матрица «пользователь → точки прокатов» на страницу): 1) Яндекс Матрица расстояний (`YANDEX_ROUTING_API_KEY`, отдельный платный ключ; расстояние и время с пробками, как на Яндекс Картах; до 100 точек за запрос, кэш 10 мин); 2) свой OSRM (`OSRM_URL`, сервис `osrm` в compose, граф `scripts/osrm/prepare.sh` → `data/osrm/`; время = км ÷ `CITY_SPEED_KMH`, кэш сутки); 3) по прямой × `ROUTE_FACTOR` (1,3) — ошибается через Кубань. Непосчитанные точки досчитывает следующий; «≈», если хоть одна точка — центр микрорайона (`geo.ts`).
+- Место проката: координаты адреса → центр микрорайона (≈) → неизвестно. Путь — **по дорогам** (`src/server/routing.ts`, цепочка `Router`, одна матрица «пользователь → точки прокатов» на страницу, кэш сутки): 1) свой OSRM (`OSRM_URL`, сервис `osrm` в compose, граф `scripts/osrm/prepare.sh` → `data/osrm/`); 2) нет или сбой — по прямой: × `ROUTE_FACTOR` (1,67), `CITY_SPEED_KMH` (28,5) + `TRIP_BASE_MIN`. Непосчитанные точки досчитывает следующий; «≈», если хоть одна точка — центр микрорайона (`geo.ts`). Яндекс в маршрутах не используется.
+- Профиль OSRM — свой (`scripts/osrm/profile`: `car.lua` + `params.lua` + `zones.geojson`, сборка `build.sh`), **откалиброван по эталонным маршрутам 2ГИС** (29.09.2026, будний день 13:00; `scripts/osrm/calibration`, README там, итог — `approaches/F-final`; данные — `data/calibration`, вне git): скорость по классу дороги, делённая на **поле скоростей** — множители времени на сетке 23×18 узлов по агломерации (`params.field`: `q` — магистрали, `q2` — остальные улицы; путь берёт средний множитель по длине, нужен `--location-dependent-data`, его передаёт `build.sh`; для другого города поле подбирается заново); выбор маршрута — отдельными весами (`rate_factors`, `route_turn`), штрафы поворотов, светофоров и перекрёстков, точка привязывается и к проездам, знаки maxspeed не учитываются. Зоны `zones.geojson` и поправки по названиям код понимает, но в итоговом `params.lua` их нет. Время OSRM = типичное дневное: минуты = (`OSRM_TIME_FACTOR` 1 × с + `OSRM_TIME_BASE_S` 48,75) / 60, округление, минимум 1. Точность на контрольных адресах (вне подбора и выбора): время — средняя ошибка 14,9% (сбалансированно по длине поездки), км — медиана 4,4%.
+- `Trip.minutes` — дневное время (оценка и порядок выдачи, ссылка стабильна в любой час); `Trip.nowMinutes` = × `trafficFactor(now, km)`: почасовая кривая 2ГИС (`TRAFFIC` в config.ts — будни, суббота, воскресенье; для поездок до 3 и от 12 км, между — плавно) — его показывают карточка и пояснение.
 - Оценка «Оптимального» = итог + `TRIPS_PER_RENTAL` (4) × минуты × `MINUTE_COST_RUB` (10).
 - Вкладки (`ranking.ts`):
   - город — «Оптимальный» (он же «Самый дешёвый») и «Самый дешёвый»;
@@ -123,11 +130,11 @@ pnpm db:studio      # drizzle studio
   Поиск не зависит от регистра, дефисов и косых черт; понимает кириллицу вместо латиницы и похожие буквы («НR2470»), неверную раскладку, до 2 опечаток, падежи (`stem`), синонимы групп, классов и брендов.
 - **Где** (`WhereField`, `geo.ts`):
   - микрорайоны и округа — сразу из справочника (`matchPlaces`, синонимы и раскладка);
-  - адреса — Геосаджест Яндекса через `/api/geo/suggest` (задержка 300 мс), координаты — `/api/geo/resolve` (`src/server/geocoder.ts`: кэш, лимит `geo`); без ключей адреса не подсказываются, остальное работает;
-  - «Определить моё местоположение» — геолокация браузера, отказ — без ошибки;
+  - адреса — **свой геокодер** (OSM + ГАР ФНС, без внешних сервисов и ключей; движок `src/lib/geocoder`, README там): улицы, посёлки, СНТ и объекты — мгновенно из мини-индекса в браузере (`/api/geo/client-index?v=<метка данных>`, грузится при фокусе, кэш навсегда), дома — `/api/geo/suggest` через `GEOCODER_DEBOUNCE_MS` (90 мс; без номера в запросе сервер не спрашивается). Подсказка сразу несёт координаты и точность — второго запроса нет; устаревшие ответы отбрасываются, прошлый список не мигает (`address.ts`: `shouldApply`, `visibleAddresses`). Не до дома (улица, «≈15», пункт) — «≈» в списке, под полем и во всей выдаче (`lp=`). Микрорайоны и округа справочника геокодер не повторяет. Лимит `geo` — 300/мин на IP. `/api/geo/resolve` — только для вкладок, открытых до перехода (ищет текст старой подсказки своим движком), удалить через релиз;
+  - «Определить моё местоположение» — геолокация браузера (отказ — без ошибки) и подпись адреса по точке (`/api/geo/reverse`: дом ≤ 60 м, иначе «рядом: улица», не дольше 1,5 с);
   - ввели и не выбрали — берётся первая подсказка, иначе город и «Не нашли такой адрес — уточните»;
   - последнее место хранится в `localStorage` (`inr_loc`) и подставляется на главной.
-- Место в URL: `loc=d:<микрорайон>` | `o:<округ>` | `p:<lat>,<lon>` (+ `la` — подпись, `src=geo`). Округ и микрорайон точки определяются по границам OSM и ближайшему центру и показываются в сводке.
+- Место в URL: `loc=d:<микрорайон>` | `o:<округ>` | `p:<lat>,<lon>` (+ `la` — подпись, `src=geo`, `lp=s|t` — адрес найден до улицы | пункта, расстояния с «≈»; нет `lp` — дом, старые ссылки читаются так же). Округ и микрорайон точки определяются по границам OSM и ближайшему центру и показываются в сводке.
 
 ## URL-структура
 
@@ -144,7 +151,7 @@ pnpm db:studio      # drizzle studio
 | `/login`, `/welcome`, `/reset`, `/banned`, `/profile` | вход, онбординг, сброс пароля, профиль |
 | `/admin/{shops,regular,leads}` | заявки на карточки, заявки «регулярно» и «не нашли», сводка обращений |
 | `/admin/{users,cities,categories}` | пользователи, справочники |
-| `/api/{auth,oauth/vk,upload,health}`, `/api/geo/{suggest,resolve}` | системные и геокодер; `/api/dev/login[?role=admin]` — dev-вход (404 в prod) |
+| `/api/{auth,oauth/vk,upload,health}`, `/api/geo/{suggest,reverse,client-index,resolve}` | системные и свой геокодер; `/api/dev/login[?role=admin]` — dev-вход (404 в prod) |
 
 Резолвер `/{city}/{seg}`: `prokaty` → `poisk` → группа → модель → категория сравнения →
 (с P2P) категория объявлений. `/{city}/{seg}/{sub}`: `prokaty/{shop}` → (с P2P)
@@ -153,9 +160,9 @@ pnpm db:studio      # drizzle studio
 ## Карта кода
 
 - **`drizzle/`** — `schema.ts` (источник схемы) + `migrations/`. Менять схему → `db:generate`.
-- **`scripts/`** — `seed.ts` (+ `seed-demo-offers.ts`), `migrate.ts`, `sync-catalog.ts`, `import-offers.ts`. Последние три в Docker собираются в `*.cjs` (в runner нет pnpm/tsx), `sync-catalog.cjs` запускается в `entrypoint.sh`.
-- **`src/lib/compare/`** — ядро сравнения, чистые функции: `config` (параметры ТЗ, п. 10), `pricing` (итог), `ranking` (расстояние, оценка, вкладки, доминирование, пояснение), `view` (модель выдачи, фильтры, тексты карточки, место в сравнении), `scenario` (параметры URL), `search` (подсказки и разбор запроса), `geo` + `geo-data` + `okrug-bounds` (места, расстояния, «Где»), `models` + `models-data` (бренды, модели, `modelKey`), `hours`, `calendar`, `faq`, `format`, `catalog-data`, `offers-csv`, `visitor` (cookies посетителя).
-- **`src/server/compare.ts`, `src/server/shops.ts`** — read-слой сравнения и прокатов (предложения группы и модели с местом и моделью, `getCityGeo`, `getSearchData`, `getModelBySeg`); **`src/server/compare/`** — синхронизация справочников и импорт CSV; **`src/server/geocoder.ts`** — Яндекс Геокодер и Геосаджест (кэш; без ключа — выключен).
+- **`scripts/`** — `seed.ts` (+ `seed-demo-offers.ts`), `migrate.ts`, `sync-catalog.ts`, `import-offers.ts`. Последние три в Docker собираются в `*.cjs` (в runner нет pnpm/tsx), `sync-catalog.cjs` запускается в `entrypoint.sh`. `scripts/geocoder/` — импорт адресов (OSM + ГАР → `geo_places/streets/houses/pois`, отчёт качества — README там), `scripts/geocoder-eval/` — замер.
+- **`src/lib/compare/`** — ядро сравнения, чистые функции: `config` (параметры ТЗ, п. 10), `pricing` (итог), `ranking` (расстояние, оценка, вкладки, доминирование, пояснение), `view` (модель выдачи, фильтры, тексты карточки, место в сравнении), `scenario` (параметры URL), `search` (подсказки и разбор запроса), `geo` + `geo-data` + `okrug-bounds` (места, расстояния, «Где»), `address` (подсказка адреса → место, «≈», порядок ответов), `models` + `models-data` (бренды, модели, `modelKey`), `hours`, `calendar`, `faq`, `format`, `catalog-data`, `offers-csv`, `visitor` (cookies посетителя).
+- **`src/server/compare.ts`, `src/server/shops.ts`** — read-слой сравнения и прокатов (предложения группы и модели с местом и моделью, `getCityGeo`, `getSearchData`, `getModelBySeg`); **`src/server/compare/`** — синхронизация справочников и импорт CSV; **`src/server/geocoder.ts`** — свой геокодер: движок на процесс (ленивая сборка из `getGeoIndexData`, пересборка при новом импорте; дома после сборки отпускаются), подсказки, reverse, мини-индекс, `geocodeShopAddress` для импорта, `addressIndexToken` для страниц; **`src/server/geocoder-index.ts`** — данные из `geo_*` (кэш, версия раз в минуту; запасной `GEOCODER_INDEX_FILE`); **`src/lib/geocoder/`** — поиск (чистый TS, README).
 - **`src/server/actions/leads.ts`** — «Показать телефон», «Цена устарела?», «Нужен регулярно», «Не нашли», `claim_click`; **`actions/shops.ts`** — заявка на карточку, цены владельца, модерация.
 - **`src/components/compare/`** — `ResultRoutes` (страницы группы, модели, поиска) → `ComparePage` (`ResultPage`), `SearchBar` (`WhatField`, `DateRangeField`, `WhereField`), `ResultTabs`, `OfferTicket`, `FiltersPanel`/`FiltersSheet`, `SavingsHint`, `OutOfRanking`, `NotFoundRequestForm`, `CityHome`, `CategoryPage`, `GroupCard` (+ `ModelCard`), `ShopPage`, `ShopsList`, `ShopClaimForm`…; **`src/components/shop/`** — формы кабинета проката.
 - **`src/server/*.ts`, `src/server/actions/*.ts`** (прочее) — P2P и общее: `catalog.ts`, `owner.ts`, `booking.ts`, `me.ts`, `admin.ts`, `profile.ts`.
@@ -183,7 +190,7 @@ pnpm db:studio      # drizzle studio
 
 ## Dev-заметки
 
-- Поднять окружение: `docker compose up -d db` → `pnpm db:migrate && pnpm db:seed` → `pnpm dev`. Расстояния по дорогам: `bash scripts/osrm/prepare.sh` → `docker compose up -d osrm` → `OSRM_URL=http://127.0.0.1:5001` в `.env`. Геокодер (адреса в «Где» и при импорте) — `YANDEX_GEOCODER_API_KEY` и `YANDEX_SUGGEST_API_KEY` в `.env`; без них работают микрорайоны, округа и геолокация.
+- Поднять окружение: `docker compose up -d db` → `pnpm db:migrate && pnpm db:seed` → `pnpm dev`. Расстояния по дорогам: `bash scripts/osrm/prepare.sh` → `docker compose up -d osrm` → `OSRM_URL=http://127.0.0.1:5001` в `.env`. Адреса (в «Где» и при импорте) — `bash scripts/geocoder/prepare.sh` (≈ 10 мин, ~4 ГБ памяти; пишет `geo_*` в БД из `.env`, сервер подхватит сам); без них работают микрорайоны, округа и геолокация. Ключей Яндекса для адресов нет.
 - Сброс dev-БД начисто: `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` + `DROP SCHEMA IF EXISTS drizzle CASCADE;` (журнал миграций живёт в схеме `drizzle`).
 - `.next/types` держит устаревшие типы удалённых роутов после dev-сервера → ложные `TS2307`; лечит `rm -rf .next/types`.
 - Перед `pnpm build` останавливать dev-сервер (общий каталог `.next`). Production-сборке нужны `DOMAIN`, `LETSENCRYPT_EMAIL`, `STORAGE_*` (env-валидация).
