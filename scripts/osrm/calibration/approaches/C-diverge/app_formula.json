@@ -1,0 +1,8 @@
+{
+ "formula": "minutes = (f * osrm_duration_s + beta_s) / 60",
+ "f": 1.0,
+ "beta_s": 24.0,
+ "note": "β от длины (β0+β1·км, β отдельно до 3 км) и f≠1 проверены CV по группам точек train — без выигрыша (14.00% → 14.01–14.03%).",
+ "OSRM_TIME_FACTOR": 1.0,
+ "OSRM_TIME_BASE_S": 24.0
+}

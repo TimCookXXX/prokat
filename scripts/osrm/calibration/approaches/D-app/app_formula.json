@@ -1,0 +1,114 @@
+{
+ "approach": "D-app: граф — рабочий профиль scripts/osrm/profile без изменений; поправка — в приложении",
+ "osrm_request": "GET {OSRM_URL}/table/v1/driving/{user};{shop1};...?sources=0&annotations=distance,duration&snapping=any",
+ "osrm_request_note": "snapping=any — ОБЯЗАТЕЛЬНО (точки привязываются к ближайшей дороге, включая service/living_street). Без него формула не годится: она подобрана на ответах со snapping=any.",
+ "km": "distance_m / 1000 (без поправки: поправки км на train не улучшили медиану)",
+ "minutes": "s = exp(Σ coef[i] · feature[i]); защита от экстраполяции: s = clamp(s, 0.6·(osrm_duration_s + 23), 1.3·(osrm_duration_s + 23)); минуты = s / 60; на сайте затем Math.max(1, Math.round(минуты)) и множитель TRAFFIC_BY_HOUR, как сейчас",
+ "constants": {
+  "CENTER_LAT": 45.0355,
+  "CENTER_LON": 38.9753,
+  "KX_km_per_deg_lon": 78.58154029852723,
+  "KY_km_per_deg_lat": 111.2,
+  "B0_s": 60,
+  "LEN_KNOTS_km": [
+   0.5,
+   1,
+   2,
+   4,
+   8,
+   15
+  ],
+  "R_KNOTS_km": [
+   2,
+   4,
+   6,
+   9,
+   12
+  ],
+  "GUARD_LO": 0.6,
+  "GUARD_HI": 1.3,
+  "GUARD_BASE_S": 23
+ },
+ "point_features": {
+  "x": "(lon − CENTER_LON) · KX  (км, восток +)",
+  "y": "(lat − CENTER_LAT) · KY  (км, север +)",
+  "r": "sqrt(x² + y²)  — км от центра",
+  "south": "okrugOfPoint(p) === null && lat < 45.045 && 38.85 < lon && lon < 39.20  (левый берег Кубани: Яблоновский, Новая Адыгея, Энем, Козет…)"
+ },
+ "features": {
+  "c": "1",
+  "ls": "ln(osrm_duration_s + B0_s)",
+  "lk": "ln(max(osrm_distance_km, 0.1))",
+  "ld": "ln(max(d, 0.1)), d = sqrt((xa−xb)² + (ya−yb)²) — км по прямой",
+  "ld>K": "max(0, ld − ln K) для K из LEN_KNOTS_km",
+  "lk>K": "max(0, lk − ln K) для K из LEN_KNOTS_km",
+  "r>K": "max(0, ra − K) + max(0, rb − K) для K из R_KNOTS_km",
+  "rmin<3": "1, если отрезок a→b проходит ближе 3 км от центра: u = clamp(−(xa·dx + ya·dy)/(dx²+dy²), 0, 1) (u=0 при dx=dy=0), dx=xb−xa, dy=yb−ya, rmin = hypot(xa + u·dx, ya + u·dy); иначе 0",
+  "cross": "1, если south(a) !== south(b), иначе 0",
+  "north": "max(0, ya) + max(0, yb)",
+  "south": "max(0, −ya) + max(0, −yb)",
+  "east": "max(0, xa) + max(0, xb)",
+  "west": "max(0, −xa) + max(0, −xb)"
+ },
+ "coef": {
+  "c": 2.2494241972283184,
+  "ls": 0.5378362166138023,
+  "lk": 0.06213128439925119,
+  "ld": 0.029489607625959823,
+  "ld>0.5": 0.08908057479753459,
+  "ld>1": -0.1321384340647357,
+  "ld>2": 0.1394714175259388,
+  "ld>4": 0.04140812009319976,
+  "ld>8": 0.08887536991307377,
+  "ld>15": 0.21785399044152243,
+  "lk>0.5": 0.21245308954190065,
+  "lk>1": 0.08927339365474718,
+  "lk>2": 0.03562906039992462,
+  "lk>4": 0.07970899340953773,
+  "lk>8": -0.1236732654601845,
+  "lk>15": -0.23217126375124517,
+  "r>2": -0.06289508196798356,
+  "r>4": 0.02767286077847213,
+  "r>6": 0.013282375767440588,
+  "r>9": -0.05936311875782105,
+  "r>12": 0.055674107413404006,
+  "rmin<3": 0.010394276353318337,
+  "cross": -0.0620460685495535,
+  "north": 0.025630436911820997,
+  "south": 0.009231174507031585,
+  "east": 0.020959829775308053,
+  "west": 0.013653943583282487
+ },
+ "fit": {
+  "data": "work/train_val.jsonl, label=day, part=train, m≥300",
+  "loss": "сбалансированная по диапазонам 0–3/3–7/7–15/15+ км средняя |прогноз/2ГИС − 1| (гладкая, eps=0.02) + ридж 0.003·Σ(θ−θ0)², θ0: ls=1, остальное 0, свободный член без штрафа",
+  "cv_points_5fold": {
+   "0-3": 0.17550572748426754,
+   "3-7": 0.16652608261700094,
+   "7-15": 0.15068483293527118,
+   "15-": 0.13017129440388814,
+   "bal": 0.15572198436010695,
+   "mean": 0.15553988904145433,
+   "median": 0.1194932823353625
+  },
+  "cv_clusters_5fold": {
+   "0-3": 0.1805318447916896,
+   "3-7": 0.16687266743787135,
+   "7-15": 0.1543605394667893,
+   "15-": 0.12892210199563178,
+   "bal": 0.1576717884229955,
+   "mean": 0.1565017762219284,
+   "median": 0.12397605799953398
+  },
+  "train_in_sample": {
+   "0-3": 0.1617223441186404,
+   "3-7": 0.16447576030255565,
+   "7-15": 0.14523996523938199,
+   "15-": 0.12099202032319581,
+   "bal": 0.14810752249594344,
+   "mean": 0.1491336227584961,
+   "median": 0.11496955835310824
+  }
+ },
+ "typescript": "\n// src/lib/compare/config.ts\nexport const OSRM_APP_FORMULA = { B0: 60, LEN_KNOTS: [0.5, 1, 2, 4, 8, 15], R_KNOTS: [2, 4, 6, 9, 12], coef: { /* app_formula.json → coef */ } };\nconst CX = 38.9753, CY = 45.0355, KX = 111.2 * Math.cos((45.0355 * Math.PI) / 180), KY = 111.2;\nfunction southBank(p: GeoPoint) { return okrugOfPoint(p) === null && p.lat < 45.045 && p.lon > 38.85 && p.lon < 39.2; }\nexport function osrmMinutes(a: GeoPoint, b: GeoPoint, distM: number, durS: number): number {\n  const F = OSRM_APP_FORMULA, c = F.coef as Record<string, number>;\n  const xa = (a.lon - CX) * KX, ya = (a.lat - CY) * KY, xb = (b.lon - CX) * KX, yb = (b.lat - CY) * KY;\n  const ra = Math.hypot(xa, ya), rb = Math.hypot(xb, yb);\n  const dx = xb - xa, dy = yb - ya, L2 = dx * dx + dy * dy;\n  const u = L2 === 0 ? 0 : Math.min(1, Math.max(0, -(xa * dx + ya * dy) / L2));\n  const rmin = Math.hypot(xa + u * dx, ya + u * dy);\n  const lk = Math.log(Math.max(distM / 1000, 0.1)), ld = Math.log(Math.max(Math.hypot(dx, dy), 0.1));\n  const pos = (v: number) => Math.max(0, v);\n  let z = c.c + c.ls * Math.log(durS + F.B0) + c.lk * lk + c.ld * ld;\n  for (const k of F.LEN_KNOTS) z += c[`ld>${k}`] * pos(ld - Math.log(k)) + c[`lk>${k}`] * pos(lk - Math.log(k));\n  for (const k of F.R_KNOTS) z += c[`r>${k}`] * (pos(ra - k) + pos(rb - k));\n  z += c[\"rmin<3\"] * (rmin < 3 ? 1 : 0) + c.cross * (southBank(a) !== southBank(b) ? 1 : 0);\n  z += c.north * (pos(ya) + pos(yb)) + c.south * (pos(-ya) + pos(-yb)) + c.east * (pos(xa) + pos(xb)) + c.west * (pos(-xa) + pos(-xb));\n  const base = durS + 23; // защита: формула подобрана на поездках до ~46 км и до ~20 км от центра\n  return Math.min(1.3 * base, Math.max(0.6 * base, Math.exp(z))) / 60;\n}\n"
+}
