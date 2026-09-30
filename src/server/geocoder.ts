@@ -1,148 +1,177 @@
-// Геокодер Яндекса (ТЗ, пп. 3.3, 8.1, 9): внешние API — только через сервер, с
-// кэшем ответов. Два продукта и два ключа кабинета разработчика Яндекса:
-//   YANDEX_GEOCODER_API_KEY — HTTP Геокодер: адрес → координаты (импорт, выбор подсказки);
-//   YANDEX_SUGGEST_API_KEY  — API Геосаджеста: подсказки адресов при вводе.
-// Нет ключа — функция отвечает «не умею» (null / []), остальное работает без адресов.
-// Условия использования и лимиты тарифа проверяются владельцем ключа.
+// Свой геокодер агломерации (адреса OSM + ГАР ФНС, без внешних сервисов): подсказки «Где»,
+// обратное геокодирование «Моё местоположение», мини-индекс для браузера и адреса прокатов
+// при CSV-импорте. Поиск — src/lib/geocoder (README там), данные — src/server/geocoder-index.ts.
+//
+// Движок — один на процесс и город: строится лениво при первом запросе (≈0,4 с) из данных
+// getGeoIndexData и пересобирается, когда те сменились (новый импорт в geo_imports).
+// Адресов в базе нет — функции отвечают «не умею» ([] / null), микрорайоны и округа
+// «Где» работают без них.
 
-import { getEnv } from "@/lib/env";
+import { createHash } from "node:crypto";
+import { buildClientIndex, Engine, type Geocoder } from "@/lib/geocoder";
+import { buildIndex } from "@/lib/geocoder/index-build";
+import type { AddressHit, GeoIndexData } from "@/lib/geocoder/types";
 import type { GeoPoint } from "@/lib/compare/geo";
+import { getPool } from "@/lib/db";
+import { getGeoIndexData, getGeoIndexVersion } from "@/server/geocoder-index";
 
-const GEOCODER_URL = "https://geocode-maps.yandex.ru/1.x/";
-const SUGGEST_URL = "https://suggest-maps.yandex.ru/v1/suggest";
-const TIMEOUT_MS = 4000;
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const CACHE_MAX = 5000;
-
-/** Прямоугольник поиска по городу: [[lon, lat] юго-запад, [lon, lat] северо-восток]. */
-export type BBox = [[number, number], [number, number]];
-
-// Краснодар с пригородами — чтобы «Северная, 15» не уехала в другой город.
-export const CITY_BBOX: Record<string, BBox> = {
-  krasnodar: [[38.75, 44.93], [39.3, 45.22]],
-};
-
-// ------------------------------------------------------------------ кэш
-
-const cache = new Map<string, { at: number; value: unknown }>();
-
-/** Кэш ответов. Сбой (таймаут, 429/5xx, сеть) — исключение из `load`: он не кэшируется. */
-async function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value as T;
-  const value = await load();
-  if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value!);
-  cache.set(key, { at: Date.now(), value });
-  return value;
+interface CityEngine {
+  geocoder: Geocoder;
+  /** Метка данных для ETag и ссылки на мини-индекс: версия выгрузок + время импорта. */
+  token: string;
+  /** Мини-индекс браузера (JSON, ≈ 1,3 МБ; gzip ≈ 0,3 МБ). */
+  clientJson: string;
 }
 
-async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`geocoder ${res.status}`);
-  return res.json();
+// Движки по объекту данных (getGeoIndexData отдаёт один объект, пока версия та же). На globalThis:
+// в dev модуль перезагружается при правке, а кэш данных — нет, и движок должен найтись снова
+// (дома из данных уже отпущены — второй раз его не собрать).
+const G = globalThis as { __inrentaGeoEngines?: WeakMap<GeoIndexData, CityEngine> };
+const engines = (): WeakMap<GeoIndexData, CityEngine> => (G.__inrentaGeoEngines ??= new WeakMap());
+
+/** Метка версии данных: короткий хэш версии выгрузок и времени импорта. */
+export function dataToken(v: { version: string; builtAt: string }): string {
+  return createHash("sha1").update(`${v.version}|${v.builtAt}`).digest("base64url").slice(0, 16);
 }
 
-// ------------------------------------------------------------------ геокодер
-
-export function geocoderEnabled(): boolean {
-  return !!getEnv().YANDEX_GEOCODER_API_KEY;
-}
-
-export function suggestEnabled(): boolean {
-  const env = getEnv();
-  return !!env.YANDEX_SUGGEST_API_KEY && !!env.YANDEX_GEOCODER_API_KEY;
-}
-
-interface GeocoderResponse {
-  response?: {
-    GeoObjectCollection?: {
-      featureMember?: { GeoObject?: { Point?: { pos?: string }; name?: string; metaDataProperty?: { GeocoderMetaData?: { precision?: string } } } }[];
-    };
+/** Движок города: тот же объект, пока данные не сменились. null — адресов для города нет. */
+export async function getCityGeocoder(citySlug: string): Promise<CityEngine | null> {
+  const data = await getGeoIndexData(citySlug);
+  if (!data) return null;
+  const cur = engines().get(data);
+  if (cur) return cur;
+  // Сборка синхронная (≈0,4 с): параллельный запрос, дождавшийся тех же данных, увидит готовый движок.
+  const ix = buildIndex(data);
+  const engine: CityEngine = {
+    geocoder: new Engine(ix), token: dataToken(data), clientJson: JSON.stringify(buildClientIndex(data, ix)),
   };
+  // Дома нужны только для сборки: движок держит их в своих массивах, мини-индекс — без домов.
+  // Отпускаем объекты домов из кэша данных — это ≈ 120 МБ кучи из ≈ 175; при новом импорте
+  // данные перечитываются целиком (новый объект — новый движок).
+  data.houses = [];
+  engines().set(data, engine);
+  return engine;
 }
 
-/** Координаты первого результата; точность хуже улицы — не считаем найденным. */
-function firstPoint(data: GeocoderResponse): (GeoPoint & { name: string | null }) | null {
-  const obj = data.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
-  const pos = obj?.Point?.pos?.split(" ").map(Number);
-  const precision = obj?.metaDataProperty?.GeocoderMetaData?.precision;
-  if (!pos || pos.length !== 2 || pos.some((n) => !Number.isFinite(n))) return null;
-  if (precision && !["exact", "number", "near", "range", "street"].includes(precision)) return null;
-  return { lon: pos[0], lat: pos[1], name: obj?.name ?? null };
+/** Сброс движков (тесты). */
+export function resetGeocoderEngines(): void {
+  G.__inrentaGeoEngines = new WeakMap();
+  readyCache.clear();
 }
 
-function geocoderUrl(params: Record<string, string>, bbox?: BBox): string {
-  const q = new URLSearchParams({ apikey: getEnv().YANDEX_GEOCODER_API_KEY!, format: "json", lang: "ru_RU", results: "1", ...params });
-  if (bbox) { q.set("bbox", `${bbox[0].join(",")}~${bbox[1].join(",")}`); q.set("rspn", "1"); }
-  return `${GEOCODER_URL}?${q}`;
-}
+const readyCache = new Map<string, { at: number; token: string | null }>();
+const READY_TTL_MS = 60_000;
 
-/** Прямоугольник города; неизвестный город (в т.ч. «constructor») — без ограничения. */
-function cityBBox(citySlug: string): BBox | undefined {
-  return Object.hasOwn(CITY_BBOX, citySlug) ? CITY_BBOX[citySlug] : undefined;
-}
-
-/** Адрес в городе → точка. null — нет ключа, не нашлось или сервис недоступен. */
-export async function geocodeAddress(address: string, cityName: string, citySlug = "krasnodar"): Promise<GeoPoint | null> {
-  if (!geocoderEnabled()) return null;
-  const text = `${cityName}, ${address}`.trim();
+/**
+ * Есть ли адреса для города — для страницы, без загрузки индекса: метка данных или null.
+ * Метка уходит в ссылку на мини-индекс (/api/geo/client-index?v=…), поэтому его можно
+ * кэшировать навсегда. Заодно в фоне прогревает движок, чтобы первая подсказка была быстрой.
+ */
+export async function addressIndexToken(citySlug: string): Promise<string | null> {
+  const hit = readyCache.get(citySlug);
+  if (hit && Date.now() - hit.at < READY_TTL_MS) return hit.token;
+  let token: string | null = null;
   try {
-    return await cached(`g:${text.toLowerCase()}`, async () => {
-      const p = firstPoint(await getJson(geocoderUrl({ geocode: text }, cityBBox(citySlug))) as GeocoderResponse);
-      return p ? { lat: p.lat, lon: p.lon } : null;
-    });
-  } catch {
-    return null;
+    const ver = await getGeoIndexVersion(getPool(), citySlug);
+    if (ver) token = dataToken(ver);
+    else if (process.env.GEOCODER_INDEX_FILE) token = "file";
+  } catch (e) {
+    // БД недоступна — адреса выключены до следующей проверки (микрорайоны и округа работают).
+    console.error("[geocoder] version check failed:", (e as Error).message);
   }
+  readyCache.set(citySlug, { at: Date.now(), token });
+  if (token) void getCityGeocoder(citySlug).catch((e) => console.error("[geocoder] warm-up failed:", (e as Error).message));
+  return token;
 }
 
-/** Точка по uri подсказки Геосаджеста — надёжнее, чем геокодировать текст заново. */
-export async function geocodeUri(uri: string): Promise<GeoPoint | null> {
-  if (!geocoderEnabled()) return null;
-  try {
-    return await cached(`u:${uri}`, async () => {
-      const p = firstPoint(await getJson(geocoderUrl({ uri })) as GeocoderResponse);
-      return p ? { lat: p.lat, lon: p.lon } : null;
-    });
-  } catch {
-    return null;
+// ------------------------------------------------------------------ подсказки и обратный геокодер
+
+export const SUGGEST_LIMIT = 7;
+
+/** Подсказки адресов «Где» — сразу с координатами и точностью. */
+export async function suggestAddresses(
+  q: string, citySlug: string, opts: { near?: GeoPoint | null; limit?: number } = {},
+): Promise<AddressHit[]> {
+  const text = q.trim();
+  if (text.length < 2) return [];
+  const engine = await getCityGeocoder(citySlug);
+  if (!engine) return [];
+  return engine.geocoder.suggest(text, { limit: opts.limit ?? SUGGEST_LIMIT, near: opts.near ?? null }).map(slimHit);
+}
+
+/** Точка → ближайший адрес: дом ≤ 60 м, иначе улица, иначе населённый пункт; далеко от всего — null. */
+export async function reverseGeocode(p: GeoPoint, citySlug: string): Promise<AddressHit | null> {
+  const engine = await getCityGeocoder(citySlug);
+  const hit = engine?.geocoder.reverse(p.lat, p.lon) ?? null;
+  return hit ? slimHit(hit) : null;
+}
+
+/** Мини-индекс браузера (улицы, пункты, объекты — без домов) и его метка; null — адресов нет. */
+export async function clientIndexJson(citySlug: string): Promise<{ json: string; token: string } | null> {
+  const engine = await getCityGeocoder(citySlug);
+  return engine ? { json: engine.clientJson, token: engine.token } : null;
+}
+
+/** В ответ API — без внутренней оценки; координаты — до 6 знаков (≈ 0,1 м). */
+function slimHit(h: AddressHit): AddressHit {
+  const r6 = (x: number) => Math.round(x * 1e6) / 1e6;
+  const out: AddressHit = { ...h, lat: r6(h.lat), lon: r6(h.lon), score: Math.round(h.score * 10) / 10 };
+  return out;
+}
+
+// ------------------------------------------------------------------ адреса прокатов (CSV-импорт)
+
+/** Ответ геокодера для адреса проката. */
+export type ShopGeocode =
+  | {
+    point: GeoPoint;
+    /** Что нашлось: «улица Красная, 120» или «улица Ставропольская, ≈106». */
+    found: string;
+    /**
+     * Что стоит проверить глазами, хотя точка записана: адрес нашёлся не в городе проката, а пункт
+     * в адресе не назван. null — проверять нечего.
+     */
+    check: string | null;
   }
-}
+  | { point: null; reason: string; found?: string };
 
-// ------------------------------------------------------------------ подсказки
-
-export interface AddressSuggestion {
-  /** «улица Северная, 15» */
-  title: string;
-  /** «Краснодар» */
-  subtitle: string | null;
-  uri: string;
-}
-
-interface SuggestResponse {
-  results?: { title?: { text?: string }; subtitle?: { text?: string }; uri?: string }[];
-}
-
-/** Подсказки адресов в городе; [] — нет ключа, нет совпадений или сервис недоступен. */
-export async function suggestAddresses(text: string, citySlug = "krasnodar"): Promise<AddressSuggestion[]> {
-  const q = text.trim();
-  if (!suggestEnabled() || q.length < 3) return [];
-  const bbox = cityBBox(citySlug);
-  // Подсказки — только в пределах известного города: без рамки Яндекс ищет по всей стране.
-  if (!bbox) return [];
-  try {
-    return await cached(`s:${citySlug}:${q.toLowerCase()}`, async () => {
-      const params = new URLSearchParams({
-        apikey: getEnv().YANDEX_SUGGEST_API_KEY!, text: q, lang: "ru", results: "5",
-        types: "house,street", print_address: "0", attrs: "uri",
-        bbox: `${bbox[0].join(",")}~${bbox[1].join(",")}`, strict_bounds: "1",
-      });
-      const data = await getJson(`${SUGGEST_URL}?${params}`) as SuggestResponse;
-      return (data.results ?? [])
-        .filter((r) => r.title?.text && r.uri)
-        .map((r) => ({ title: r.title!.text!, subtitle: r.subtitle?.text ?? null, uri: r.uri! }));
-    });
-  } catch {
-    return [];
+/**
+ * Адрес проката → точка, строго: только однозначный дом из адресной базы с точной точкой
+ * (здание, адресный узел или интерполяция данных). Пункт в адресе не назван, а такой адрес есть
+ * в нескольких пунктах — ищем в городе проката («Краснодар, …»). Всё, что «≈», — без координат,
+ * с причиной (прокат покажется от центра микрорайона с «≈»): номера нет в базе (найдено до улицы,
+ * хотя движок и оценил точку по соседям), точка дома в базе примерная, только улица или пункт.
+ */
+export function geocodeShopAddress(g: Geocoder, address: string, cityName: string): ShopGeocode {
+  let r = g.geocodeDetailed(address, { strict: true });
+  if (!r.hit && r.reason === "ambiguous_place") {
+    // Только если ответ — в самом городе: «Краснодар, …» движок допускает и для посёлков у его
+    // границы (так пишут жители Новой Адыгеи), а здесь это была бы догадка.
+    const inCity = g.geocodeDetailed(`${cityName}, ${address}`, { strict: true });
+    if (inCity.hit && inCity.hit.parts?.place === cityName) r = inCity;
   }
+  const hit = r.hit;
+  if (!hit) {
+    const alts = r.alternatives.slice(0, 3).map((a) => `${a.title} (${a.subtitle})`).join("; ");
+    return { point: null, reason: `${r.message ?? "Адрес не найден"}${alts ? `: ${alts}` : ""}` };
+  }
+  const found = `${hit.title}, ${hit.subtitle}`;
+  if ((hit.kind !== "house" && hit.kind !== "poi") || (hit.precision !== "house" && hit.precision !== "interpolated")) {
+    return {
+      point: null, found,
+      reason: hit.kind === "place" || hit.precision === "place"
+        ? `найден только населённый пункт (${found}) — уточните улицу и дом или укажите lat/lon`
+        : hit.kind === "house"
+          ? `до улицы: дом есть в адресном реестре, но его точка известна только примерно (${found}) — укажите lat/lon`
+          : hit.parts?.street && /≈/.test(hit.title)
+            ? `до улицы: такого номера нет в адресной базе (${found}) — проверьте номер или укажите lat/lon`
+            : `до улицы: дом не указан (${found}) — уточните номер или укажите lat/lon`,
+    };
+  }
+  const fold = (x: string) => x.toLowerCase().replace(/ё/g, "е");
+  const place = hit.parts?.place ?? null;
+  const check = place && place !== cityName && !fold(address).includes(fold(place))
+    ? `адрес найден не в городе, а в пункте «${place}» — проверьте`
+    : null;
+  return { point: { lat: hit.lat, lon: hit.lon }, found, check };
 }

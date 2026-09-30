@@ -57,13 +57,14 @@ const MD_GROW: Record<string, string> = {
 // compact — на выдаче с текущим выбором, на телефоне сворачивается в строку
 // «Puzzi 8/1 · 27–29 сен · ЮМР» с карандашом. Даты не выбраны — сегодня на 1 сутки.
 export function SearchBar({
-  citySlug, cityName, search, geo, addressEnabled, value, today, variant,
+  citySlug, cityName, search, geo, addressIndex, value, today, variant,
 }: {
   citySlug: string;
   cityName: string;
   search: SearchBarData;
   geo: CityGeo;
-  addressEnabled: boolean;
+  /** Метка версии адресов города; null — адресов нет (только микрорайоны и округа). */
+  addressIndex: string | null;
   value: SearchValue;
   today: string;
   variant: "hero" | "compact";
@@ -161,7 +162,7 @@ export function SearchBar({
           value={v.loc}
           onChange={setLoc}
           track={track}
-          addressEnabled={addressEnabled}
+          addressIndex={addressIndex}
           list={layout === "column" ? "inline" : "popover"}
           labelClassName={labelCls}
           valueClassName={valueCls}

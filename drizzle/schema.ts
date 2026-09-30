@@ -468,3 +468,113 @@ export const regularRequests = pgTable("regular_requests", {
   contact: varchar("contact", { length: 120 }).notNull(),
   status: regularRequestStatus("status").notNull().default("new"),
 });
+
+// ============================== Свой геокодер ==============================
+// Адреса агломерации города из OpenStreetMap (© участники OSM, ODbL) и ГАР ФНС
+// (открытые данные). Таблицы целиком пересобирает импорт scripts/geocoder (Python):
+// удаляет строки города и пишет новые в одной транзакции. id — стабильные ключи
+// источника (хеш OSM-объекта / ГАР-GUID / улица+номер), а не ULID: повторный
+// импорт той же выгрузки даёт те же id. Сервер собирает из таблиц GeoIndexData
+// (src/lib/geocoder/types.ts) и держит поисковый индекс в памяти.
+
+/** Точность точки адреса — AddrPrecision в src/lib/geocoder/types.ts. */
+export const geoPrecision = pgEnum("geo_precision", ["house", "interpolated", "street", "place"]);
+/** Источник записи — AddrSource. */
+export const geoSource = pgEnum("geo_source", ["osm", "gar", "osm+gar", "manual"]);
+
+// Населённые пункты, округа, микрорайоны и СНТ (PlaceKind).
+export const geoPlaces = pgTable("geo_places", {
+  id: text("id").primaryKey(),
+  cityId: text("city_id").notNull().references(() => cities.id),
+  kind: varchar("kind", { length: 20 }).notNull(),                          // city|town|village|hamlet|microdistrict|snt|district|okrug
+  name: varchar("name", { length: 160 }).notNull(),                         // «Яблоновский», «СНТ Кубаночка»
+  aliases: text("aliases").array().notNull().default(sql`'{}'::text[]`),   // «пгт Яблоновский», «ЮМР»
+  parentId: text("parent_id").references((): AnyPgColumn => geoPlaces.id, { onDelete: "set null" }),
+  lat: doublePrecision("lat").notNull(),
+  lon: doublePrecision("lon").notNull(),
+  // Упрощённый контур (кольца [lon, lat]) — для обратного геокодирования; NULL — только точка.
+  bounds: jsonb("bounds").$type<[number, number][][]>(),
+  source: geoSource("source").notNull(),
+  osmRef: varchar("osm_ref", { length: 24 }),                               // r123 / w456 / n789
+  garGuid: varchar("gar_guid", { length: 36 }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  cityKindIdx: index("geo_places_city_kind_idx").on(t.cityId, t.kind),
+  parentIdx: index("geo_places_parent_idx").on(t.parentId),
+}));
+
+// Улицы: одна строка — одна улица одного пункта (одноимённые улицы разных пунктов и СНТ — разные строки).
+export const geoStreets = pgTable("geo_streets", {
+  id: text("id").primaryKey(),
+  cityId: text("city_id").notNull().references(() => cities.id),
+  placeId: text("place_id").references(() => geoPlaces.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 200 }).notNull(),                         // «улица Красная»
+  type: varchar("type", { length: 30 }).notNull().default(""),              // улица, проспект… ('' — без типа)
+  // Ключ сопоставления: без типа, «им.», инициалов, ё, порядок слов неважен.
+  nameKey: varchar("name_key", { length: 200 }).notNull(),
+  aliases: text("aliases").array().notNull().default(sql`'{}'::text[]`),
+  lat: doublePrecision("lat").notNull(),
+  lon: doublePrecision("lon").notNull(),
+  houses: integer("houses").notNull().default(0),                           // домов в индексе — вес ранжирования
+  // Линия улицы для обратного геокодирования («ближайшая улица»): куски [[lon, lat], …], упрощены до ~3 м.
+  // NULL — линии в OSM нет (улица только из домов или из ГАР).
+  line: jsonb("line").$type<[number, number][][]>(),
+  source: geoSource("source").notNull(),
+  garGuid: varchar("gar_guid", { length: 36 }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  cityIdx: index("geo_streets_city_idx").on(t.cityId),
+  placeKeyIdx: index("geo_streets_place_key_idx").on(t.placeId, t.nameKey),
+}));
+
+// Дома: OSM (здания, адресные точки) + ГАР (дома и участки; точка — по соседям или улице).
+export const geoHouses = pgTable("geo_houses", {
+  id: text("id").primaryKey(),
+  cityId: text("city_id").notNull().references(() => cities.id),
+  streetId: text("street_id").references(() => geoStreets.id, { onDelete: "cascade" }),  // NULL — адрес по пункту
+  placeId: text("place_id").references(() => geoPlaces.id, { onDelete: "set null" }),
+  number: varchar("number", { length: 40 }).notNull(),                      // «21к1», «7Б», «21/1»
+  numberNorm: varchar("number_norm", { length: 40 }).notNull(),             // «21к1», «7б» — ключ сопоставления
+  lat: doublePrecision("lat").notNull(),
+  lon: doublePrecision("lon").notNull(),
+  precision: geoPrecision("precision").notNull(),
+  source: geoSource("source").notNull(),
+  postcode: varchar("postcode", { length: 6 }),
+  osmRef: varchar("osm_ref", { length: 24 }),
+  garGuid: varchar("gar_guid", { length: 36 }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  cityIdx: index("geo_houses_city_idx").on(t.cityId),
+  streetNumberIdx: index("geo_houses_street_number_idx").on(t.streetId, t.numberNorm),
+  placeIdx: index("geo_houses_place_idx").on(t.placeId),
+  latLonIdx: index("geo_houses_lat_lon_idx").on(t.lat, t.lon),
+}));
+
+// Объекты, которые вводят вместо адреса: ТЦ, рынки, ЖК, вузы, больницы, вокзалы.
+export const geoPois = pgTable("geo_pois", {
+  id: text("id").primaryKey(),
+  cityId: text("city_id").notNull().references(() => cities.id),
+  placeId: text("place_id").references(() => geoPlaces.id, { onDelete: "set null" }),
+  name: varchar("name", { length: 200 }).notNull(),                         // «ТЦ Красная Площадь»
+  kind: varchar("kind", { length: 30 }).notNull(),                          // mall|market|residential_complex|university…
+  aliases: text("aliases").array().notNull().default(sql`'{}'::text[]`),
+  lat: doublePrecision("lat").notNull(),
+  lon: doublePrecision("lon").notNull(),
+  address: varchar("address", { length: 200 }),                             // «улица Дзержинского, 100»
+  source: geoSource("source").notNull(),
+  osmRef: varchar("osm_ref", { length: 24 }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  cityIdx: index("geo_pois_city_idx").on(t.cityId),
+}));
+
+// Журнал импортов: версия данных города — сервер пересобирает индекс в памяти, когда она меняется.
+export const geoImports = pgTable("geo_imports", {
+  id: text("id").primaryKey(),
+  cityId: text("city_id").notNull().references(() => cities.id),
+  version: varchar("version", { length: 64 }).notNull(),                    // «osm-2026-09-27+gar-2026-09-28»
+  builtAt: timestamp("built_at").defaultNow().notNull(),
+  counts: jsonb("counts").$type<Record<string, number>>().notNull().default({}),
+}, (t) => ({
+  cityBuiltIdx: index("geo_imports_city_built_idx").on(t.cityId, t.builtAt),
+}));

@@ -5,22 +5,31 @@ import { LocateFixed, MapPin, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GEOCODER_DEBOUNCE_MS } from "@/lib/compare/config";
 import {
-  CITY_LOCATION, locationLabel, matchPlaces, type CityGeo, type PlaceSuggestion, type UserLocation,
+  CITY_LOCATION, locationLabel, matchPlaces, type CityGeo, type GeoPoint, type PlaceSuggestion, type UserLocation,
 } from "@/lib/compare/geo";
-
-interface AddressItem { title: string; subtitle: string | null; uri: string }
+import {
+  hasHouseNumber, hitPrecision, hitToLocation, needsServer, precisionNote, reverseLabel, shouldApply,
+  visibleAddresses, withoutPlaceDuplicates, type AddressHit, type SuggestReply,
+} from "@/lib/compare/address";
+import { fetchAddressHits, fetchReverse, loadClientGeocoder, type ClientSuggester } from "./address-client";
 
 type Item =
   | { kind: "place"; place: PlaceSuggestion }
-  | { kind: "address"; address: AddressItem }
+  | { kind: "address"; address: AddressHit }
   | { kind: "geo" };
 
-// «Где» (ТЗ, п. 3.3): микрорайоны и округа — сразу из справочника; адреса — от
-// геокодера через сервер с задержкой; «Определить моё местоположение» — геолокация
-// браузера (отказ — без сообщения). Ввели и не выбрали — первая подсказка; подсказок
-// нет — город и «Не нашли такой адрес — уточните». Пользователь всегда забирает сам.
+const ADDRESS_LIMIT = 7;
+
+// «Где» (ТЗ, п. 3.3): микрорайоны и округа — сразу из справочника; адреса — свой геокодер
+// (OSM + ГАР, без внешних сервисов): улицы, посёлки и микрорайоны — мгновенно из мини-индекса
+// в браузере (грузится при фокусе и собирается в Web Worker, ввод не подвисает), дома — с сервера
+// через ~90 мс после ввода. Подсказка
+// сразу несёт координаты и точность: адрес не до дома — с «≈». «Определить моё
+// местоположение» — геолокация браузера (отказ — без сообщения) и подпись адреса по точке.
+// Ввели и не выбрали — первая подсказка; подсказок нет — город и «Не нашли такой адрес —
+// уточните». Пользователь всегда забирает сам.
 export function WhereField({
-  id, citySlug, cityName, geo, value, onChange, track, addressEnabled, list, labelClassName, valueClassName,
+  id, citySlug, cityName, geo, value, onChange, track, addressIndex, list, labelClassName, valueClassName,
 }: {
   /** Место определяется асинхронно (адрес, геолокация) — «Найти» ждёт этот промис. */
   track?: (pending: Promise<void>) => void;
@@ -31,8 +40,8 @@ export function WhereField({
   geo: CityGeo;
   value: UserLocation;
   onChange: (loc: UserLocation) => void;
-  /** Есть ключи геокодера — подсказываем адреса. */
-  addressEnabled: boolean;
+  /** Метка версии адресов города (src/server/geocoder.ts); null — адресов нет, только места. */
+  addressIndex: string | null;
   list: "popover" | "inline";
   labelClassName?: string;
   valueClassName?: string;
@@ -40,39 +49,76 @@ export function WhereField({
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState<string | null>(null);
   const [active, setActive] = useState(-1);
-  const [addresses, setAddresses] = useState<AddressItem[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [client, setClient] = useState<ClientSuggester | null>(null);
+  // Последний ответ мини-индекса: держится, пока не пришёл ответ на новый текст (без мигания).
+  const [clientReply, setClientReply] = useState<AddressHit[] | null>(null);
+  const [server, setServer] = useState<SuggestReply | null>(null);
+  const [notice, setNotice] = useState<{ text: string; tone: "warn" | "info" } | null>(null);
   const [locating, setLocating] = useState(false);
   const picked = useRef(false);
+  const seq = useRef(0);
+  const shownSeq = useRef(0);
 
   const label = value.kind === "city" ? "" : locationLabel(value, geo, cityName);
   const q = query ?? "";
+  const qRef = useRef(q);
+  qRef.current = q;
   const typing = query !== null && q.trim().length >= 2 && q !== label;
   const places = useMemo(() => (typing ? matchPlaces(q, geo) : []), [typing, q, geo]);
+  const knownPlaces = useMemo(
+    () => [...geo.microdistricts.map((m) => m.name), ...geo.okrugs.map((o) => o.name)],
+    [geo],
+  );
+  // Рядом с прошлым выбором одноимённые улицы выше («Вишнёвая» в своём СНТ).
+  const near: GeoPoint | null = useMemo(() => {
+    if (value.kind === "point") return value.point;
+    if (value.kind === "microdistrict") return geo.microdistricts.find((m) => m.slug === value.microdistrict) ?? null;
+    return null;
+  }, [value, geo]);
 
-  const fetchAddresses = async (text: string, signal?: AbortSignal): Promise<AddressItem[]> => {
-    try {
-      const res = await fetch(`/api/geo/suggest?city=${citySlug}&q=${encodeURIComponent(text)}`, { signal });
-      return res.ok ? ((await res.json()) as { items: AddressItem[] }).items : [];
-    } catch {
-      return []; // сеть или отмена — без адресов
-    }
+  // Мини-индекс — один раз, при первом фокусе поля.
+  const loadClient = () => {
+    if (!addressIndex || client) return;
+    void loadClientGeocoder(citySlug, addressIndex).then((g) => { if (g) setClient(g); });
   };
 
-  // Адреса — с задержкой после ввода, чтобы не дёргать геокодер на каждую букву.
-  // Старые подсказки сразу убираем: иначе под новым текстом висел бы чужой адрес.
+  // Улицы, пункты, объекты — из мини-индекса, на каждое нажатие (в воркере: доли миллисекунды и
+  // пересылка). Ответ на уже изменённый текст отбрасывается; воркер упал (null) — только сервер.
   useEffect(() => {
-    setAddresses([]);
-    if (!addressEnabled || !typing || q.trim().length < 3) return;
-    const ctl = new AbortController();
+    if (!client || !typing) return;
+    let live = true;
+    void client.suggest(q, { limit: ADDRESS_LIMIT, near }).then((items) => {
+      if (!live) return;
+      if (items === null) {
+        setClient(null);
+        setClientReply(null);
+      } else setClientReply(items);
+    });
+    return () => { live = false; };
+  }, [client, typing, q, near]);
+  const clientHits = client && typing ? clientReply : null;
+
+  // Дома — с сервера, с короткой задержкой. Запрос в полёте не отменяем (AbortController), а
+  // сверяем его ответ: отмена отклоняет промисы fetch, и обёртки fetch (расширения браузера)
+  // выдают это как необработанную ошибку «signal is aborted without reason». Устаревший ответ
+  // (пришёл позже более нового или на текст, который уже стёрли) отбрасывается.
+  useEffect(() => {
+    if (!addressIndex || !typing || !needsServer(q, !!client)) return;
     const t = setTimeout(async () => {
-      const items = await fetchAddresses(q, ctl.signal);
-      if (!ctl.signal.aborted) { setAddresses(items); setActive(-1); }
+      const mine = ++seq.current;
+      const items = await fetchAddressHits(citySlug, q.trim(), near);
+      if (items && shouldApply({ seq: mine, q }, shownSeq.current, qRef.current)) {
+        shownSeq.current = mine;
+        setServer({ seq: mine, q: q.trim(), items });
+        setActive(-1);
+      }
     }, GEOCODER_DEBOUNCE_MS);
-    return () => { clearTimeout(t); ctl.abort(); };
-    // fetchAddresses зависит только от citySlug.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addressEnabled, typing, q, citySlug]);
+    return () => clearTimeout(t);
+  }, [addressIndex, typing, q, client, citySlug, near]);
+
+  const addresses = typing
+    ? withoutPlaceDuplicates(visibleAddresses(q, server, clientHits), knownPlaces).slice(0, ADDRESS_LIMIT)
+    : [];
 
   // Только на клиенте: на сервере navigator нет, а разметка должна совпасть при гидрации.
   const [canLocate, setCanLocate] = useState(false);
@@ -94,26 +140,29 @@ export function WhereField({
         ? { kind: "okrug", okrug: item.place.slug }
         : { kind: "microdistrict", microdistrict: item.place.slug });
     } else if (item.kind === "address") {
-      try {
-        const res = await fetch(`/api/geo/resolve?uri=${encodeURIComponent(item.address.uri)}`);
-        const point = res.ok ? ((await res.json()) as { point: { lat: number; lon: number } | null }).point : null;
-        if (point) onChange({ kind: "point", point, label: item.address.title, source: "address" });
-        else { onChange(CITY_LOCATION); setNotice("Не нашли такой адрес — уточните"); }
-      } catch {
-        setNotice("Не нашли такой адрес — уточните");
+      // Координаты уже в подсказке — второго запроса нет.
+      const loc = hitToLocation(item.address, cityName);
+      onChange(loc);
+      if (loc.precision) {
+        setNotice({
+          tone: "info",
+          text: loc.precision === "street"
+            ? (hasHouseNumber(item.address.title) ? "Дома нет в адресной базе — расстояния от улицы, ≈" : "Расстояния — от улицы, ≈")
+            : "Расстояния — от центра населённого пункта, ≈",
+        });
       }
     } else {
       setLocating(true);
-      await new Promise<void>((resolve) => navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocating(false);
-          onChange({ kind: "point", point: { lat: pos.coords.latitude, lon: pos.coords.longitude }, label: null, source: "geo" });
-          resolve();
-        },
+      const point = await new Promise<GeoPoint | null>((resolve) => navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
         // Отказ или таймаут — без сообщения об ошибке: поле остаётся для ввода.
-        () => { setLocating(false); resolve(); },
+        () => resolve(null),
         { timeout: 10_000, maximumAge: 5 * 60_000 },
       ));
+      // Подпись точки — адрес рядом («улица Красная, 162Б»); не успел — «Моё местоположение».
+      const hit = point && addressIndex ? await fetchReverse(citySlug, point) : null;
+      setLocating(false);
+      if (point) onChange({ kind: "point", point, label: reverseLabel(hit, cityName), source: "geo" });
     }
   };
 
@@ -121,10 +170,29 @@ export function WhereField({
   const resolveTyped = async (text: string): Promise<void> => {
     const place = matchPlaces(text, geo)[0];
     if (place) return choose({ kind: "place", place });
-    const address = addressEnabled && text.length >= 3 ? (await fetchAddresses(text))[0] : undefined;
+    let address: AddressHit | undefined;
+    let failed = false;
+    if (addressIndex) {
+      if (server && server.q.toLowerCase() === text.toLowerCase()) address = server.items[0];
+      else {
+        const local = client && !hasHouseNumber(text) ? await client.suggest(text, { limit: 1, near }) : null;
+        if (local) address = local[0];
+        else {
+          const found = await fetchAddressHits(citySlug, text, near);
+          failed = found === null;
+          // Сервер не ответил — хотя бы улица из мини-индекса.
+          address = found?.[0] ?? (client ? (await client.suggest(text, { limit: 1, near }))?.[0] : undefined);
+        }
+      }
+    }
     if (address) return choose({ kind: "address", address });
     onChange(CITY_LOCATION);
-    setNotice("Не нашли такой адрес — уточните");
+    setNotice({
+      tone: "warn",
+      text: failed
+        ? "Не получилось определить адрес — попробуйте ещё раз или выберите микрорайон"
+        : "Не нашли такой адрес — уточните",
+    });
   };
 
   const pick = (item: Item) => {
@@ -184,7 +252,10 @@ export function WhereField({
           spellCheck={false}
           placeholder={locating ? "Определяем…" : `${cityName} — или район, адрес`}
           value={query ?? label}
-          onFocus={(e) => { picked.current = false; setNotice(null); setQuery(label); setActive(-1); e.currentTarget.select(); }}
+          onFocus={(e) => {
+            picked.current = false; setNotice(null); setServer(null); setClientReply(null); setQuery(label); setActive(-1);
+            e.currentTarget.select(); loadClient();
+          }}
           onChange={(e) => { setQuery(e.target.value); setActive(-1); }}
           onKeyDown={onKeyDown}
           onBlur={onBlur}
@@ -205,7 +276,11 @@ export function WhereField({
           </button>
         )}
       </div>
-      {notice && <span role="status" className="text-xs text-warn">{notice}</span>}
+      {notice && (
+        <span role="status" className={cn("text-xs", notice.tone === "warn" ? "text-warn" : "text-muted-foreground")}>
+          {notice.text}
+        </span>
+      )}
       {open && (
         <ul
           id={listId}
@@ -220,7 +295,7 @@ export function WhereField({
         >
           {items.map((item, i) => (
             <li
-              key={item.kind === "place" ? `p:${item.place.slug}` : item.kind === "address" ? `a:${item.address.uri}` : "geo"}
+              key={item.kind === "place" ? `p:${item.place.slug}` : item.kind === "address" ? `a:${item.address.id}` : "geo"}
               id={optionId(i)}
               role="option"
               aria-selected={i === active}
@@ -238,7 +313,7 @@ export function WhereField({
                 </span>
                 {item.kind !== "geo" && (
                   <span className="truncate text-[13px] text-muted-foreground">
-                    {item.kind === "place" ? item.place.subtitle : item.address.subtitle ?? cityName}
+                    {item.kind === "place" ? item.place.subtitle : addressSubtitle(item.address, cityName)}
                   </span>
                 )}
               </span>
@@ -248,4 +323,10 @@ export function WhereField({
       )}
     </div>
   );
+}
+
+/** Вторая строка адреса: «Яблоновский» / «Краснодар, Юбилейный» и «≈ до улицы», если точка не дома. */
+function addressSubtitle(hit: AddressHit, cityName: string): string {
+  const note = precisionNote(hitPrecision(hit));
+  return [hit.subtitle || cityName, note].filter(Boolean).join(" · ");
 }

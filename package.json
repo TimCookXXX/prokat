@@ -16,7 +16,8 @@
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
     "db:sync-catalog": "tsx --env-file=.env scripts/sync-catalog.ts",
     "db:import-offers": "tsx --env-file=.env scripts/import-offers.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:export-geo": "tsx --env-file=.env scripts/geocoder/export.ts"
   },
   "dependencies": {
     "@auth/core": "0.41.2",

@@ -45,7 +45,17 @@ export function Footer() {
          * пользователя; здесь он для анонима, у которого меню нет. */}
         <div className="mt-9 flex items-end justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            {content.copyright} · {content.footer.disclaimer}
+            {content.copyright} · {content.footer.disclaimer}{" "}
+            {content.footer.dataCredits.osmPrefix}{" "}
+            <a
+              href={content.footer.dataCredits.osmHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-dotted underline-offset-2 hover:text-accent"
+            >
+              {content.footer.dataCredits.osm}
+            </a>{" "}
+            {content.footer.dataCredits.osmLicense} {content.footer.dataCredits.gar}
           </p>
           <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
             {content.footer.themeLabel}
